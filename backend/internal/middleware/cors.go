@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,12 @@ func CORSMiddleware() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD")
 		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Content-Type, Authorization")
+
+		// Debug: logger les requêtes POST pour identifier le problème
+		if c.Request.Method == "POST" && c.Request.URL.Path == "/api/auth/login" {
+			log.Printf("[CORS] POST /api/auth/login - Origin: %s, RemoteAddr: %s, X-Forwarded-For: %s", 
+				origin, c.Request.RemoteAddr, c.Request.Header.Get("X-Forwarded-For"))
+		}
 
 		// Ne PAS bloquer les requêtes - laisser passer
 		c.Next()
