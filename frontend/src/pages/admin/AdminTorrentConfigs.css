@@ -1,0 +1,144 @@
+.admin-torrent-configs {
+  min-height: calc(100vh - 60px);
+  background-color: #0f0f0f;
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: #ffffff;
+}
+
+.add-config-form {
+  background-color: #181818;
+  padding: 24px;
+  border-radius: 8px;
+  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.add-config-form input,
+.add-config-form select {
+  padding: 12px;
+  background-color: #303030;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 16px;
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.form-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+}
+
+.add-config-form button {
+  padding: 12px 24px;
+  background-color: #6c5ce7;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.configs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-card {
+  background-color: #181818;
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid #303030;
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.config-header h3 {
+  color: #ffffff;
+  margin: 0;
+  font-size: 20px;
+}
+
+.config-source {
+  padding: 4px 12px;
+  background-color: #303030;
+  color: #aaaaaa;
+  border-radius: 12px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.config-details {
+  margin-bottom: 16px;
+}
+
+.config-details p {
+  color: #aaaaaa;
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.config-actions {
+  display: flex;
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #303030;
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.toggle-switch input[type="checkbox"] {
+  width: 50px;
+  height: 24px;
+  appearance: none;
+  background-color: #303030;
+  border-radius: 24px;
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.toggle-switch input[type="checkbox"]:checked {
+  background-color: #6c5ce7;
+}
+
+.toggle-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: #ffffff;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.3s;
+}
+
+.toggle-switch input[type="checkbox"]:checked::before {
+  transform: translateX(26px);
+}
+

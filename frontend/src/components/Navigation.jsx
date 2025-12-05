@@ -46,6 +46,14 @@ const Navigation = () => {
               <Link to="/playlists" className="nav-link">
                 Mes Playlists
               </Link>
+              <Link to="/upload" className="nav-link">
+                Upload
+              </Link>
+              {user.role === 'admin' && (
+                <Link to="/admin" className="nav-link nav-link-admin">
+                  Administration
+                </Link>
+              )}
               <div className="user-menu">
                 <span className="username">{user.username}</span>
                 <button onClick={handleLogout} className="logout-button">

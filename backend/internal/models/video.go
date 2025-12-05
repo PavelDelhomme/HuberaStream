@@ -27,6 +27,11 @@ type Video struct {
 	Views       int         `gorm:"default:0" json:"views"`
 	ThumbnailPath string    `json:"thumbnail_path"`
 	OriginalURL   string    `json:"original_url"` // URL source si téléchargé depuis streaming
+	CategoryID    *uuid.UUID `gorm:"type:uuid" json:"category_id"`
+	Category      *Category  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	SubCategoryID *uuid.UUID `gorm:"type:uuid" json:"sub_category_id"`
+	SubCategory   *SubCategory `gorm:"foreignKey:SubCategoryID" json:"sub_category,omitempty"`
+	IsPublic      bool      `gorm:"default:true" json:"is_public"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`

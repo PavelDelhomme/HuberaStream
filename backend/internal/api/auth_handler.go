@@ -98,12 +98,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Générer le token JWT
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id":  user.ID.String(),
-		"username": user.Username,
-		"exp":       time.Now().Add(time.Hour * 24).Unix(),
-	})
+		// Générer le token JWT
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"user_id":  user.ID.String(),
+			"username": user.Username,
+			"role":     string(user.Role),
+			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		})
 
 	tokenString, err := token.SignedString([]byte(h.cfg.JWTSecret))
 	if err != nil {

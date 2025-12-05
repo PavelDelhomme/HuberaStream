@@ -1,113 +1,98 @@
-.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test
+.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api
 
 # Variables
-COMPOSE_FILE = docker-compose.yml
-PROJECT_NAME = streammake
+PROJECT_NAME := streammake
+DOCKER_COMPOSE_FILE := docker-compose.yml
+GREEN := \033[0;32m
+YELLOW := \033[0;33m
+RED := \033[0;31m
+NC := \033[0m
 
-# Couleurs pour les messages
-GREEN = \033[0;32m
-YELLOW = \033[1;33m
-RED = \033[0;31m
-NC = \033[0m # No Color
+help:
+	@echo "${GREEN}Commandes disponibles:${NC}"
+	@echo "${YELLOW}  build${NC}          Construire les images Docker"
+	@echo "${YELLOW}  up${NC}             Démarrer tous les services en mode détaché"
+	@echo "${YELLOW}  down${NC}           Arrêter et supprimer tous les services"
+	@echo "${YELLOW}  restart${NC}        Redémarrer tous les services"
+	@echo "${YELLOW}  logs${NC}           Afficher les logs de tous les services"
+	@echo "${YELLOW}  logs-<service>${NC} Afficher les logs d'un service spécifique (ex: logs-backend)"
+	@echo "${YELLOW}  clean${NC}          Nettoyer les conteneurs, volumes et réseaux arrêtés"
+	@echo "${YELLOW}  dev-backend${NC}    Lancer le backend en mode développement (hors Docker)"
+	@echo "${YELLOW}  dev-frontend${NC}  Lancer le frontend en mode développement (hors Docker)"
+	@echo "${YELLOW}  debug-backend${NC}  Lancer le backend avec le debugger Delve"
+	@echo "${YELLOW}  test${NC}           Exécuter les tests backend"
+	@echo "${YELLOW}  test-api${NC}      Tester l'API (CORS, login, etc.)"
+	@echo "${YELLOW}  install-deps${NC}  Installer les dépendances backend Go"
+	@echo "${YELLOW}  status${NC}        Afficher le statut des services Docker"
+	@echo "${YELLOW}  shell-backend${NC}  Accéder au shell du conteneur backend"
+	@echo "${YELLOW}  shell-db${NC}       Accéder au shell PostgreSQL"
 
-help: ## Affiche cette aide
-	@echo "$(GREEN)StreamMake - Commandes disponibles:$(NC)"
-	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
+build:
+	@echo "${GREEN}Construction des images Docker...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build
 
-build: ## Construit les images Docker
-	@echo "$(GREEN)Construction des images Docker...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) build
+up:
+	@echo "${GREEN}Démarrage de tous les services...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d
+	@echo "${GREEN}Attente du démarrage des services...${NC}"
+	@sleep 5
+	@echo "${GREEN}Exécution des tests API...${NC}"
+	@./test-api.sh || true
 
-up: ## Démarre tous les services
-	@echo "$(GREEN)Démarrage de tous les services...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) up -d
-	@echo "$(GREEN)Services démarrés!$(NC)"
-	@echo "$(YELLOW)Frontend (via Nginx): http://localhost:3300$(NC)"
-	@echo "$(YELLOW)Frontend (direct): http://localhost:3304$(NC)"
-	@echo "$(YELLOW)Backend API: http://localhost:3301$(NC)"
-	@echo "$(YELLOW)PostgreSQL: localhost:3302$(NC)"
-	@echo "$(YELLOW)Redis: localhost:3303$(NC)"
-	@echo "$(YELLOW)Debugger (Delve): localhost:2345$(NC)"
+down:
+	@echo "${YELLOW}Arrêt de tous les services...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down
 
-down: ## Arrête tous les services
-	@echo "$(YELLOW)Arrêt de tous les services...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) down
+restart: down up
 
-restart: ## Redémarre tous les services
-	@echo "$(YELLOW)Redémarrage des services...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) restart
+logs:
+	@echo "${GREEN}Affichage des logs de tous les services (Ctrl+C pour quitter)...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs -f
 
-logs: ## Affiche les logs de tous les services
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) logs -f
+logs-%:
+	@echo "${GREEN}Affichage des logs du service $* (Ctrl+C pour quitter)...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs -f $*
 
-logs-backend: ## Affiche les logs du backend uniquement
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) logs -f backend
+clean:
+	@echo "${YELLOW}Nettoyage des conteneurs, volumes et réseaux...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --volumes --rmi all --remove-orphans
 
-logs-frontend: ## Affiche les logs du frontend uniquement
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) logs -f frontend
+dev-backend:
+	@echo "${GREEN}Démarrage du backend en mode développement...${NC}"
+	cd backend && go run ./cmd/server
 
-logs-db: ## Affiche les logs de la base de données
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) logs -f postgres
-
-clean: ## Arrête et supprime les conteneurs, volumes et images
-	@echo "$(RED)Suppression des conteneurs, volumes et images...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) down -v --rmi all
-	@echo "$(GREEN)Nettoyage terminé!$(NC)"
-
-clean-volumes: ## Supprime uniquement les volumes
-	@echo "$(YELLOW)Suppression des volumes...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) down -v
-
-dev-backend: ## Lance le backend en mode développement (sans Docker)
-	@echo "$(GREEN)Lancement du backend en mode développement...$(NC)"
-	cd backend && go run cmd/server/main.go
-
-dev-frontend: ## Lance le frontend en mode développement (sans Docker)
-	@echo "$(GREEN)Lancement du frontend en mode développement...$(NC)"
+dev-frontend:
+	@echo "${GREEN}Démarrage du frontend en mode développement...${NC}"
 	cd frontend && npm run dev
 
-debug-backend: ## Lance le backend avec Delve (debugger)
-	@echo "$(GREEN)Lancement du backend en mode debug...$(NC)"
-	@echo "$(YELLOW)Le debugger écoute sur le port 2345$(NC)"
-	cd backend && dlv debug cmd/server/main.go --listen=:2345 --headless=true --api-version=2 --accept-multiclient
+debug-backend:
+	@echo "${GREEN}Démarrage du backend en mode debug avec Delve...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d backend
+	docker exec -it $(PROJECT_NAME)-backend /usr/bin/dlv debug --headless --listen=:2345 --api-version=2 --accept-multiclient ./cmd/server
 
-test: ## Lance les tests
-	@echo "$(GREEN)Lancement des tests...$(NC)"
+test:
+	@echo "${GREEN}Exécution des tests backend...${NC}"
 	cd backend && go test ./...
 
-test-verbose: ## Lance les tests en mode verbeux
-	@echo "$(GREEN)Lancement des tests en mode verbeux...$(NC)"
-	cd backend && go test -v ./...
+test-api:
+	@echo "${GREEN}Test de l'API...${NC}"
+	@./test-api.sh
 
-install-deps: ## Installe les dépendances
-	@echo "$(GREEN)Installation des dépendances...$(NC)"
-	cd backend && go mod download && go mod tidy
-	cd frontend && npm install
+install-deps:
+	@echo "${GREEN}Installation des dépendances Go...${NC}"
+	cd backend && go mod tidy
 
-migrate: ## Lance les migrations de base de données
-	@echo "$(GREEN)Les migrations sont automatiques via GORM$(NC)"
-	@echo "$(YELLOW)Les migrations SQL sont dans database/migrations/$(NC)"
+status:
+	@echo "${GREEN}Statut des services Docker:${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) ps
+	@echo ""
+	@echo "${GREEN}Test rapide de l'API:${NC}"
+	@./test-api.sh || true
 
-shell-backend: ## Ouvre un shell dans le conteneur backend
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) exec backend sh
+shell-backend:
+	@echo "${GREEN}Accès au shell du conteneur backend...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec backend sh
 
-shell-db: ## Ouvre un shell PostgreSQL
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) exec postgres psql -U streammake -d streammake_db
-
-status: ## Affiche le statut des services
-	@echo "$(GREEN)Statut des services:$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) ps
-
-rebuild: ## Reconstruit et redémarre les services
-	@echo "$(GREEN)Reconstruction et redémarrage...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) up -d --build
-
-stop: ## Arrête les services sans les supprimer
-	@echo "$(YELLOW)Arrêt des services...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) stop
-
-start: ## Démarre les services arrêtés
-	@echo "$(GREEN)Démarrage des services...$(NC)"
-	docker-compose -f $(COMPOSE_FILE) -p $(PROJECT_NAME) start
-
+shell-db:
+	@echo "${GREEN}Accès au shell du conteneur PostgreSQL...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec postgres psql -U streammake streammake_db

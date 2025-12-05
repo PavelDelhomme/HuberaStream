@@ -1,0 +1,240 @@
+import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import api from '../services/api'
+import './Upload.css'
+
+const Upload = () => {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    category_id: '',
+    sub_category_id: '',
+    is_public: true
+  })
+  const [videoFile, setVideoFile] = useState(null)
+  const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [categories, setCategories] = useState([])
+  const [subCategories, setSubCategories] = useState([])
+
+  React.useEffect(() => {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    fetchCategories()
+  }, [user, navigate])
+
+  React.useEffect(() => {
+    if (formData.category_id) {
+      fetchSubCategories(formData.category_id)
+    } else {
+      setSubCategories([])
+    }
+  }, [formData.category_id])
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/categories')
+      setCategories(response.data || [])
+    } catch (error) {
+      console.error('Erreur:', error)
+    }
+  }
+
+  const fetchSubCategories = async (categoryId) => {
+    try {
+      const category = categories.find(c => c.id === categoryId)
+      if (category && category.sub_categories) {
+        setSubCategories(category.sub_categories)
+      } else {
+        setSubCategories([])
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+      setSubCategories([])
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    if (!videoFile) {
+      alert('Veuillez sélectionner un fichier vidéo')
+      return
+    }
+
+    setUploading(true)
+    setProgress(0)
+
+    try {
+      const uploadData = new FormData()
+      uploadData.append('video', videoFile)
+      uploadData.append('title', formData.title)
+      uploadData.append('description', formData.description)
+      if (formData.category_id) {
+        uploadData.append('category_id', formData.category_id)
+      }
+      if (formData.sub_category_id) {
+        uploadData.append('sub_category_id', formData.sub_category_id)
+      }
+      uploadData.append('is_public', formData.is_public)
+
+      const response = await api.post('/videos/upload', uploadData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          )
+          setProgress(percentCompleted)
+        },
+      })
+
+      // Upload thumbnail si fourni
+      if (thumbnailFile && response.data.video_id) {
+        const thumbnailData = new FormData()
+        thumbnailData.append('thumbnail', thumbnailFile)
+        await api.post(`/videos/${response.data.video_id}/thumbnail`, thumbnailData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        })
+      }
+
+      alert('Vidéo uploadée avec succès!')
+      navigate(`/video/${response.data.video_id}`)
+    } catch (error) {
+      console.error('Erreur:', error)
+      alert('Erreur lors de l\'upload')
+    } finally {
+      setUploading(false)
+      setProgress(0)
+    }
+  }
+
+  return (
+    <div className="upload-page">
+      <div className="upload-container">
+        <h1>Uploader une vidéo</h1>
+        <form onSubmit={handleSubmit} className="upload-form">
+          <div className="form-group">
+            <label htmlFor="video">Fichier vidéo *</label>
+            <input
+              type="file"
+              id="video"
+              accept="video/*"
+              onChange={(e) => setVideoFile(e.target.files[0])}
+              required
+              disabled={uploading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="thumbnail">Miniature (optionnel)</label>
+            <input
+              type="file"
+              id="thumbnail"
+              accept="image/*"
+              onChange={(e) => setThumbnailFile(e.target.files[0])}
+              disabled={uploading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="title">Titre *</label>
+            <input
+              type="text"
+              id="title"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              required
+              disabled={uploading}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="description">Description</label>
+            <textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              disabled={uploading}
+              rows="4"
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="category">Catégorie</label>
+              <select
+                id="category"
+                value={formData.category_id}
+                onChange={(e) => setFormData({ ...formData, category_id: e.target.value, sub_category_id: '' })}
+                disabled={uploading}
+              >
+                <option value="">Aucune</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.icon} {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {subCategories.length > 0 && (
+              <div className="form-group">
+                <label htmlFor="subcategory">Sous-catégorie</label>
+                <select
+                  id="subcategory"
+                  value={formData.sub_category_id}
+                  onChange={(e) => setFormData({ ...formData, sub_category_id: e.target.value })}
+                  disabled={uploading}
+                >
+                  <option value="">Aucune</option>
+                  {subCategories.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={formData.is_public}
+                onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
+                disabled={uploading}
+              />
+              Vidéo publique
+            </label>
+          </div>
+
+          {uploading && (
+            <div className="upload-progress">
+              <div className="progress-bar">
+                <div className="progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+              <span>{progress}%</span>
+            </div>
+          )}
+
+          <button type="submit" disabled={uploading} className="submit-button">
+            {uploading ? 'Upload en cours...' : 'Uploader'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default Upload
+

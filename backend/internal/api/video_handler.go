@@ -22,9 +22,12 @@ func NewVideoHandler(db *gorm.DB, cfg *config.Config) *VideoHandler {
 }
 
 type CreateVideoRequest struct {
-	Title       string `json:"title" binding:"required"`
-	Description string `json:"description"`
-	Tags        []string `json:"tags"`
+	Title         string     `json:"title" binding:"required"`
+	Description   string     `json:"description"`
+	Tags          []string   `json:"tags"`
+	CategoryID    *uuid.UUID `json:"category_id"`
+	SubCategoryID *uuid.UUID `json:"sub_category_id"`
+	IsPublic      bool       `json:"is_public"`
 }
 
 func (h *VideoHandler) CreateVideo(c *gin.Context) {
@@ -39,11 +42,14 @@ func (h *VideoHandler) CreateVideo(c *gin.Context) {
 	}
 
 	video := models.Video{
-		ID:          uuid.New(),
-		Title:       req.Title,
-		Description: req.Description,
-		UserID:      userUUID,
-		Status:      models.VideoStatusPending,
+		ID:            uuid.New(),
+		Title:         req.Title,
+		Description:   req.Description,
+		UserID:        userUUID,
+		Status:        models.VideoStatusPending,
+		CategoryID:    req.CategoryID,
+		SubCategoryID: req.SubCategoryID,
+		IsPublic:      req.IsPublic,
 	}
 
 	if err := h.db.Create(&video).Error; err != nil {

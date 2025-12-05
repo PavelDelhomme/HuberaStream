@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   postgres:
@@ -49,12 +48,14 @@ services:
       DB_NAME: streammake_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      JWT_SECRET: your-secret-key-change-in-production
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       VIDEO_STORAGE_PATH: /app/storage/videos
       THUMBNAIL_STORAGE_PATH: /app/storage/thumbnails
+      TORRENT_STORAGE_PATH: /app/storage/torrents
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-dev@delhomme.ovh}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminStreamMake2024!}
       PORT: 8080
     volumes:
-      - ./backend:/app
       - video_storage:/app/storage/videos
       - thumbnail_storage:/app/storage/thumbnails
     ports:
@@ -75,8 +76,8 @@ services:
       dockerfile: Dockerfile
     container_name: streammake-frontend
     environment:
-      REACT_APP_API_URL: http://localhost:3301/api
-      VITE_API_URL: http://localhost:3301/api
+      REACT_APP_API_URL: "http://localhost:3300/api"
+      VITE_API_URL: "http://localhost:3300/api"
     volumes:
       - ./frontend:/app
       - /app/node_modules

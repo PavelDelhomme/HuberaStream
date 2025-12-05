@@ -47,6 +47,10 @@ func autoMigrate(db *gorm.DB) error {
 		&models.PlaylistVideo{},
 		&models.WatchHistory{},
 		&models.VideoFormat{},
+		&models.Category{},
+		&models.SubCategory{},
+		&models.Torrent{},
+		&models.TorrentConfig{},
 	)
 }
 

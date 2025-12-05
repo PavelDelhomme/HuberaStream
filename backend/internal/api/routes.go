@@ -4,28 +4,30 @@ import (
 	"streammake/internal/config"
 	"streammake/internal/middleware"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
-	router := gin.Default()
+	router := gin.New()
+	
+	// Ajouter les middlewares de base (logger et recovery)
+	router.Use(gin.Logger())
+	router.Use(gin.Recovery())
 
-	// Configuration CORS
-	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:80"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-	}))
+	// Configuration CORS - DOIT être le premier middleware après logger/recovery
+	router.Use(middleware.CORSMiddleware())
 
 	// Initialiser les handlers
 	authHandler := NewAuthHandler(db, cfg)
 	videoHandler := NewVideoHandler(db, cfg)
 	playlistHandler := NewPlaylistHandler(db)
 	streamHandler := NewStreamHandler(db, cfg)
+	adminHandler := NewAdminHandler(db, cfg)
+	categoryHandler := NewCategoryHandler(db)
+	torrentHandler := NewTorrentHandler(db, cfg)
+	uploadHandler := NewUploadHandler(db, cfg)
+	scraperHandler := NewScraperHandler(db, cfg)
 
 	// Routes publiques
 	api := router.Group("/api")
@@ -54,6 +56,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		videos := protected.Group("/videos")
 		{
 			videos.POST("", videoHandler.CreateVideo)
+			videos.POST("/upload", uploadHandler.UploadVideo)
+			videos.POST("/:id/thumbnail", uploadHandler.UploadThumbnail)
 			videos.PUT("/:id", videoHandler.UpdateVideo)
 			videos.DELETE("/:id", videoHandler.DeleteVideo)
 			videos.POST("/:id/download", videoHandler.DownloadFromStream)
@@ -82,6 +86,62 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		users := protected.Group("/users")
 		{
 			users.GET("/me", authHandler.GetProfile)
+		}
+
+		// Catégories (lecture pour tous)
+		categories := protected.Group("/categories")
+		{
+			categories.GET("", categoryHandler.ListCategories)
+		}
+	}
+
+	// Routes administrateur
+	admin := api.Group("/admin")
+	admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
+	admin.Use(middleware.AdminMiddleware(db))
+	{
+		// Utilisateurs
+		users := admin.Group("/users")
+		{
+			users.GET("", adminHandler.ListUsers)
+			users.PUT("/:id", adminHandler.UpdateUser)
+			users.DELETE("/:id", adminHandler.DeleteUser)
+		}
+
+		// Statistiques
+		admin.GET("/stats", adminHandler.GetStats)
+
+		// Catégories
+		categories := admin.Group("/categories")
+		{
+			categories.POST("", categoryHandler.CreateCategory)
+			categories.PUT("/:id", categoryHandler.UpdateCategory)
+			categories.POST("/:categoryId/subcategories", categoryHandler.CreateSubCategory)
+		}
+
+		// Torrents
+		torrents := admin.Group("/torrents")
+		{
+			torrents.GET("", torrentHandler.ListTorrents)
+			torrents.POST("", torrentHandler.CreateTorrent)
+			torrents.PUT("/:id", torrentHandler.UpdateTorrent)
+			torrents.DELETE("/:id", torrentHandler.DeleteTorrent)
+		}
+
+		// Configurations de torrent
+		torrentConfigs := admin.Group("/torrent-configs")
+		{
+			torrentConfigs.GET("", torrentHandler.ListTorrentConfigs)
+			torrentConfigs.POST("", torrentHandler.CreateTorrentConfig)
+			torrentConfigs.PUT("/:id", torrentHandler.UpdateTorrentConfig)
+			torrentConfigs.DELETE("/:id", torrentHandler.DeleteTorrentConfig)
+		}
+
+		// Scraper (recherche de torrents)
+		scrapers := admin.Group("/scraper")
+		{
+			scrapers.POST("/search", scraperHandler.Search)
+			scrapers.GET("/details", scraperHandler.GetTorrentDetails)
 		}
 	}
 

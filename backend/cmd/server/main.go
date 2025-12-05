@@ -19,6 +19,11 @@ func main() {
 		log.Fatalf("Erreur lors de l'initialisation de la base de données: %v", err)
 	}
 
+	// Seed la base de données (créer admin et catégories par défaut)
+	if err := database.SeedDatabase(db, cfg); err != nil {
+		log.Printf("Avertissement lors du seed de la base de données: %v", err)
+	}
+
 	// Créer les dossiers de stockage si nécessaire
 	if err := os.MkdirAll(cfg.VideoStoragePath, 0755); err != nil {
 		log.Fatalf("Erreur lors de la création du dossier de stockage vidéo: %v", err)
@@ -29,6 +34,9 @@ func main() {
 
 	// Initialiser le routeur API
 	router := api.SetupRouter(db, cfg)
+
+	// Configurer Gin pour accepter les requêtes proxy (nécessaire pour Nginx)
+	router.SetTrustedProxies([]string{"172.19.0.0/16", "127.0.0.1", "::1"})
 
 	// Démarrer le serveur
 	port := os.Getenv("PORT")

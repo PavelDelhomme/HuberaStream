@@ -37,6 +37,10 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  const isAdmin = () => {
+    return user && user.role === 'admin'
+  }
+
   const login = async (email, password) => {
     try {
       const response = await api.post('/auth/login', { email, password })
@@ -74,7 +78,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAdmin }}>
       {children}
     </AuthContext.Provider>
   )

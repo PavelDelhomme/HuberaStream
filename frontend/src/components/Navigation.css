@@ -95,6 +95,15 @@
   background-color: #cc0000;
 }
 
+.nav-link-admin {
+  background-color: #6c5ce7;
+  color: #ffffff;
+}
+
+.nav-link-admin:hover {
+  background-color: #5a4fcf;
+}
+
 .user-menu {
   display: flex;
   align-items: center;

@@ -18,7 +18,7 @@ RUN go mod download
 COPY . .
 
 # Construire l'application
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /app/main ./cmd/server
 
 FROM alpine:latest
 
@@ -31,12 +31,15 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Copier le binaire depuis le builder
-COPY --from=builder /app/main .
+COPY --from=builder /app/main /app/main
 
 # Créer les dossiers de stockage
 RUN mkdir -p /app/storage/videos /app/storage/thumbnails
 
+# Rendre le binaire exécutable
+RUN chmod +x /app/main
+
 EXPOSE 8080
 
-CMD ["./main"]
+CMD ["/app/main"]
 

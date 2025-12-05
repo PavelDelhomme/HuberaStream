@@ -1,7 +1,26 @@
 import axios from 'axios'
 
+// Utiliser l'URL via Nginx (port 3300) pour éviter les problèmes CORS
+// Si on est sur localhost:3300, utiliser le chemin relatif /api
+// Sinon, utiliser l'URL complète via Nginx
+const getApiBaseURL = () => {
+  const envURL = import.meta.env.VITE_API_URL
+  if (envURL) {
+    return envURL
+  }
+  // Si on accède via Nginx (port 3300), utiliser le chemin relatif
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin
+    if (origin === 'http://localhost:3300' || origin === 'http://127.0.0.1:3300') {
+      return '/api'
+    }
+  }
+  // Sinon, utiliser l'URL complète via Nginx
+  return 'http://localhost:3300/api'
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3301/api',
+  baseURL: getApiBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -34,4 +53,3 @@ api.interceptors.response.use(
 )
 
 export default api
-
