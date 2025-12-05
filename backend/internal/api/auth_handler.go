@@ -79,6 +79,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
+	// Debug: vérifier que la requête arrive bien
+	if c.Request.Method != "POST" {
+		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Méthode non autorisée"})
+		return
+	}
+
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

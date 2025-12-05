@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/http"
 	"streammake/internal/config"
 	"streammake/internal/middleware"
 
@@ -144,6 +145,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			scrapers.GET("/details", scraperHandler.GetTorrentDetails)
 		}
 	}
+
+	// Handler pour les routes non trouvées (debug)
+	router.NoRoute(func(c *gin.Context) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Route non trouvée",
+			"path":  c.Request.URL.Path,
+			"method": c.Request.Method,
+		})
+	})
 
 	return router
 }
