@@ -20,8 +20,13 @@ Plateforme de streaming personnelle avec backend Go, frontend React, et support 
 
 1. Cloner le projet
 ```bash
-git clone <repository-url>
+git clone git@github.com:PavelDelhomme/StreamMake.git
 cd StreamMake
+```
+
+2. Basculer sur la branche de développement (optionnel)
+```bash
+git checkout dev
 ```
 
 2. Démarrer les services avec Docker Compose
@@ -102,6 +107,32 @@ npm run dev
 ## Configuration
 
 Les variables d'environnement peuvent être configurées dans `docker-compose.yml` ou via des fichiers `.env`.
+
+## Workflow Git
+
+Le projet utilise un workflow avec deux branches principales :
+- **`main`** : Branche de production, code stable et testé
+- **`dev`** : Branche de développement, travail actif et nouvelles fonctionnalités
+
+### Travailler sur le projet
+
+```bash
+# Basculer sur la branche dev
+git checkout dev
+
+# Créer une nouvelle branche de fonctionnalité
+git checkout -b feature/ma-fonctionnalite
+
+# Après développement, merger dans dev
+git checkout dev
+git merge feature/ma-fonctionnalite
+git push origin dev
+
+# Quand dev est stable, merger dans main pour la production
+git checkout main
+git merge dev
+git push origin main
+```
 
 ## Notes
 
