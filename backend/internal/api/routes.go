@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"streammake/internal/config"
 	"streammake/internal/middleware"
@@ -11,6 +12,15 @@ import (
 
 func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	router := gin.New()
+	
+	// Middleware de debug pour identifier où les requêtes sont bloquées
+	router.Use(func(c *gin.Context) {
+		if c.Request.Method == "POST" && c.Request.URL.Path == "/api/auth/login" {
+			log.Printf("[DEBUG] Requête POST /api/auth/login reçue - RemoteAddr: %s, ClientIP: %s, X-Forwarded-For: %s", 
+				c.Request.RemoteAddr, c.ClientIP(), c.Request.Header.Get("X-Forwarded-For"))
+		}
+		c.Next()
+	})
 	
 	// Ajouter les middlewares de base (logger et recovery)
 	router.Use(gin.Logger())
