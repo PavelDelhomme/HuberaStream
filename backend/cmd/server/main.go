@@ -36,9 +36,12 @@ func main() {
 	router := api.SetupRouter(db, cfg)
 
 	// Configurer Gin pour accepter les requêtes proxy (nécessaire pour Nginx)
-	// Autoriser tous les proxies dans le réseau Docker
-	// Note: nil signifie accepter tous les proxies (développement uniquement)
-	router.SetTrustedProxies(nil)
+	// IMPORTANT: SetTrustedProxies doit être appelé AVANT SetupRouter dans Gin v1.9+
+	// Mais ici on le fait après car SetupRouter retourne le router
+	// Autoriser tous les proxies dans le réseau Docker (développement uniquement)
+	// En production, spécifier les IPs exactes des proxies
+	router.SetTrustedProxies([]string{"0.0.0.0/0", "::/0"}) // Accepter tous les proxies pour le développement
+	router.TrustedPlatform = "X-Forwarded-For" // Utiliser X-Forwarded-For pour identifier l'IP du client
 
 	// Démarrer le serveur
 	port := os.Getenv("PORT")

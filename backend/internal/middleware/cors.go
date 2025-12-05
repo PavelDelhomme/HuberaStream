@@ -41,8 +41,8 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		// Debug: logger les requêtes POST pour identifier le problème
 		if c.Request.Method == "POST" && c.Request.URL.Path == "/api/auth/login" {
-			log.Printf("[CORS] POST /api/auth/login - Origin: %s, RemoteAddr: %s, X-Forwarded-For: %s", 
-				origin, c.Request.RemoteAddr, c.Request.Header.Get("X-Forwarded-For"))
+			log.Printf("[CORS] POST /api/auth/login - Origin: %s, RemoteAddr: %s, X-Forwarded-For: %s, ClientIP: %s", 
+				origin, c.Request.RemoteAddr, c.Request.Header.Get("X-Forwarded-For"), c.ClientIP())
 		}
 
 		// Ne PAS bloquer les requêtes - laisser passer
