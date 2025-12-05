@@ -1,0 +1,26 @@
+FROM golang:1.21-alpine
+
+# Installer les dépendances système nécessaires
+RUN apk add --no-cache \
+    git \
+    gcc \
+    musl-dev \
+    ffmpeg-dev \
+    ffmpeg \
+    delve
+
+WORKDIR /app
+
+# Copier les fichiers de dépendances
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copier le code source
+COPY . .
+
+# Exposer les ports
+EXPOSE 8080 2345
+
+# Commande par défaut pour le développement
+CMD ["go", "run", "cmd/server/main.go"]
+

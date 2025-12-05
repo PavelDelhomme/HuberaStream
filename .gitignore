@@ -1,0 +1,21 @@
+# Docker volumes
+postgres_data/
+redis_data/
+video_storage/
+thumbnail_storage/
+
+# Environment files
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+

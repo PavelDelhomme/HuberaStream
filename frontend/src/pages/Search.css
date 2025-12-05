@@ -1,0 +1,42 @@
+.search-container {
+  min-height: calc(100vh - 60px);
+  background-color: #0f0f0f;
+  padding: 20px;
+}
+
+.search-results-header {
+  max-width: 1400px;
+  margin: 0 auto 30px;
+  color: #ffffff;
+}
+
+.search-results-header h2 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.results-count {
+  color: #aaaaaa;
+  font-size: 14px;
+}
+
+.search-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #aaaaaa;
+  font-size: 18px;
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 60px 20px;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.error {
+  color: #ff4444;
+}
+

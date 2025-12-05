@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: streammake-postgres
+    environment:
+      POSTGRES_USER: streammake
+      POSTGRES_PASSWORD: streammake_password
+      POSTGRES_DB: streammake_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "3302:5432"
+    networks:
+      - streammake-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streammake"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: streammake-redis
+    ports:
+      - "3303:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - streammake-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: streammake-backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: streammake
+      DB_PASSWORD: streammake_password
+      DB_NAME: streammake_db
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: your-secret-key-change-in-production
+      VIDEO_STORAGE_PATH: /app/storage/videos
+      THUMBNAIL_STORAGE_PATH: /app/storage/thumbnails
+      PORT: 8080
+    volumes:
+      - ./backend:/app
+      - video_storage:/app/storage/videos
+      - thumbnail_storage:/app/storage/thumbnails
+    ports:
+      - "3301:8080"
+      - "2345:2345"  # Port pour Delve debugger
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - streammake-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: streammake-frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:3301/api
+      VITE_API_URL: http://localhost:3301/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3304:3000"  # Port direct pour le frontend (dev)
+    depends_on:
+      - backend
+    networks:
+      - streammake-network
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: streammake-nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - video_storage:/usr/share/nginx/html/videos:ro
+      - thumbnail_storage:/usr/share/nginx/html/thumbnails:ro
+    ports:
+      - "3300:80"  # Port principal via nginx
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - streammake-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  video_storage:
+  thumbnail_storage:
+
+networks:
+  streammake-network:
+    driver: bridge
+

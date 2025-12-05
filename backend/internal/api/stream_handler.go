@@ -1,0 +1,95 @@
+package api
+
+import (
+	"net/http"
+	"os"
+	"strings"
+
+	"streammake/internal/config"
+	"streammake/internal/models"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type StreamHandler struct {
+	db  *gorm.DB
+	cfg *config.Config
+}
+
+func NewStreamHandler(db *gorm.DB, cfg *config.Config) *StreamHandler {
+	return &StreamHandler{db: db, cfg: cfg}
+}
+
+func (h *StreamHandler) StreamVideo(c *gin.Context) {
+	id := c.Param("id")
+	videoID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
+
+	format := c.DefaultQuery("format", "progressive")
+	quality := c.DefaultQuery("quality", "")
+
+	// Récupérer la vidéo et ses formats
+	var video models.Video
+	var videoFormat models.VideoFormat
+
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+
+	// Trouver le format demandé
+	query := h.db.Where("video_id = ? AND format = ?", videoID, format)
+	if quality != "" {
+		query = query.Where("quality = ?", quality)
+	}
+	
+	if err := query.First(&videoFormat).Error; err != nil {
+		// Si le format n'existe pas, essayer de trouver n'importe quel format disponible
+		if err := h.db.Where("video_id = ?", videoID).First(&videoFormat).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Format de vidéo non disponible"})
+			return
+		}
+	}
+
+	filePath := videoFormat.FilePath
+
+	// Vérifier si le fichier existe
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Fichier vidéo non trouvé"})
+		return
+	}
+
+	// Gérer les différents formats de streaming
+	switch strings.ToLower(format) {
+	case "hls":
+		// Servir le manifeste HLS
+		if videoFormat.ManifestPath != "" {
+			c.File(videoFormat.ManifestPath)
+		} else {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "Manifeste HLS non disponible"})
+		}
+	case "dash":
+		// Servir le manifeste DASH
+		if videoFormat.ManifestPath != "" {
+			c.File(videoFormat.ManifestPath)
+		} else {
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "Manifeste DASH non disponible"})
+		}
+	case "webrtc":
+		// WebRTC nécessite une implémentation plus complexe
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "WebRTC non encore implémenté"})
+	case "progressive", "":
+		// Lecture progressive - servir le fichier directement
+		c.Header("Content-Type", "video/mp4")
+		c.Header("Accept-Ranges", "bytes")
+		c.File(filePath)
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Format non supporté"})
+	}
+}
+

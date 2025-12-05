@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# Docker
+docker-compose.yml
+Dockerfile*
+.dockerignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend
+backend/main
+backend/*.test
+backend/vendor
+
+# Frontend
+frontend/node_modules
+frontend/dist
+frontend/build
+frontend/.vite
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+

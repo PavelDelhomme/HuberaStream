@@ -1,0 +1,17 @@
+.home-container {
+  min-height: calc(100vh - 60px);
+  background-color: #0f0f0f;
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 60px 20px;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.error {
+  color: #ff4444;
+}
+
