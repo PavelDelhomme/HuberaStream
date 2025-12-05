@@ -13,18 +13,27 @@ import (
 func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	router := gin.New()
 	
-	// Middleware de debug pour identifier où les requêtes sont bloquées
-	router.Use(func(c *gin.Context) {
-		if c.Request.Method == "POST" && c.Request.URL.Path == "/api/auth/login" {
-			log.Printf("[DEBUG] Requête POST /api/auth/login reçue - RemoteAddr: %s, ClientIP: %s, X-Forwarded-For: %s", 
-				c.Request.RemoteAddr, c.ClientIP(), c.Request.Header.Get("X-Forwarded-For"))
-		}
-		c.Next()
-	})
-	
 	// Ajouter les middlewares de base (logger et recovery)
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
+
+	// Middleware de debug TRÈS TÔT pour capturer toutes les requêtes
+	// IMPORTANT: Ce middleware doit être le PREMIER pour capturer toutes les requêtes
+	router.Use(func(c *gin.Context) {
+		// Logger TOUTES les requêtes pour debug
+		if c.Request.Method == "POST" || c.Request.Method == "OPTIONS" {
+			log.Printf("[EARLY-DEBUG] %s %s - RemoteAddr: %s, Origin: %s, ClientIP: %s", 
+				c.Request.Method,
+				c.Request.URL.Path,
+				c.Request.RemoteAddr,
+				c.Request.Header.Get("Origin"),
+				c.ClientIP())
+		}
+		c.Next()
+		if (c.Request.Method == "POST" || c.Request.Method == "OPTIONS") && c.Request.URL.Path == "/api/auth/login" {
+			log.Printf("[EARLY-DEBUG] %s %s terminée - Status: %d", c.Request.Method, c.Request.URL.Path, c.Writer.Status())
+		}
+	})
 
 	// Configuration CORS - DOIT être le premier middleware après logger/recovery
 	router.Use(middleware.CORSMiddleware())

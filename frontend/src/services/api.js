@@ -1,22 +1,15 @@
 import axios from 'axios'
 
-// Utiliser l'URL via Nginx (port 3300) pour éviter les problèmes CORS
-// Si on est sur localhost:3300, utiliser le chemin relatif /api
-// Sinon, utiliser l'URL complète via Nginx
+// WORKAROUND TEMPORAIRE: Utiliser directement le backend (port 3301) au lieu de Nginx (port 3300)
+// pour contourner le problème 403 Forbidden avec les requêtes POST via Nginx
+// TODO: Résoudre le problème avec Gin v1.11.0 et SetTrustedProxies pour réactiver Nginx
 const getApiBaseURL = () => {
   const envURL = import.meta.env.VITE_API_URL
   if (envURL) {
     return envURL
   }
-  // Si on accède via Nginx (port 3300), utiliser le chemin relatif
-  if (typeof window !== 'undefined') {
-    const origin = window.location.origin
-    if (origin === 'http://localhost:3300' || origin === 'http://127.0.0.1:3300') {
-      return '/api'
-    }
-  }
-  // Sinon, utiliser l'URL complète via Nginx
-  return 'http://localhost:3300/api'
+  // Utiliser directement le backend (port 3301) au lieu de Nginx
+  return 'http://localhost:3301/api'
 }
 
 const api = axios.create({

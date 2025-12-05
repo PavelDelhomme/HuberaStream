@@ -76,8 +76,8 @@ services:
       dockerfile: Dockerfile
     container_name: streammake-frontend
     environment:
-      REACT_APP_API_URL: "http://localhost:3300/api"
-      VITE_API_URL: "http://localhost:3300/api"
+      REACT_APP_API_URL: "http://localhost:3301/api"
+      VITE_API_URL: "http://localhost:3301/api"
     volumes:
       - ./frontend:/app
       - /app/node_modules
