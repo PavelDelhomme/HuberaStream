@@ -5,12 +5,15 @@ import api from '../../services/api'
 import './AdminDashboard.css'
 
 const AdminDashboard = () => {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Attendre que le chargement de l'authentification soit terminé
+    if (authLoading) return
+    
     if (!user) {
       navigate('/login')
       return
@@ -20,7 +23,7 @@ const AdminDashboard = () => {
       return
     }
     fetchStats()
-  }, [user, isAdmin, navigate])
+  }, [user, authLoading, isAdmin, navigate])
 
   const fetchStats = async () => {
     try {

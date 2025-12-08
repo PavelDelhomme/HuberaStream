@@ -6,6 +6,8 @@
 
 .main-content {
   flex: 1;
-  padding-top: 60px; /* Hauteur de la navigation */
+  padding-top: 70px; /* Hauteur de la navigation */
+  background: #000000;
+  min-height: calc(100vh - 70px);
 }
 

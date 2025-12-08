@@ -1,0 +1,250 @@
+=========================================
+RAPPORT DE DIAGNOSTIC - Problème 403 Forbidden
+Date: lun. 08 déc. 2025 09:34:17 CET
+=========================================
+
+1. Vérification des services Docker...
+----------------------------------------
+NAME                  IMAGE                 COMMAND                  SERVICE    CREATED              STATUS                  PORTS
+streammake-backend    streammake-backend    "/app/main"              backend    About a minute ago   Up About a minute       0.0.0.0:2345->2345/tcp, [::]:2345->2345/tcp, 0.0.0.0:3301->8080/tcp, [::]:3301->8080/tcp
+streammake-frontend   streammake-frontend   "docker-entrypoint.s…"   frontend   10 hours ago         Up 14 seconds           0.0.0.0:3304->3000/tcp, [::]:3304->3000/tcp
+streammake-nginx      nginx:alpine          "/docker-entrypoint.…"   nginx      10 hours ago         Up 10 hours             0.0.0.0:3300->80/tcp, [::]:3300->80/tcp
+streammake-postgres   postgres:15-alpine    "docker-entrypoint.s…"   postgres   10 hours ago         Up 10 hours (healthy)   0.0.0.0:3302->5432/tcp, [::]:3302->5432/tcp
+streammake-redis      redis:7-alpine        "docker-entrypoint.s…"   redis      10 hours ago         Up 10 hours (healthy)   0.0.0.0:3303->6379/tcp, [::]:3303->6379/tcp
+
+2. Test direct au backend (port 3301)...
+----------------------------------------
+Commande: curl -X POST http://localhost:3301/api/auth/login -H 'Content-Type: application/json' -d '{"email":"dev@delhomme.ovh","password":"AdminStreamMake2024!"}'
+{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjUyNjkyNTcsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJiOTY3NzEzZS1hNjM1LTQxMmItYmI2ZS00YTcxMDQ1ZmM5NmYiLCJ1c2VybmFtZSI6ImFkbWluIn0.9WTrPfT111UL0ywqy2PBPjmgKLCU_nNGkgSqqnbRbdI","user":{"email":"dev@delhomme.ovh","id":"b967713e-a635-412b-bb6e-4a71045fc96f","username":"admin"}}
+HTTP_CODE:200
+TIME:0.047704
+
+3. Test via Nginx (port 3300)...
+----------------------------------------
+Commande: curl -X POST http://localhost:3300/api/auth/login -H 'Origin: http://localhost:3300' -H 'Content-Type: application/json' -d '{"email":"dev@delhomme.ovh","password":"AdminStreamMake2024!"}'
+{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjUyNjkyNTcsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJiOTY3NzEzZS1hNjM1LTQxMmItYmI2ZS00YTcxMDQ1ZmM5NmYiLCJ1c2VybmFtZSI6ImFkbWluIn0.9WTrPfT111UL0ywqy2PBPjmgKLCU_nNGkgSqqnbRbdI","user":{"email":"dev@delhomme.ovh","id":"b967713e-a635-412b-bb6e-4a71045fc96f","username":"admin"}}
+HTTP_CODE:200
+TIME:0.046646
+
+4. Test OPTIONS (preflight CORS)...
+----------------------------------------
+Commande: curl -X OPTIONS http://localhost:3300/api/auth/login -H 'Origin: http://localhost:3300' -v
+> Access-Control-Request-Method: POST
+> Access-Control-Request-Headers: Content-Type
+< HTTP/1.1 204 No Content
+< Access-Control-Allow-Origin: http://localhost:3300
+< Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD
+< Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers
+< Access-Control-Allow-Credentials: true
+< Access-Control-Max-Age: 86400
+
+5. Headers détaillés de la requête via Nginx...
+----------------------------------------
+> POST /api/auth/login HTTP/1.1
+> Host: localhost:3300
+> User-Agent: curl/8.16.0
+> Accept: */*
+> Origin: http://localhost:3300
+> Content-Type: application/json
+> Content-Length: 62
+> 
+< HTTP/1.1 200 OK
+< Server: nginx/1.29.3
+< Date: Mon, 08 Dec 2025 08:34:17 GMT
+< Content-Type: application/json; charset=utf-8
+< Content-Length: 327
+< Connection: keep-alive
+< Vary: Accept-Encoding
+< Access-Control-Allow-Credentials: true
+< Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With
+< Access-Control-Allow-Methods: POST, OPTIONS, GET, PUT, DELETE, PATCH, HEAD
+< Access-Control-Allow-Origin: http://localhost:3300
+< Access-Control-Expose-Headers: Content-Length, Content-Type, Authorization
+< Access-Control-Allow-Origin: http://localhost:3300
+< Access-Control-Allow-Credentials: true
+< Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD
+< Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With
+< Access-Control-Expose-Headers: Content-Length, Content-Type, Authorization
+< 
+
+6. Test depuis Nginx vers Backend (interne)...
+----------------------------------------
+{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjUyNjkyNTcsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJiOTY3NzEzZS1hNjM1LTQxMmItYmI2ZS00YTcxMDQ1ZmM5NmYiLCJ1c2VybmFtZSI6ImFkbWluIn0.9WTrPfT111UL0ywqy2PBPjmgKLCU_nNGkgSqqnbRbdI","user":{"email":"dev@delhomme.ovh","id":"b967713e-a635-412b-bb6e-4a71045fc96f","username":"admin"}}
+7. Logs backend récents (20 dernières lignes)...
+----------------------------------------
+streammake-backend  | 2025/12/08 08:34:17 [CORS] POST /api/auth/login - Origin: http://localhost:3300, RemoteAddr: 172.18.0.6:58588, X-Forwarded-For: 172.18.0.1, ClientIP: 172.18.0.1
+streammake-backend  | 
+streammake-backend  | 2025/12/08 08:34:17 [32m/app/internal/api/auth_handler.go:96
+streammake-backend  | [0m[33m[0.236ms] [34;1m[rows:1][0m SELECT * FROM "users" WHERE email = 'dev@delhomme.ovh' AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1
+streammake-backend  | 2025/12/08 08:34:17 [EARLY-DEBUG] POST /api/auth/login terminée - Status: 200
+streammake-backend  | [GIN] 2025/12/08 - 08:34:17 | 200 |   46.012051ms |      172.18.0.1 | POST     "/api/auth/login"
+streammake-backend  | 2025/12/08 08:34:17 [EARLY-DEBUG] POST /api/auth/login - RemoteAddr: 172.18.0.6:58590, Origin: http://localhost:3300, ClientIP: 172.18.0.1
+streammake-backend  | 2025/12/08 08:34:17 [CORS] POST /api/auth/login - Origin: http://localhost:3300, RemoteAddr: 172.18.0.6:58590, X-Forwarded-For: 172.18.0.1, ClientIP: 172.18.0.1
+streammake-backend  | 
+streammake-backend  | 2025/12/08 08:34:17 [32m/app/internal/api/auth_handler.go:96
+streammake-backend  | [0m[33m[0.345ms] [34;1m[rows:1][0m SELECT * FROM "users" WHERE email = 'dev@delhomme.ovh' AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1
+streammake-backend  | [GIN] 2025/12/08 - 08:34:17 | 200 |   46.366984ms |      172.18.0.1 | POST     "/api/auth/login"
+streammake-backend  | 2025/12/08 08:34:17 [EARLY-DEBUG] POST /api/auth/login terminée - Status: 200
+streammake-backend  | 2025/12/08 08:34:17 [EARLY-DEBUG] POST /api/auth/login - RemoteAddr: 172.18.0.6:58598, Origin: , ClientIP: 172.18.0.6
+streammake-backend  | 2025/12/08 08:34:17 [CORS] POST /api/auth/login - Origin: , RemoteAddr: 172.18.0.6:58598, X-Forwarded-For: , ClientIP: 172.18.0.6
+streammake-backend  | 
+streammake-backend  | 2025/12/08 08:34:17 [32m/app/internal/api/auth_handler.go:96
+streammake-backend  | [0m[33m[0.223ms] [34;1m[rows:1][0m SELECT * FROM "users" WHERE email = 'dev@delhomme.ovh' AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1
+streammake-backend  | 2025/12/08 08:34:17 [EARLY-DEBUG] POST /api/auth/login terminée - Status: 200
+streammake-backend  | [GIN] 2025/12/08 - 08:34:17 | 200 |   46.137726ms |      172.18.0.6 | POST     "/api/auth/login"
+
+8. Logs Nginx récents (20 dernières lignes)...
+----------------------------------------
+streammake-nginx  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+streammake-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+streammake-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+streammake-nginx  | /docker-entrypoint.sh: Configuration complete; ready for start up
+streammake-nginx  | 172.18.0.1 - - [07/Dec/2025:22:16:22 +0000] "OPTIONS /api/auth/login HTTP/1.1" 204 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [07/Dec/2025:22:16:22 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:07:03:13 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:07:03:13 +0000] "OPTIONS /api/auth/login HTTP/1.1" 204 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:07:03:13 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:07:03:13 +0000] "GET /api/videos HTTP/1.1" 200 43 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:07:11:33 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:32:43 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:33:14 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:33:14 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:33:14 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:33:14 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:33:14 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:34:17 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:34:17 +0000] "OPTIONS /api/auth/login HTTP/1.1" 204 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.18.0.1 - - [08/Dec/2025:08:34:17 +0000] "POST /api/auth/login HTTP/1.1" 200 327 "-" "curl/8.16.0" "-"
+
+9. Configuration Nginx (location /api/)...
+----------------------------------------
+        location /api/ {
+            # Gérer OPTIONS (preflight CORS) - DOIT être avant proxy_pass
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers' always;
+                add_header 'Access-Control-Allow-Credentials' 'true' always;
+                add_header 'Access-Control-Max-Age' '86400' always;
+                add_header 'Content-Length' '0' always;
+                return 204;
+            }
+
+            # Proxy vers le backend pour toutes les autres méthodes
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            # IMPORTANT: Préserver le body de la requête pour les requêtes POST
+            proxy_pass_request_body on;
+            proxy_pass_request_headers on;
+            proxy_buffering off;  # Désactiver le buffering pour éviter les problèmes avec les requêtes POST
+            
+            # Headers CORS pour les réponses (après proxy)
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD' always;
+
+10. Variables d'environnement backend...
+----------------------------------------
+REDIS_PORT=6379
+JWT_SECRET=your-secret-key-change-in-production
+DB_PASSWORD=streammake_password
+DB_USER=streammake
+DB_PORT=5432
+PORT=8080
+DB_HOST=postgres
+DB_NAME=streammake_db
+REDIS_HOST=redis
+
+11. Test GET /api/videos (pour comparaison)...
+----------------------------------------
+GET direct (port 3301):
+{"limit":20,"page":1,"total":0,"videos":[]}
+HTTP_CODE:200
+
+GET via Nginx (port 3300):
+{"limit":20,"page":1,"total":0,"videos":[]}
+HTTP_CODE:200
+
+12. Vérification réseau Docker...
+----------------------------------------
+IP du backend:
+172.18.0.4
+IP de Nginx:
+172.18.0.6
+Test de connexion Nginx -> Backend:
+PING backend (172.18.0.4): 56 data bytes
+64 bytes from 172.18.0.4: seq=0 ttl=64 time=0.039 ms
+64 bytes from 172.18.0.4: seq=1 ttl=64 time=0.044 ms
+
+--- backend ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.039/0.041/0.044 ms
+
+13. Headers envoyés par Nginx au backend...
+----------------------------------------
+> POST /api/auth/login HTTP/1.1
+> Host: localhost:3300
+> User-Agent: curl/8.14.1
+> Accept: */*
+> Content-Type: application/json
+> X-Forwarded-For: 172.19.0.1
+> X-Real-IP: 172.19.0.1
+> Content-Length: 62
+> 
+< HTTP/1.1 200 OK
+
+14. Version de Gin utilisée...
+----------------------------------------
+	github.com/gin-gonic/gin v1.11.0
+
+15. Configuration SetTrustedProxies dans main.go...
+----------------------------------------
+	// Le warning "You trusted all proxies" apparaît quand SetTrustedProxies n'est pas configuré
+	// mais que Gin détecte des headers X-Forwarded-For. Il faut configurer explicitement.
+	
+	trustedProxies := []string{
+		"172.18.0.6/32",   // IP exacte de Nginx (d'après le rapport)
+		"172.18.0.0/16",  // Réseau Docker complet (172.18.x.x)
+		"172.19.0.0/16",  // Réseau Docker alternatif (pour X-Forwarded-For)
+		"172.17.0.0/16",  // Réseau Docker bridge par défaut
+		"127.0.0.1",      // Localhost
+		"::1",            // Localhost IPv6
+	}
+	
+	if err := router.SetTrustedProxies(trustedProxies); err != nil {
+		log.Printf("Avertissement: Erreur lors de la configuration des proxies: %v", err)
+	}
+	
+	// Utiliser X-Forwarded-For comme plateforme de confiance
+	router.TrustedPlatform = "X-Forwarded-For"
+	
+	log.Printf("Configuration des proxies: IPs de confiance = %v, TrustedPlatform = %s", trustedProxies, router.TrustedPlatform)
+
+	// Démarrer le serveur
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Serveur démarré sur le port %s", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("Erreur lors du démarrage du serveur: %v", err)
+	}
+}
+
+
+16. RÉSUMÉ DES RÉSULTATS...
+----------------------------------------
+✅ Backend direct (3301): FONCTIONNE
+✅ Via Nginx (3300): FONCTIONNE
+
+=========================================
+Fin du rapport
+=========================================

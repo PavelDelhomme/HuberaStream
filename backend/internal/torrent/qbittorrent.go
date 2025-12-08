@@ -40,9 +40,9 @@ type QBittorrentTorrent struct {
 }
 
 func NewQBittorrentClient(cfg *config.Config) (*QBittorrentClient, error) {
-	baseURL := "http://localhost:8080"
-	if cfg.TorrentClientPath != "" {
-		baseURL = cfg.TorrentClientPath
+	baseURL := cfg.TorrentClientPath
+	if baseURL == "" {
+		baseURL = "http://qbittorrent:8080"
 	}
 
 	client := &QBittorrentClient{

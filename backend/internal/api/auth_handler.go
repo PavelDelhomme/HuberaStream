@@ -55,12 +55,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Créer l'utilisateur
+	// Créer l'utilisateur (inactif par défaut, nécessite validation admin)
 	user := models.User{
 		ID:       uuid.New(),
 		Username: req.Username,
 		Email:    req.Email,
 		Password: string(hashedPassword),
+		IsActive: false, // Nécessite validation par un admin
+		Role:     models.RoleUser,
 	}
 
 	if err := h.db.Create(&user).Error; err != nil {
@@ -69,12 +71,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "Utilisateur créé avec succès",
+		"message": "Demande d'inscription créée avec succès. Votre compte sera activé après validation par un administrateur.",
 		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
+			"id":        user.ID,
+			"username":  user.Username,
+			"email":     user.Email,
+			"is_active": user.IsActive,
 		},
+		"pending_approval": true,
 	})
 }
 

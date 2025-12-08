@@ -78,12 +78,46 @@
 }
 
 .auth-error {
-  background-color: #ff4444;
-  color: #ffffff;
+  background-color: rgba(255, 68, 68, 0.1);
+  border: 1px solid #ff4444;
+  color: #ff4444;
   padding: 12px;
-  border-radius: 4px;
+  border-radius: 8px;
   margin-bottom: 20px;
   font-size: 14px;
+}
+
+.auth-success {
+  text-align: center;
+  padding: 30px 20px;
+}
+
+.auth-success h2 {
+  color: #4caf50;
+  font-size: 24px;
+  margin-bottom: 15px;
+}
+
+.auth-success p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 16px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.info-box {
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+}
+
+.info-box p {
+  color: #2196f3;
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .auth-link {

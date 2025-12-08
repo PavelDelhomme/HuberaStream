@@ -22,7 +22,12 @@ const Login = () => {
     if (result.success) {
       navigate('/')
     } else {
-      setError(result.error)
+      // Vérifier si c'est une erreur de compte non validé
+      if (result.error && result.error.includes('pas encore activé')) {
+        setError('⏳ Votre compte n\'est pas encore activé. Veuillez attendre la validation par un administrateur.')
+      } else {
+        setError(result.error)
+      }
     }
   }
 

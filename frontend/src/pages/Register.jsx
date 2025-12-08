@@ -13,9 +13,12 @@ const Register = () => {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const [success, setSuccess] = useState(false)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    setSuccess(false)
 
     if (password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas')
@@ -32,7 +35,11 @@ const Register = () => {
     setLoading(false)
 
     if (result.success) {
-      navigate('/login')
+      setSuccess(true)
+      // Afficher le message de succès pendant 5 secondes avant de rediriger
+      setTimeout(() => {
+        navigate('/login')
+      }, 5000)
     } else {
       setError(result.error)
     }
@@ -42,8 +49,19 @@ const Register = () => {
     <div className="auth-container">
       <div className="auth-card">
         <h1>Inscription</h1>
-        <form onSubmit={handleSubmit}>
-          {error && <div className="auth-error">{error}</div>}
+        {success ? (
+          <div className="auth-success">
+            <h2>✅ Demande d'inscription envoyée !</h2>
+            <p>Votre compte sera activé après validation par un administrateur.</p>
+            <p>Vous serez redirigé vers la page de connexion dans quelques secondes...</p>
+            <Link to="/login" className="auth-button">Aller à la connexion</Link>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            {error && <div className="auth-error">{error}</div>}
+            <div className="info-box">
+              <p>ℹ️ Votre compte nécessitera une validation par un administrateur avant d'être activé.</p>
+            </div>
           <div className="form-group">
             <label htmlFor="username">Nom d'utilisateur</label>
             <input
@@ -88,13 +106,16 @@ const Register = () => {
               disabled={loading}
             />
           </div>
-          <button type="submit" disabled={loading} className="auth-button">
-            {loading ? 'Inscription...' : "S'inscrire"}
-          </button>
-        </form>
-        <p className="auth-link">
-          Déjà un compte ? <Link to="/login">Se connecter</Link>
-        </p>
+            <button type="submit" disabled={loading} className="auth-button">
+              {loading ? 'Inscription...' : "S'inscrire"}
+            </button>
+          </form>
+        )}
+        {!success && (
+          <p className="auth-link">
+            Déjà un compte ? <Link to="/login">Se connecter</Link>
+          </p>
+        )}
       </div>
     </div>
   )

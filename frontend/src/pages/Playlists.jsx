@@ -5,7 +5,7 @@ import api from '../services/api'
 import './Playlists.css'
 
 const Playlists = () => {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [playlists, setPlaylists] = useState([])
   const [loading, setLoading] = useState(true)
@@ -13,14 +13,19 @@ const Playlists = () => {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newPlaylistName, setNewPlaylistName] = useState('')
   const [newPlaylistDescription, setNewPlaylistDescription] = useState('')
+  
+  // Note: Le terme "playlist" est utilisé dans l'API, mais l'interface affiche "Liste"
 
   useEffect(() => {
+    // Attendre que le chargement de l'authentification soit terminé
+    if (authLoading) return
+    
     if (user) {
       fetchPlaylists()
     } else {
       navigate('/login')
     }
-  }, [user, navigate])
+  }, [user, authLoading, navigate])
 
   const fetchPlaylists = async () => {
     try {
@@ -30,7 +35,7 @@ const Playlists = () => {
       setError(null)
     } catch (err) {
       console.error('Erreur lors de la récupération des playlists:', err)
-      setError('Impossible de charger les playlists')
+      setError('Impossible de charger les listes')
     } finally {
       setLoading(false)
     }
@@ -57,7 +62,7 @@ const Playlists = () => {
   if (loading) {
     return (
       <div className="playlists-container">
-        <div className="loading">Chargement des playlists...</div>
+        <div className="loading">Chargement des listes...</div>
       </div>
     )
   }
@@ -73,12 +78,12 @@ const Playlists = () => {
   return (
     <div className="playlists-container">
       <div className="playlists-header">
-        <h1>Mes Playlists</h1>
+        <h1>Mes Listes</h1>
         <button
           className="create-playlist-button"
           onClick={() => setShowCreateForm(!showCreateForm)}
         >
-          {showCreateForm ? 'Annuler' : '+ Créer une playlist'}
+          {showCreateForm ? 'Annuler' : '+ Créer une liste'}
         </button>
       </div>
 

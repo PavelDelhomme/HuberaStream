@@ -69,15 +69,31 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	offset := (page - 1) * limit
 
+	// Filtre par catégorie
+	if categoryID := c.Query("category_id"); categoryID != "" {
+		catUUID, err := uuid.Parse(categoryID)
+		if err == nil {
+			query = query.Where("category_id = ?", catUUID)
+		}
+	}
+
 	// Recherche
 	if search := c.Query("search"); search != "" {
 		query = query.Where("title ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
 
+	// Trier par vues pour les tendances
+	sortBy := c.DefaultQuery("sort", "created_at")
+	if sortBy == "views" {
+		query = query.Order("views DESC")
+	} else {
+		query = query.Order("created_at DESC")
+	}
+
 	var total int64
 	query.Model(&models.Video{}).Count(&total)
 
-	if err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&videos).Error; err != nil {
+	if err := query.Offset(offset).Limit(limit).Find(&videos).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération des vidéos"})
 		return
 	}
@@ -90,8 +106,59 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 	})
 }
 
+// GetContinueWatching récupère les vidéos en cours de visionnage
+// Peut être appelé depuis les routes publiques ou protégées
+func (h *VideoHandler) GetContinueWatching(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		// Pas d'utilisateur connecté, retourner un tableau vide
+		c.JSON(http.StatusOK, gin.H{"videos": []interface{}{}})
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		c.JSON(http.StatusOK, gin.H{"videos": []interface{}{}})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"videos": []interface{}{}})
+		return
+	}
+
+	var history []models.WatchHistory
+	// Récupérer les vidéos avec position > 0 et < 90% de la durée
+	if err := h.db.Preload("Video").Preload("Video.User").
+		Where("user_id = ? AND position > 0", userUUID).
+		Order("watched_at DESC").
+		Limit(20).
+		Find(&history).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération"})
+		return
+	}
+
+	// Filtrer pour ne garder que les vidéos non terminées
+	var continueWatching []models.WatchHistory
+	for _, h := range history {
+		if h.Video.Duration > 0 && float64(h.Position) < float64(h.Video.Duration)*0.9 {
+			continueWatching = append(continueWatching, h)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"videos": continueWatching})
+}
+
 func (h *VideoHandler) GetVideo(c *gin.Context) {
 	id := c.Param("id")
+	
+	// Si c'est "continue-watching", rediriger vers le bon handler
+	if id == "continue-watching" {
+		h.GetContinueWatching(c)
+		return
+	}
+	
 	videoID, err := uuid.Parse(id)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
@@ -120,6 +187,7 @@ func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 
 	userID, _ := c.Get("user_id")
 	userIDStr := userID.(string)
+	userUUID, _ := uuid.Parse(userIDStr)
 
 	var video models.Video
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
@@ -127,20 +195,44 @@ func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 		return
 	}
 
-	// Vérifier que l'utilisateur est le propriétaire
-	if video.UserID.String() != userIDStr {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Vous n'êtes pas autorisé à modifier cette vidéo"})
-		return
+	// Vérifier les permissions (propriétaire ou admin)
+	if video.UserID != userUUID {
+		// Vérifier si admin
+		var user models.User
+		if err := h.db.Where("id = ?", userUUID).First(&user).Error; err != nil || user.Role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Permission refusée"})
+			return
+		}
 	}
 
-	var req CreateVideoRequest
+	var req struct {
+		Title         string     `json:"title"`
+		Description   string     `json:"description"`
+		CategoryID    *uuid.UUID `json:"category_id"`
+		SubCategoryID *uuid.UUID `json:"sub_category_id"`
+		IsPublic      *bool      `json:"is_public"`
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	video.Title = req.Title
-	video.Description = req.Description
+	if req.Title != "" {
+		video.Title = req.Title
+	}
+	if req.Description != "" {
+		video.Description = req.Description
+	}
+	if req.CategoryID != nil {
+		video.CategoryID = req.CategoryID
+	}
+	if req.SubCategoryID != nil {
+		video.SubCategoryID = req.SubCategoryID
+	}
+	if req.IsPublic != nil {
+		video.IsPublic = *req.IsPublic
+	}
 
 	if err := h.db.Save(&video).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour"})
@@ -160,6 +252,7 @@ func (h *VideoHandler) DeleteVideo(c *gin.Context) {
 
 	userID, _ := c.Get("user_id")
 	userIDStr := userID.(string)
+	userUUID, _ := uuid.Parse(userIDStr)
 
 	var video models.Video
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
@@ -167,10 +260,13 @@ func (h *VideoHandler) DeleteVideo(c *gin.Context) {
 		return
 	}
 
-	// Vérifier que l'utilisateur est le propriétaire
-	if video.UserID.String() != userIDStr {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Vous n'êtes pas autorisé à supprimer cette vidéo"})
-		return
+	// Vérifier les permissions (propriétaire ou admin)
+	if video.UserID != userUUID {
+		var user models.User
+		if err := h.db.Where("id = ?", userUUID).First(&user).Error; err != nil || user.Role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Permission refusée"})
+			return
+		}
 	}
 
 	if err := h.db.Delete(&video).Error; err != nil {
@@ -261,4 +357,3 @@ func (h *VideoHandler) AddToWatchHistory(c *gin.Context) {
 
 	c.JSON(http.StatusOK, history)
 }
-

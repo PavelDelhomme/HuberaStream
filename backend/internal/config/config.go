@@ -32,10 +32,19 @@ type Config struct {
 	AdminPassword string
 
 	// Torrent
-	TorrentClientPath   string
-	TorrentClientType   string
-	TorrentDownloadPath string
-	EnableAutoDownload  bool
+	TorrentClientPath           string
+	TorrentClientType           string
+	TorrentDownloadPath         string
+	EnableAutoDownload          bool
+	TorrentClientTransmissionURL string
+	TorrentClientTransmissionUser string
+	TorrentClientTransmissionPass string
+	TorrentClientQBittorrentURL string
+	TorrentClientQBittorrentUser string
+	TorrentClientQBittorrentPass string
+	TorrentClientDelugeURL      string
+	TorrentClientDelugePass     string
+	TorrentClientRTorrentURL    string
 
 	// Server
 	Port string
@@ -74,10 +83,20 @@ func Load() *Config {
 		AdminPassword: getEnv("ADMIN_PASSWORD", "AdminStreamMake2024!"),
 
 		// Torrent
-		TorrentClientPath:   getEnv("TORRENT_CLIENT_PATH", "http://localhost:9091/transmission/rpc"),
-		TorrentClientType:   getEnv("TORRENT_CLIENT_TYPE", "transmission"), // transmission, qbittorrent, deluge, rtorrent
-		TorrentDownloadPath: getEnv("TORRENT_DOWNLOAD_PATH", "./storage/torrents/downloads"),
-		EnableAutoDownload:  getEnv("ENABLE_AUTO_DOWNLOAD", "false") == "true",
+		// Utiliser les URLs spécifiques si définies, sinon TORRENT_CLIENT_PATH, sinon défaut
+		TorrentClientPath:           getTorrentClientPath(),
+		TorrentClientType:           getEnv("TORRENT_CLIENT_TYPE", "transmission"), // transmission, qbittorrent, deluge, rtorrent
+		TorrentDownloadPath:         getEnv("TORRENT_DOWNLOAD_PATH", "./storage/torrents/downloads"),
+		EnableAutoDownload:          getEnv("ENABLE_AUTO_DOWNLOAD", "false") == "true",
+		TorrentClientTransmissionURL: getEnv("TRANSMISSION_URL", "http://transmission:9091/transmission/rpc"),
+		TorrentClientTransmissionUser: getEnv("TRANSMISSION_USER", "transmission"),
+		TorrentClientTransmissionPass: getEnv("TRANSMISSION_PASS", "transmission"),
+		TorrentClientQBittorrentURL: getEnv("QBITTORRENT_URL", "http://qbittorrent:8080"),
+		TorrentClientQBittorrentUser: getEnv("QBITTORRENT_USER", "admin"),
+		TorrentClientQBittorrentPass: getEnv("QBITTORRENT_PASS", "adminadmin"),
+		TorrentClientDelugeURL:      getEnv("DELUGE_URL", "http://deluge:8112/json"),
+		TorrentClientDelugePass:     getEnv("DELUGE_PASS", "deluge"),
+		TorrentClientRTorrentURL:    getEnv("RTORRENT_URL", "http://rtorrent:5000/RPC2"),
 
 		// Server
 		Port: getEnv("PORT", "8080"),
@@ -90,5 +109,37 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getTorrentClientPath retourne l'URL du client torrent en fonction du type et des variables d'environnement
+func getTorrentClientPath() string {
+	// Vérifier d'abord TORRENT_CLIENT_PATH (priorité)
+	if path := os.Getenv("TORRENT_CLIENT_PATH"); path != "" {
+		return path
+	}
+
+	// Sinon, utiliser les URLs spécifiques selon le type
+	clientType := getEnv("TORRENT_CLIENT_TYPE", "transmission")
+	switch clientType {
+	case "transmission":
+		if url := os.Getenv("TRANSMISSION_URL"); url != "" {
+			return url
+		}
+		return "http://transmission:9091/transmission/rpc"
+	case "qbittorrent":
+		if url := os.Getenv("QBITTORRENT_URL"); url != "" {
+			return url
+		}
+		return "http://qbittorrent:8080"
+	case "deluge":
+		if url := os.Getenv("DELUGE_URL"); url != "" {
+			return url
+		}
+		return "http://deluge:8112/json"
+	case "rtorrent":
+		return "http://rtorrent:5000"
+	default:
+		return "http://transmission:9091/transmission/rpc"
+	}
 }
 

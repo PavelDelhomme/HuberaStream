@@ -13,29 +13,38 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(localStorage.getItem('token'))
+  const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  // Vérifier le token au chargement initial
   useEffect(() => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      fetchUser()
-    } else {
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem('token')
+      
+      if (storedToken) {
+        try {
+          // Configurer l'API avec le token
+          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+          
+          // Vérifier que le token est valide en récupérant l'utilisateur
+          const response = await api.get('/users/me')
+          setUser(response.data)
+          setToken(storedToken)
+        } catch (error) {
+          console.error('Token invalide ou expiré:', error)
+          // Token invalide, nettoyer
+          localStorage.removeItem('token')
+          delete api.defaults.headers.common['Authorization']
+          setToken(null)
+          setUser(null)
+        }
+      }
+      
       setLoading(false)
     }
-  }, [token])
 
-  const fetchUser = async () => {
-    try {
-      const response = await api.get('/users/me')
-      setUser(response.data)
-    } catch (error) {
-      console.error('Erreur lors de la récupération de l\'utilisateur:', error)
-      logout()
-    } finally {
-      setLoading(false)
-    }
-  }
+    initAuth()
+  }, []) // Exécuter une seule fois au montage
 
   const isAdmin = () => {
     return user && user.role === 'admin'
@@ -45,15 +54,22 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/auth/login', { email, password })
       const { token: newToken, user: userData } = response.data
-      setToken(newToken)
-      setUser(userData)
+      
+      // Sauvegarder le token
       localStorage.setItem('token', newToken)
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
+      
+      // Mettre à jour l'état
+      setToken(newToken)
+      setUser(userData)
+      
       return { success: true }
     } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Erreur lors de la connexion'
       return {
         success: false,
-        error: error.response?.data?.error || 'Erreur lors de la connexion'
+        error: errorMessage,
+        pendingApproval: error.response?.data?.pending_approval || false
       }
     }
   }
@@ -83,4 +99,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   )
 }
-

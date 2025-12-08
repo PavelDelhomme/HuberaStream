@@ -1,0 +1,248 @@
+=========================================
+RAPPORT DE DIAGNOSTIC - Problème 403 Forbidden
+Date: ven. 05 déc. 2025 19:25:38 CET
+=========================================
+
+1. Vérification des services Docker...
+----------------------------------------
+NAME                  IMAGE                 COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+streammake-backend    streammake-backend    "/app/main"              backend    54 minutes ago   Up 19 minutes             0.0.0.0:2345->2345/tcp, [::]:2345->2345/tcp, 0.0.0.0:3301->8080/tcp, [::]:3301->8080/tcp
+streammake-frontend   streammake-frontend   "docker-entrypoint.s…"   frontend   54 minutes ago   Up 54 minutes             0.0.0.0:3304->3000/tcp, [::]:3304->3000/tcp
+streammake-nginx      nginx:alpine          "/docker-entrypoint.…"   nginx      54 minutes ago   Up 29 minutes             0.0.0.0:3300->80/tcp, [::]:3300->80/tcp
+streammake-postgres   postgres:15-alpine    "docker-entrypoint.s…"   postgres   54 minutes ago   Up 54 minutes (healthy)   0.0.0.0:3302->5432/tcp, [::]:3302->5432/tcp
+streammake-redis      redis:7-alpine        "docker-entrypoint.s…"   redis      54 minutes ago   Up 54 minutes (healthy)   0.0.0.0:3303->6379/tcp, [::]:3303->6379/tcp
+
+2. Test direct au backend (port 3301)...
+----------------------------------------
+Commande: curl -X POST http://localhost:3301/api/auth/login -H 'Content-Type: application/json' -d '{"email":"dev@delhomme.ovh","password":"AdminStreamMake2024!"}'
+{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjUwNDU1MzgsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJiOTY3NzEzZS1hNjM1LTQxMmItYmI2ZS00YTcxMDQ1ZmM5NmYiLCJ1c2VybmFtZSI6ImFkbWluIn0.gO-9tvQ5_SbXQA9zUdKssTmwymPPmgCFBldNAbRoXh0","user":{"email":"dev@delhomme.ovh","id":"b967713e-a635-412b-bb6e-4a71045fc96f","username":"admin"}}
+HTTP_CODE:200
+TIME:0.047410
+
+3. Test via Nginx (port 3300)...
+----------------------------------------
+Commande: curl -X POST http://localhost:3300/api/auth/login -H 'Origin: http://localhost:3300' -H 'Content-Type: application/json' -d '{"email":"dev@delhomme.ovh","password":"AdminStreamMake2024!"}'
+
+HTTP_CODE:403
+TIME:0.000507
+
+4. Test OPTIONS (preflight CORS)...
+----------------------------------------
+Commande: curl -X OPTIONS http://localhost:3300/api/auth/login -H 'Origin: http://localhost:3300' -v
+> Access-Control-Request-Method: POST
+> Access-Control-Request-Headers: Content-Type
+< HTTP/1.1 204 No Content
+< Access-Control-Allow-Origin: http://localhost:3300
+< Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD
+< Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers
+< Access-Control-Allow-Credentials: true
+< Access-Control-Max-Age: 86400
+
+5. Headers détaillés de la requête via Nginx...
+----------------------------------------
+> POST /api/auth/login HTTP/1.1
+> Host: localhost:3300
+> User-Agent: curl/8.16.0
+> Accept: */*
+> Origin: http://localhost:3300
+> Content-Type: application/json
+> Content-Length: 62
+> 
+< HTTP/1.1 403 Forbidden
+< Server: nginx/1.29.3
+< Date: Fri, 05 Dec 2025 18:25:38 GMT
+< Content-Length: 0
+< Connection: keep-alive
+< Access-Control-Allow-Origin: http://localhost:3300
+< Access-Control-Allow-Credentials: true
+< Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD
+< Access-Control-Allow-Headers: Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With
+< Access-Control-Expose-Headers: Content-Length, Content-Type, Authorization
+< 
+
+6. Test depuis Nginx vers Backend (interne)...
+----------------------------------------
+{"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjUwNDU1MzgsInJvbGUiOiJhZG1pbiIsInVzZXJfaWQiOiJiOTY3NzEzZS1hNjM1LTQxMmItYmI2ZS00YTcxMDQ1ZmM5NmYiLCJ1c2VybmFtZSI6ImFkbWluIn0.gO-9tvQ5_SbXQA9zUdKssTmwymPPmgCFBldNAbRoXh0","user":{"email":"dev@delhomme.ovh","id":"b967713e-a635-412b-bb6e-4a71045fc96f","username":"admin"}}
+7. Logs backend récents (20 dernières lignes)...
+----------------------------------------
+streammake-backend  | [GIN-debug] PUT    /api/admin/torrents/:id   --> streammake/internal/api.(*TorrentHandler).UpdateTorrent-fm (6 handlers)
+streammake-backend  | [GIN-debug] DELETE /api/admin/torrents/:id   --> streammake/internal/api.(*TorrentHandler).DeleteTorrent-fm (6 handlers)
+streammake-backend  | [GIN-debug] GET    /api/admin/torrent-configs --> streammake/internal/api.(*TorrentHandler).ListTorrentConfigs-fm (6 handlers)
+streammake-backend  | [GIN-debug] POST   /api/admin/torrent-configs --> streammake/internal/api.(*TorrentHandler).CreateTorrentConfig-fm (6 handlers)
+streammake-backend  | [GIN-debug] PUT    /api/admin/torrent-configs/:id --> streammake/internal/api.(*TorrentHandler).UpdateTorrentConfig-fm (6 handlers)
+streammake-backend  | [GIN-debug] DELETE /api/admin/torrent-configs/:id --> streammake/internal/api.(*TorrentHandler).DeleteTorrentConfig-fm (6 handlers)
+streammake-backend  | [GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+streammake-backend  | Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+streammake-backend  | [GIN-debug] Listening and serving HTTP on :8080
+streammake-backend  | [GIN] 2025/12/05 - 18:05:56 | 403 |      19.197µs |      172.19.0.1 | POST     "/api/auth/login"
+streammake-backend  | 
+streammake-backend  | 2025/12/05 18:25:38 [32m/app/internal/api/auth_handler.go:90
+streammake-backend  | [0m[33m[1.417ms] [34;1m[rows:1][0m SELECT * FROM "users" WHERE email = 'dev@delhomme.ovh' AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1
+streammake-backend  | [GIN] 2025/12/05 - 18:25:38 | 200 |   46.910504ms |      172.19.0.1 | POST     "/api/auth/login"
+streammake-backend  | [GIN] 2025/12/05 - 18:25:38 | 403 |      14.144µs |      172.19.0.1 | POST     "/api/auth/login"
+streammake-backend  | [GIN] 2025/12/05 - 18:25:38 | 403 |       9.002µs |      172.19.0.1 | POST     "/api/auth/login"
+streammake-backend  | 
+streammake-backend  | 2025/12/05 18:25:38 [32m/app/internal/api/auth_handler.go:90
+streammake-backend  | [0m[33m[0.362ms] [34;1m[rows:1][0m SELECT * FROM "users" WHERE email = 'dev@delhomme.ovh' AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1
+streammake-backend  | [GIN] 2025/12/05 - 18:25:38 | 200 |   45.686067ms |      172.19.0.6 | POST     "/api/auth/login"
+
+8. Logs Nginx récents (20 dernières lignes)...
+----------------------------------------
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/Auth.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/Login.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/admin/AdminDashboard.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/admin/AdminDashboard.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/admin/AdminUsers.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/admin/AdminUsers.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/admin/AdminTorrents.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/admin/AdminTorrents.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/admin/AdminCategories.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/admin/AdminCategories.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/admin/AdminTorrentConfigs.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/admin/AdminTorrentConfigs.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/pages/Upload.css HTTP/1.1" 304 0 "http://localhost:3300/src/pages/Upload.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/components/VideoGrid.css HTTP/1.1" 304 0 "http://localhost:3300/src/components/VideoGrid.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /src/components/VideoPlayer.css HTTP/1.1" 304 0 "http://localhost:3300/src/components/VideoPlayer.jsx" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:00 +0000] "GET /vite.svg HTTP/1.1" 304 0 "http://localhost:3300/login" "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Mobile Safari/537.36" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:01 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:56:16 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:57:15 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:57:30 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:58:03 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:17:58:18 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:18:05:56 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:18:25:38 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:18:25:38 +0000] "OPTIONS /api/auth/login HTTP/1.1" 204 0 "-" "curl/8.16.0" "-"
+streammake-nginx  | 172.19.0.1 - - [05/Dec/2025:18:25:38 +0000] "POST /api/auth/login HTTP/1.1" 403 0 "-" "curl/8.16.0" "-"
+
+9. Configuration Nginx (location /api/)...
+----------------------------------------
+        location /api/ {
+            # Gérer OPTIONS (preflight CORS) - DOIT être avant proxy_pass
+            if ($request_method = 'OPTIONS') {
+                add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+                add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD' always;
+                add_header 'Access-Control-Allow-Headers' 'Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Origin, X-Requested-With, Access-Control-Request-Method, Access-Control-Request-Headers' always;
+                add_header 'Access-Control-Allow-Credentials' 'true' always;
+                add_header 'Access-Control-Max-Age' '86400' always;
+                add_header 'Content-Length' '0' always;
+                return 204;
+            }
+
+            # Proxy vers le backend pour toutes les autres méthodes
+            proxy_pass http://backend;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Forwarded-Port $server_port;
+            
+            # IMPORTANT: Préserver le body de la requête pour les requêtes POST
+            proxy_pass_request_body on;
+            proxy_pass_request_headers on;
+            proxy_buffering off;  # Désactiver le buffering pour éviter les problèmes avec les requêtes POST
+            
+            # Headers CORS pour les réponses (après proxy)
+            add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS, PATCH, HEAD' always;
+
+10. Variables d'environnement backend...
+----------------------------------------
+JWT_SECRET=your-secret-key-change-in-production
+DB_PORT=5432
+REDIS_PORT=6379
+DB_HOST=postgres
+REDIS_HOST=redis
+PORT=8080
+DB_USER=streammake
+DB_PASSWORD=streammake_password
+DB_NAME=streammake_db
+
+11. Test GET /api/videos (pour comparaison)...
+----------------------------------------
+GET direct (port 3301):
+{"limit":20,"page":1,"total":0,"videos":[]}
+HTTP_CODE:200
+
+GET via Nginx (port 3300):
+{"limit":20,"page":1,"total":0,"videos":[]}
+HTTP_CODE:200
+
+12. Vérification réseau Docker...
+----------------------------------------
+IP du backend:
+172.19.0.4
+IP de Nginx:
+172.19.0.6
+Test de connexion Nginx -> Backend:
+PING backend (172.19.0.4): 56 data bytes
+64 bytes from 172.19.0.4: seq=0 ttl=64 time=0.039 ms
+64 bytes from 172.19.0.4: seq=1 ttl=64 time=0.154 ms
+
+--- backend ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+round-trip min/avg/max = 0.039/0.096/0.154 ms
+
+13. Headers envoyés par Nginx au backend...
+----------------------------------------
+> POST /api/auth/login HTTP/1.1
+> Host: localhost:3300
+> User-Agent: curl/8.14.1
+> Accept: */*
+> Content-Type: application/json
+> X-Forwarded-For: 172.19.0.1
+> X-Real-IP: 172.19.0.1
+> Content-Length: 62
+> 
+< HTTP/1.1 200 OK
+
+14. Version de Gin utilisée...
+----------------------------------------
+	github.com/gin-gonic/gin v1.9.1
+
+15. Configuration SetTrustedProxies dans main.go...
+----------------------------------------
+	// IMPORTANT: SetTrustedProxies doit être appelé AVANT que le serveur ne démarre
+	// Dans Gin v1.9.1, il y a un comportement spécifique avec les proxies
+	// Solution: Utiliser une liste explicite incluant tous les réseaux Docker possibles
+	trustedProxies := []string{
+		"0.0.0.0/0",      // IPv4 - tous les proxies (développement uniquement)
+		"::/0",           // IPv6 - tous les proxies (développement uniquement)
+		"172.19.0.0/16",  // Réseau Docker par défaut
+		"172.17.0.0/16",  // Réseau Docker bridge
+		"172.18.0.0/16",  // Autre réseau Docker possible
+		"127.0.0.1",      // Localhost IPv4
+		"::1",            // Localhost IPv6
+		"10.0.0.0/8",     // Réseau privé
+		"192.168.0.0/16", // Réseau privé
+	}
+	
+	// Essayer d'abord avec nil (devrait accepter tous les proxies)
+	// Si cela ne fonctionne pas, utiliser la liste explicite
+	if err := router.SetTrustedProxies(nil); err != nil {
+		log.Printf("Erreur avec SetTrustedProxies(nil): %v, utilisation de la liste explicite", err)
+		router.SetTrustedProxies(trustedProxies)
+	}
+	
+	router.TrustedPlatform = "X-Forwarded-For" // Utiliser X-Forwarded-For pour identifier l'IP du client
+	
+	log.Printf("Configuration des proxies: SetTrustedProxies configuré, TrustedPlatform=%s", router.TrustedPlatform)
+
+	// Démarrer le serveur
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Serveur démarré sur le port %s", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("Erreur lors du démarrage du serveur: %v", err)
+	}
+}
+
+
+16. RÉSUMÉ DES RÉSULTATS...
+----------------------------------------
+✅ Backend direct (3301): FONCTIONNE
+❌ Via Nginx (3300): ÉCHEC (403 Forbidden)
+
+=========================================
+Fin du rapport
+=========================================

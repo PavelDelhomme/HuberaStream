@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api
+.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api test-all
 
 # Variables
 PROJECT_NAME := streammake
@@ -22,10 +22,12 @@ help:
 	@echo "${YELLOW}  debug-backend${NC}  Lancer le backend avec le debugger Delve"
 	@echo "${YELLOW}  test${NC}           Exécuter les tests backend"
 	@echo "${YELLOW}  test-api${NC}      Tester l'API (CORS, login, etc.)"
+	@echo "${YELLOW}  test-all${NC}      Exécuter tous les tests complets de l'application"
 	@echo "${YELLOW}  install-deps${NC}  Installer les dépendances backend Go"
 	@echo "${YELLOW}  status${NC}        Afficher le statut des services Docker"
 	@echo "${YELLOW}  shell-backend${NC}  Accéder au shell du conteneur backend"
 	@echo "${YELLOW}  shell-db${NC}       Accéder au shell PostgreSQL"
+	@echo "${YELLOW}  install-torrents${NC} Installer et démarrer les clients torrent"
 
 build:
 	@echo "${GREEN}Construction des images Docker...${NC}"
@@ -37,7 +39,7 @@ up:
 	@echo "${GREEN}Attente du démarrage des services...${NC}"
 	@sleep 5
 	@echo "${GREEN}Exécution des tests API...${NC}"
-	@./test-api.sh || true
+	@./scripts/test-api.sh || true
 
 down:
 	@echo "${YELLOW}Arrêt de tous les services...${NC}"
@@ -76,7 +78,11 @@ test:
 
 test-api:
 	@echo "${GREEN}Test de l'API...${NC}"
-	@./test-api.sh
+	@./scripts/test-api.sh
+
+test-all:
+	@echo "${GREEN}Tests complets de l'application...${NC}"
+	@./scripts/test-all.sh
 
 install-deps:
 	@echo "${GREEN}Installation des dépendances Go...${NC}"
@@ -87,7 +93,7 @@ status:
 	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) ps
 	@echo ""
 	@echo "${GREEN}Test rapide de l'API:${NC}"
-	@./test-api.sh || true
+	@./scripts/test-api.sh || true
 
 shell-backend:
 	@echo "${GREEN}Accès au shell du conteneur backend...${NC}"
@@ -96,3 +102,12 @@ shell-backend:
 shell-db:
 	@echo "${GREEN}Accès au shell du conteneur PostgreSQL...${NC}"
 	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec postgres psql -U streammake streammake_db
+
+install-torrents:
+	@echo "${GREEN}Installation et démarrage des clients torrent...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d transmission qbittorrent deluge rtorrent
+	@echo "${GREEN}✅ Clients torrent démarrés:${NC}"
+	@echo "${YELLOW}  - Transmission: http://localhost:3305${NC}"
+	@echo "${YELLOW}  - qBittorrent: http://localhost:3306${NC}"
+	@echo "${YELLOW}  - Deluge: http://localhost:3307${NC}"
+	@echo "${YELLOW}  - ruTorrent: http://localhost:3308${NC}"

@@ -48,6 +48,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	torrentHandler := NewTorrentHandler(db, cfg)
 	uploadHandler := NewUploadHandler(db, cfg)
 	scraperHandler := NewScraperHandler(db, cfg)
+	dvdHandler := NewDVDHandler(db, cfg)
+	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
+	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
 
 	// Routes publiques
 	api := router.Group("/api")
@@ -59,12 +62,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			auth.POST("/login", authHandler.Login)
 		}
 
+		// Route continue-watching (chemin différent pour éviter le conflit avec /videos/:id)
+		api.GET("/continue-watching", videoHandler.GetContinueWatching)
+		
 		// Vidéos publiques
 		videos := api.Group("/videos")
 		{
 			videos.GET("", videoHandler.ListVideos)
-			videos.GET("/:id", videoHandler.GetVideo)
 			videos.GET("/:id/stream", streamHandler.StreamVideo)
+			videos.GET("/:id", videoHandler.GetVideo)
 		}
 	}
 
@@ -76,11 +82,27 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		videos := protected.Group("/videos")
 		{
 			videos.POST("", videoHandler.CreateVideo)
-			videos.POST("/upload", uploadHandler.UploadVideo)
 			videos.POST("/:id/thumbnail", uploadHandler.UploadThumbnail)
 			videos.PUT("/:id", videoHandler.UpdateVideo)
 			videos.DELETE("/:id", videoHandler.DeleteVideo)
 			videos.POST("/:id/download", videoHandler.DownloadFromStream)
+		}
+
+		// Upload (admin seulement)
+		upload := protected.Group("/videos")
+		upload.Use(middleware.AdminMiddleware(db))
+		{
+			upload.POST("/upload", uploadHandler.UploadVideo)
+		}
+
+		// Extraction DVD (admin seulement)
+		dvd := protected.Group("/dvd")
+		dvd.Use(middleware.AdminMiddleware(db))
+		{
+			dvd.GET("/detect", dvdHandler.DetectDVD)
+			dvd.GET("/info", dvdHandler.GetDVDInfo)
+			dvd.POST("/extract", dvdHandler.ExtractDVD)
+			dvd.GET("/extract/:id/status", dvdHandler.GetExtractionStatus)
 		}
 
 		// Playlists
@@ -155,6 +177,22 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			torrentConfigs.POST("", torrentHandler.CreateTorrentConfig)
 			torrentConfigs.PUT("/:id", torrentHandler.UpdateTorrentConfig)
 			torrentConfigs.DELETE("/:id", torrentHandler.DeleteTorrentConfig)
+		}
+
+		// Gestion des clients torrent
+		torrentClients := admin.Group("/torrent-clients")
+		{
+			torrentClients.GET("/status", torrentClientsHandler.GetTorrentClientsStatus)
+			torrentClients.GET("/current", torrentClientsHandler.GetCurrentTorrentClient)
+			torrentClients.PUT("/current", torrentClientsHandler.UpdateCurrentTorrentClient)
+			torrentClients.POST("/test", torrentClientsHandler.TestTorrentClient)
+		}
+
+		// Paramètres multimédias
+		mediaSettings := admin.Group("/media-settings")
+		{
+			mediaSettings.GET("", mediaSettingsHandler.GetMediaSettings)
+			mediaSettings.PUT("", mediaSettingsHandler.UpdateMediaSettings)
 		}
 
 		// Scraper (recherche de torrents)

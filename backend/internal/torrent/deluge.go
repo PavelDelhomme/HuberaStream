@@ -32,9 +32,9 @@ type DelugeResponse struct {
 }
 
 func NewDelugeClient(cfg *config.Config) (*DelugeClient, error) {
-	baseURL := "http://localhost:8112/json"
-	if cfg.TorrentClientPath != "" {
-		baseURL = cfg.TorrentClientPath
+	baseURL := cfg.TorrentClientPath
+	if baseURL == "" {
+		baseURL = "http://deluge:8112/json"
 	}
 
 	client := &DelugeClient{

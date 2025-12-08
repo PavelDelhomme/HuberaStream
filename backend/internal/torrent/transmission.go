@@ -52,7 +52,7 @@ type TransmissionTorrent struct {
 func NewTransmissionClient(cfg *config.Config) (*TransmissionClient, error) {
 	baseURL := cfg.TorrentClientPath
 	if baseURL == "" {
-		baseURL = "http://localhost:9091/transmission/rpc"
+		baseURL = "http://transmission:9091/transmission/rpc"
 	}
 
 	client := &TransmissionClient{

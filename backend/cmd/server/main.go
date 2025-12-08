@@ -35,16 +35,33 @@ func main() {
 	// Initialiser le routeur API
 	router := api.SetupRouter(db, cfg)
 
-	// CRITIQUE: Le problème 403 persiste même sans SetTrustedProxies
-	// Le blocage se produit AVANT les middlewares (quelques microsecondes)
-	// 
-	// SOLUTION EXPÉRIMENTALE: Ne PAS configurer SetTrustedProxies du tout
-	// et utiliser le mode Release de Gin qui pourrait avoir un comportement différent
+	// CONFIGURATION DES PROXIES DE CONFIANCE
+	// D'après le rapport de diagnostic:
+	// - Backend IP: 172.18.0.4
+	// - Nginx IP: 172.18.0.6
+	// - X-Forwarded-For peut être 172.19.0.1 (réseau différent)
+	// - Une requête depuis Nginx (172.18.0.6) a réussi (ligne 87 du rapport)
+	//
+	// Le warning "You trusted all proxies" apparaît quand SetTrustedProxies n'est pas configuré
+	// mais que Gin détecte des headers X-Forwarded-For. Il faut configurer explicitement.
 	
-	// Ne PAS appeler SetTrustedProxies - laisser le comportement par défaut
-	// En mode développement, Gin devrait accepter toutes les requêtes
+	trustedProxies := []string{
+		"172.18.0.6/32",   // IP exacte de Nginx (d'après le rapport)
+		"172.18.0.0/16",  // Réseau Docker complet (172.18.x.x)
+		"172.19.0.0/16",  // Réseau Docker alternatif (pour X-Forwarded-For)
+		"172.17.0.0/16",  // Réseau Docker bridge par défaut
+		"127.0.0.1",      // Localhost
+		"::1",            // Localhost IPv6
+	}
 	
-	log.Printf("Configuration des proxies: DÉSACTIVÉE (comportement par défaut)")
+	if err := router.SetTrustedProxies(trustedProxies); err != nil {
+		log.Printf("Avertissement: Erreur lors de la configuration des proxies: %v", err)
+	}
+	
+	// Utiliser X-Forwarded-For comme plateforme de confiance
+	router.TrustedPlatform = "X-Forwarded-For"
+	
+	log.Printf("Configuration des proxies: IPs de confiance = %v, TrustedPlatform = %s", trustedProxies, router.TrustedPlatform)
 
 	// Démarrer le serveur
 	port := os.Getenv("PORT")

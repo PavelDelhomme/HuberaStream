@@ -1,4 +1,4 @@
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Installer les dépendances système nécessaires
 RUN apk add --no-cache \
@@ -22,9 +22,11 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o /app/main ./cmd/s
 
 FROM alpine:latest
 
-# Installer FFmpeg pour le transcodage vidéo
+# Installer FFmpeg et outils pour l'extraction DVD
 RUN apk add --no-cache \
     ffmpeg \
+    ffmpeg-dev \
+    file \
     ca-certificates \
     tzdata
 
