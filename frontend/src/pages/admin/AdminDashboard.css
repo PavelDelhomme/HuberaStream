@@ -9,11 +9,112 @@
 .admin-header {
   margin-bottom: 30px;
   color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
 }
 
 .admin-header h1 {
   font-size: 32px;
   font-weight: 600;
+  margin: 0;
+}
+
+.admin-header-actions {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.admin-action-button {
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 15px;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-action-button.primary {
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  color: #ffffff;
+}
+
+.admin-action-button.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+}
+
+.admin-action-button.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.admin-action-button.secondary:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Actions rapides */
+.admin-quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.quick-action-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 30px;
+  text-decoration: none;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.quick-action-card:hover {
+  transform: translateY(-5px);
+  border-color: #ff0000;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(255, 0, 0, 0.2);
+}
+
+.quick-action-card.upload-card:hover {
+  border-color: #ff0000;
+  box-shadow: 0 8px 24px rgba(255, 0, 0, 0.3);
+}
+
+.quick-action-card.dvd-card:hover {
+  border-color: #6c5ce7;
+  box-shadow: 0 8px 24px rgba(108, 92, 231, 0.3);
+}
+
+.quick-action-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.quick-action-card h2 {
+  color: #ffffff;
+  font-size: 24px;
+  margin: 0 0 10px 0;
+}
+
+.quick-action-card p {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  margin: 0;
+  line-height: 1.5;
 }
 
 .admin-stats {
@@ -79,3 +180,35 @@
   margin: 0;
 }
 
+@media (max-width: 768px) {
+  .admin-dashboard {
+    padding: 20px;
+  }
+
+  .admin-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .admin-action-button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .admin-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-quick-actions {
+    grid-template-columns: 1fr;
+  }
+  
+  .admin-menu {
+    grid-template-columns: 1fr;
+  }
+}

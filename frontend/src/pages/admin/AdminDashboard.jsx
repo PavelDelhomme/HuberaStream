@@ -43,7 +43,15 @@ const AdminDashboard = () => {
   return (
     <div className="admin-dashboard">
       <div className="admin-header">
-        <h1>Tableau de bord administrateur</h1>
+        <h1>📊 Tableau de bord administrateur</h1>
+        <div className="admin-header-actions">
+          <Link to="/upload" className="admin-action-button primary">
+            ⬆️ Upload Vidéo
+          </Link>
+          <Link to="/dvd-extract" className="admin-action-button secondary">
+            📀 Extraire DVD
+          </Link>
+        </div>
       </div>
 
       <div className="admin-stats">
@@ -69,6 +77,20 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* Actions rapides */}
+      <div className="admin-quick-actions">
+        <Link to="/upload" className="quick-action-card upload-card">
+          <div className="quick-action-icon">⬆️</div>
+          <h2>Upload Vidéo</h2>
+          <p>Téléverser une nouvelle vidéo sur la plateforme</p>
+        </Link>
+        <Link to="/dvd-extract" className="quick-action-card dvd-card">
+          <div className="quick-action-icon">📀</div>
+          <h2>Extraire DVD</h2>
+          <p>Extraire le contenu d'un DVD physique</p>
+        </Link>
+      </div>
+
       <div className="admin-menu">
         <Link to="/admin/users" className="admin-menu-card">
           <h2>👥 Utilisateurs</h2>
@@ -78,9 +100,17 @@ const AdminDashboard = () => {
           <h2>📥 Torrents</h2>
           <p>Gérer les téléchargements torrent</p>
         </Link>
+        <Link to="/admin/torrent-clients" className="admin-menu-card">
+          <h2>⚙️ Clients Torrent</h2>
+          <p>Configurer les clients torrent (Transmission, qBittorrent, etc.)</p>
+        </Link>
         <Link to="/admin/torrent-configs" className="admin-menu-card">
           <h2>⚙️ Configurations Torrent</h2>
           <p>Configurer les téléchargements automatiques</p>
+        </Link>
+        <Link to="/admin/media-settings" className="admin-menu-card">
+          <h2>🎬 Paramètres Média</h2>
+          <p>Configurer le transcodage et le stockage</p>
         </Link>
         <Link to="/admin/categories" className="admin-menu-card">
           <h2>📂 Catégories</h2>

@@ -91,7 +91,7 @@ const Upload = () => {
       }
       uploadData.append('is_public', formData.is_public)
 
-      const response = await api.post('/videos/upload', uploadData, {
+      const response = await api.post('/admin/videos/upload', uploadData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
