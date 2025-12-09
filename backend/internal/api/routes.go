@@ -51,6 +51,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	dvdHandler := NewDVDHandler(db, cfg)
 	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
 	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
+	favoriteHandler := NewFavoriteHandler(db, cfg)
 
 	// Routes publiques
 	api := router.Group("/api")
@@ -125,6 +126,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		users := protected.Group("/users")
 		{
 			users.GET("/me", authHandler.GetProfile)
+		}
+
+		// Favoris
+		favorites := protected.Group("/favorites")
+		{
+			favorites.GET("", favoriteHandler.ListFavorites)
+			favorites.POST("/:id", favoriteHandler.AddFavorite)
+			favorites.DELETE("/:id", favoriteHandler.RemoveFavorite)
+			favorites.GET("/:id/check", favoriteHandler.IsFavorite)
 		}
 	}
 
