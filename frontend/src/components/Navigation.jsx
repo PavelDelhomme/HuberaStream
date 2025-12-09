@@ -233,7 +233,8 @@ const Navigation = () => {
               🔍
             </button>
           </form>
-        </div>
+          </div>
+        )}
 
         {/* Bouton recherche qui ouvre la barre - seulement si connecté */}
         {user && (
