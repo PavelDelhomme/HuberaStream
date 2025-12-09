@@ -20,6 +20,15 @@ const Navigation = () => {
   // Fermer les menus quand on clique ailleurs
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Vérifier si le clic est sur un lien dans le dropdown
+      const isLinkClick = event.target.closest('a.dropdown-item') || 
+                          event.target.closest('.dropdown-item')
+      
+      // Ne pas fermer si on clique sur un lien dans le menu
+      if (isLinkClick) {
+        return
+      }
+      
       if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
         setShowAdminMenu(false)
       }
@@ -36,8 +45,9 @@ const Navigation = () => {
         setShowSearchBar(false)
       }
     }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    // Utiliser 'click' au lieu de 'mousedown' pour permettre aux liens de fonctionner
+    document.addEventListener('click', handleClickOutside, true)
+    return () => document.removeEventListener('click', handleClickOutside, true)
   }, [showSearchBar])
 
   // Fermer le menu mobile quand on change de page
@@ -338,8 +348,13 @@ const Navigation = () => {
                           to="/admin" 
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            // Navigation manuelle pour s'assurer que ça fonctionne
+                            setTimeout(() => {
+                              navigate('/admin');
+                            }, 0);
                           }}
                         >
                           📊 Tableau de bord
@@ -449,6 +464,7 @@ const Navigation = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowUserMenu(false);
+                        navigate('/profile');
                       }}
                     >
                       👤 Mon Profil
@@ -459,6 +475,7 @@ const Navigation = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowUserMenu(false);
+                        navigate('/favorites');
                       }}
                     >
                       ⭐ Favoris
@@ -469,6 +486,7 @@ const Navigation = () => {
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowUserMenu(false);
+                        navigate('/history');
                       }}
                     >
                       📺 Historique
