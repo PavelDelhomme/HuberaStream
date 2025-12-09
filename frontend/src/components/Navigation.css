@@ -626,11 +626,19 @@
   
   .nav-links {
     gap: 8px;
+    flex-wrap: nowrap;
   }
   
   .nav-link {
-    padding: 8px 12px;
+    padding: 10px 16px;
     font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  
+  .nav-link-primary {
+    padding: 10px 18px;
+    font-weight: 600;
   }
   
   .username {
@@ -660,11 +668,13 @@
 @media (max-width: 480px) {
   .nav-container {
     padding: 0 10px;
-    gap: 8px;
+    gap: 6px;
   }
 
   .nav-logo {
     font-size: 18px;
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .logo-text {
@@ -683,6 +693,25 @@
   .mobile-menu-item {
     padding: 14px 16px;
     font-size: 15px;
+  }
+  
+  .nav-links {
+    gap: 6px;
+  }
+  
+  .nav-link {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .nav-link-primary {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+  
+  /* Cacher le bouton recherche sur mobile si non connecté */
+  .search-toggle-button:not(:has(+ .nav-links)) {
+    display: none;
   }
 }
 

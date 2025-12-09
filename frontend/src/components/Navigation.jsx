@@ -201,8 +201,9 @@ const Navigation = () => {
           </div>
         )}
 
-        {/* Barre de recherche animée */}
-        <div className={`search-container ${showSearchBar ? 'active' : ''}`}>
+        {/* Barre de recherche animée - seulement si connecté */}
+        {user && (
+          <div className={`search-container ${showSearchBar ? 'active' : ''}`}>
           <form className="nav-search" onSubmit={(e) => {
             handleSearch(e)
             setShowSearchBar(false)
@@ -234,23 +235,25 @@ const Navigation = () => {
           </form>
         </div>
 
-        {/* Bouton recherche qui ouvre la barre */}
-        <button 
-          className={`search-toggle-button ${showSearchBar ? 'active' : ''}`}
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setShowSearchBar(prev => {
-              const newState = !prev
-              console.log('Toggle search bar:', newState)
-              return newState
-            })
-          }}
-          type="button"
-          aria-label="Rechercher"
-        >
-          🔍
-        </button>
+        {/* Bouton recherche qui ouvre la barre - seulement si connecté */}
+        {user && (
+          <button 
+            className={`search-toggle-button ${showSearchBar ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setShowSearchBar(prev => {
+                const newState = !prev
+                console.log('Toggle search bar:', newState)
+                return newState
+              })
+            }}
+            type="button"
+            aria-label="Rechercher"
+          >
+            🔍
+          </button>
+        )}
 
         {/* Bouton Upload visible pour les admins */}
         {user && (user.role === 'admin' || isAdmin()) && (
