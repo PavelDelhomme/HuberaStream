@@ -8,7 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import './Home.css'
 
 const Home = () => {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth()
   const [continueWatching, setContinueWatching] = useState([])
   const [trendingVideos, setTrendingVideos] = useState([])
   const [recentVideos, setRecentVideos] = useState([])
@@ -19,8 +19,12 @@ const Home = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    // Attendre que l'authentification soit chargée avant de faire les requêtes
+    if (authLoading) {
+      return
+    }
     fetchAllData()
-  }, [user])
+  }, [user, authLoading])
 
   const fetchAllData = async () => {
     try {

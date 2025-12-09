@@ -27,16 +27,35 @@ export const AuthProvider = ({ children }) => {
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
           
           // Vérifier que le token est valide en récupérant l'utilisateur
-          const response = await api.get('/users/me')
-          setUser(response.data)
-          setToken(storedToken)
+          // Utiliser un timeout pour éviter que la requête bloque trop longtemps
+          const response = await api.get('/users/me', {
+            timeout: 5000, // 5 secondes de timeout
+            // Ne pas intercepter cette requête pour éviter les conflits
+            validateStatus: (status) => status < 500 // Accepter les erreurs 401/403 mais pas 500+
+          })
+          
+          if (response.status === 200 && response.data) {
+            setUser(response.data)
+            setToken(storedToken)
+          } else {
+            // Token invalide ou expiré
+            throw new Error('Token invalide')
+          }
         } catch (error) {
-          console.error('Token invalide ou expiré:', error)
-          // Token invalide, nettoyer
-          localStorage.removeItem('token')
-          delete api.defaults.headers.common['Authorization']
-          setToken(null)
-          setUser(null)
+          // Seulement nettoyer le token si c'est vraiment une erreur d'authentification
+          if (error.response?.status === 401 || error.response?.status === 403) {
+            console.error('Token invalide ou expiré:', error)
+            localStorage.removeItem('token')
+            delete api.defaults.headers.common['Authorization']
+            setToken(null)
+            setUser(null)
+          } else {
+            // Pour les autres erreurs (réseau, timeout), garder le token
+            // L'utilisateur pourra réessayer
+            console.warn('Erreur lors de la vérification du token (réseau/timeout):', error)
+            // Garder le token mais ne pas définir l'utilisateur
+            // L'utilisateur devra se reconnecter si nécessaire
+          }
         }
       }
       

@@ -52,12 +52,26 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Ne rediriger que si ce n'est pas la route de login et si c'est vraiment une erreur 401
-    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
-      localStorage.removeItem('token')
-      // Utiliser navigate au lieu de window.location pour éviter les rechargements
-      // Mais ici on doit utiliser window.location car l'intercepteur n'a pas accès à navigate
-      // On va laisser AuthContext gérer la redirection
+    // Ne pas supprimer le token si on est sur la page d'accueil ou de login
+    // L'AuthContext gérera la vérification du token au chargement
+    if (error.response?.status === 401) {
+      const currentPath = window.location.pathname
+      // Ne pas supprimer le token si on est sur la page d'accueil ou de login
+      // Cela permet à AuthContext de vérifier le token correctement
+      if (currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
+        // Laisser AuthContext gérer la vérification
+        return Promise.reject(error)
+      }
+      // Pour les autres pages, supprimer le token seulement si on n'est pas en train de charger
+      // (pour éviter de supprimer le token pendant la vérification initiale)
+      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
+        // Vérifier si le token existe encore (pour éviter de supprimer pendant le chargement initial)
+        const token = localStorage.getItem('token')
+        if (token && error.config?.url !== '/users/me') {
+          // Ne pas supprimer le token si c'est la requête de vérification initiale
+          // AuthContext gérera cela
+        }
+      }
     }
     return Promise.reject(error)
   }
