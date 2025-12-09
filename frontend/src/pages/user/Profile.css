@@ -1,8 +1,30 @@
 .profile-page {
-  padding: 100px 30px 30px;
-  max-width: 1000px;
+  padding: 30px;
+  max-width: 1200px;
   margin: 0 auto;
-  min-height: calc(100vh - 70px);
+  min-height: calc(100vh - 80px);
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(108, 92, 231, 0.2);
+  border-top-color: #6c5ce7;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .profile-header h1 {

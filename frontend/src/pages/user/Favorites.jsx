@@ -20,19 +20,42 @@ const Favorites = () => {
 
   const fetchFavorites = async () => {
     try {
-      // TODO: Implémenter l'API des favoris
-      // const response = await api.get('/favorites')
-      // setFavorites(response.data || [])
-      setFavorites([]) // Temporaire
+      // Essayer l'endpoint /favorites, sinon utiliser les playlists ou une autre source
+      try {
+        const response = await api.get('/favorites')
+        setFavorites(response.data || [])
+      } catch (favoritesError) {
+        // Si l'endpoint n'existe pas, essayer de récupérer depuis les playlists favorites
+        try {
+          const playlistsResponse = await api.get('/playlists')
+          const favoritePlaylist = playlistsResponse.data?.find(p => p.name?.toLowerCase().includes('favori'))
+          if (favoritePlaylist?.videos) {
+            setFavorites(favoritePlaylist.videos)
+          } else {
+            setFavorites([])
+          }
+        } catch (playlistError) {
+          console.log('Aucun système de favoris disponible pour le moment')
+          setFavorites([])
+        }
+      }
     } catch (error) {
       console.error('Erreur lors de la récupération des favoris:', error)
+      setFavorites([])
     } finally {
       setLoading(false)
     }
   }
 
   if (loading) {
-    return <div className="favorites-page">Chargement...</div>
+    return (
+      <div className="favorites-page">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Chargement des favoris...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -44,22 +67,41 @@ const Favorites = () => {
 
       {favorites.length === 0 ? (
         <div className="empty-state">
+          <div className="empty-icon">⭐</div>
           <p>Vous n'avez pas encore de favoris</p>
+          <p className="empty-hint">Ajoutez des vidéos à vos favoris pour les retrouver facilement</p>
           <Link to="/" className="btn-primary">Découvrir des vidéos</Link>
         </div>
       ) : (
         <div className="favorites-grid">
-          {favorites.map((video) => (
-            <Link key={video.id} to={`/video/${video.id}`} className="favorite-item">
-              {video.thumbnail && (
-                <img src={video.thumbnail} alt={video.title} className="favorite-thumbnail" />
-              )}
-              <div className="favorite-info">
-                <h3>{video.title || 'Vidéo'}</h3>
-                <p className="favorite-description">{video.description}</p>
-              </div>
-            </Link>
-          ))}
+          {favorites.map((video) => {
+            const videoData = video.Video || video.video || video
+            return (
+              <Link key={videoData.id || video.id} to={`/video/${videoData.id || video.id}`} className="favorite-item">
+                {videoData.thumbnail_path || video.thumbnail ? (
+                  <img 
+                    src={videoData.thumbnail_path ? `/thumbnails/${videoData.thumbnail_path.split('/').pop()}` : video.thumbnail} 
+                    alt={videoData.title || video.title || 'Vidéo'} 
+                    className="favorite-thumbnail"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/320x180?text=No+Thumbnail'
+                    }}
+                  />
+                ) : (
+                  <div className="favorite-thumbnail-placeholder">
+                    <span>📹</span>
+                  </div>
+                )}
+                <div className="favorite-info">
+                  <h3>{videoData.title || video.title || 'Vidéo'}</h3>
+                  <p className="favorite-description">{videoData.description || video.description || ''}</p>
+                  {videoData.views !== undefined && (
+                    <p className="favorite-views">{videoData.views} vues</p>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

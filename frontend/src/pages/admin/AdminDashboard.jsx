@@ -27,23 +27,64 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await api.get('/admin/stats')
-      setStats(response.data)
+      // Essayer de récupérer les stats depuis l'API admin
+      try {
+        const response = await api.get('/admin/stats')
+        setStats(response.data)
+      } catch (statsError) {
+        // Si l'endpoint n'existe pas, calculer les stats depuis les autres endpoints
+        console.log('Endpoint /admin/stats non disponible, calcul des stats...')
+        const [usersRes, videosRes, torrentsRes, categoriesRes] = await Promise.allSettled([
+          api.get('/admin/users?page=1&limit=1'),
+          api.get('/videos?page=1&limit=1'),
+          api.get('/admin/torrents'),
+          api.get('/categories')
+        ])
+        
+        const stats = {
+          total_users: usersRes.status === 'fulfilled' ? (usersRes.value.data?.total || usersRes.value.data?.users?.length || 0) : 0,
+          total_videos: videosRes.status === 'fulfilled' ? (videosRes.value.data?.total || videosRes.value.data?.videos?.length || 0) : 0,
+          total_torrents: torrentsRes.status === 'fulfilled' ? (torrentsRes.value.data?.torrents?.length || 0) : 0,
+          active_torrents: torrentsRes.status === 'fulfilled' 
+            ? (torrentsRes.value.data?.torrents?.filter(t => t.status === 'downloading' || t.status === 'seeding')?.length || 0) 
+            : 0,
+          total_categories: categoriesRes.status === 'fulfilled' ? (categoriesRes.value.data?.length || 0) : 0
+        }
+        setStats(stats)
+      }
     } catch (error) {
       console.error('Erreur lors de la récupération des statistiques:', error)
+      // Stats par défaut en cas d'erreur
+      setStats({
+        total_users: 0,
+        total_videos: 0,
+        total_torrents: 0,
+        active_torrents: 0,
+        total_categories: 0
+      })
     } finally {
       setLoading(false)
     }
   }
 
   if (loading) {
-    return <div className="admin-dashboard">Chargement...</div>
+    return (
+      <div className="admin-dashboard">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="admin-dashboard">
       <div className="admin-header">
-        <h1>📊 Tableau de bord administrateur</h1>
+        <div className="admin-header-title">
+          <h1>📊 Tableau de bord administrateur</h1>
+          <p className="admin-subtitle">Vue d'ensemble de votre plateforme StreamMake</p>
+        </div>
         <div className="admin-header-actions">
           <Link to="/upload" className="admin-action-button primary">
             ⬆️ Upload Vidéo
@@ -54,72 +95,107 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      {/* Statistiques principales */}
       <div className="admin-stats">
-        <div className="stat-card">
-          <h3>Utilisateurs</h3>
-          <p className="stat-value">{stats?.total_users || 0}</p>
+        <div className="stat-card stat-card-users">
+          <div className="stat-icon">👥</div>
+          <div className="stat-content">
+            <h3>Utilisateurs</h3>
+            <p className="stat-value">{stats?.total_users || 0}</p>
+            <Link to="/admin/users" className="stat-link">Voir tous →</Link>
+          </div>
         </div>
-        <div className="stat-card">
-          <h3>Vidéos</h3>
-          <p className="stat-value">{stats?.total_videos || 0}</p>
+        <div className="stat-card stat-card-videos">
+          <div className="stat-icon">🎬</div>
+          <div className="stat-content">
+            <h3>Vidéos</h3>
+            <p className="stat-value">{stats?.total_videos || 0}</p>
+            <Link to="/admin/videos" className="stat-link">Gérer →</Link>
+          </div>
         </div>
-        <div className="stat-card">
-          <h3>Torrents</h3>
-          <p className="stat-value">{stats?.total_torrents || 0}</p>
+        <div className="stat-card stat-card-torrents">
+          <div className="stat-icon">📥</div>
+          <div className="stat-content">
+            <h3>Torrents</h3>
+            <p className="stat-value">{stats?.total_torrents || 0}</p>
+            <Link to="/admin/torrents" className="stat-link">Gérer →</Link>
+          </div>
         </div>
-        <div className="stat-card">
-          <h3>Torrents actifs</h3>
-          <p className="stat-value">{stats?.active_torrents || 0}</p>
+        <div className="stat-card stat-card-active">
+          <div className="stat-icon">⚡</div>
+          <div className="stat-content">
+            <h3>Torrents actifs</h3>
+            <p className="stat-value">{stats?.active_torrents || 0}</p>
+            <Link to="/admin/torrents" className="stat-link">Voir →</Link>
+          </div>
         </div>
-        <div className="stat-card">
-          <h3>Catégories</h3>
-          <p className="stat-value">{stats?.total_categories || 0}</p>
+        <div className="stat-card stat-card-categories">
+          <div className="stat-icon">📂</div>
+          <div className="stat-content">
+            <h3>Catégories</h3>
+            <p className="stat-value">{stats?.total_categories || 0}</p>
+            <Link to="/admin/categories" className="stat-link">Gérer →</Link>
+          </div>
         </div>
       </div>
 
       {/* Actions rapides */}
       <div className="admin-quick-actions">
-        <Link to="/upload" className="quick-action-card upload-card">
-          <div className="quick-action-icon">⬆️</div>
-          <h2>Upload Vidéo</h2>
-          <p>Téléverser une nouvelle vidéo sur la plateforme</p>
-        </Link>
-        <Link to="/dvd-extract" className="quick-action-card dvd-card">
-          <div className="quick-action-icon">📀</div>
-          <h2>Extraire DVD</h2>
-          <p>Extraire le contenu d'un DVD physique</p>
-        </Link>
+        <h2 className="section-title">⚡ Actions rapides</h2>
+        <div className="quick-actions-grid">
+          <Link to="/upload" className="quick-action-card upload-card">
+            <div className="quick-action-icon">⬆️</div>
+            <h3>Upload Vidéo</h3>
+            <p>Téléverser une nouvelle vidéo sur la plateforme</p>
+          </Link>
+          <Link to="/dvd-extract" className="quick-action-card dvd-card">
+            <div className="quick-action-icon">📀</div>
+            <h3>Extraire DVD</h3>
+            <p>Extraire le contenu d'un DVD physique</p>
+          </Link>
+        </div>
       </div>
 
+      {/* Menu d'administration */}
       <div className="admin-menu">
-        <Link to="/admin/videos" className="admin-menu-card">
-          <h2>📹 Gérer Vidéos</h2>
-          <p>Gérer toutes les vidéos de la plateforme</p>
-        </Link>
-        <Link to="/admin/users" className="admin-menu-card">
-          <h2>👥 Utilisateurs</h2>
-          <p>Gérer les utilisateurs et leurs permissions</p>
-        </Link>
-        <Link to="/admin/categories" className="admin-menu-card">
-          <h2>📂 Catégories</h2>
-          <p>Gérer les catégories et sous-catégories</p>
-        </Link>
-        <Link to="/admin/torrents" className="admin-menu-card">
-          <h2>📥 Torrents</h2>
-          <p>Gérer les téléchargements torrent</p>
-        </Link>
-        <Link to="/admin/torrent-clients" className="admin-menu-card">
-          <h2>⚙️ Clients Torrent</h2>
-          <p>Configurer les clients torrent (Transmission, qBittorrent, etc.)</p>
-        </Link>
-        <Link to="/admin/torrent-configs" className="admin-menu-card">
-          <h2>⚙️ Configurations Torrent</h2>
-          <p>Configurer les téléchargements automatiques</p>
-        </Link>
-        <Link to="/admin/media-settings" className="admin-menu-card">
-          <h2>🎬 Paramètres Média</h2>
-          <p>Configurer le transcodage et le stockage</p>
-        </Link>
+        <h2 className="section-title">⚙️ Administration</h2>
+        <div className="admin-menu-grid">
+          <Link to="/admin/videos" className="admin-menu-card">
+            <div className="menu-card-icon">📹</div>
+            <h3>Gérer Vidéos</h3>
+            <p>Gérer toutes les vidéos de la plateforme</p>
+          </Link>
+          <Link to="/admin/users" className="admin-menu-card">
+            <div className="menu-card-icon">👥</div>
+            <h3>Utilisateurs</h3>
+            <p>Gérer les utilisateurs et leurs permissions</p>
+          </Link>
+          <Link to="/admin/categories" className="admin-menu-card">
+            <div className="menu-card-icon">📂</div>
+            <h3>Catégories</h3>
+            <p>Gérer les catégories et sous-catégories</p>
+          </Link>
+          <Link to="/admin/torrents" className="admin-menu-card">
+            <div className="menu-card-icon">📥</div>
+            <h3>Torrents</h3>
+            <p>Gérer les téléchargements torrent</p>
+          </Link>
+          <Link to="/admin/torrent-clients" className="admin-menu-card">
+            <div className="menu-card-icon">⚙️</div>
+            <h3>Clients Torrent</h3>
+            <p>Configurer les clients torrent</p>
+          </Link>
+          <Link to="/admin/torrent-configs" className="admin-menu-card">
+            <div className="menu-card-icon">🔧</div>
+            <h3>Configurations</h3>
+            <p>Gérer les configurations de téléchargement</p>
+          </Link>
+          <Link to="/admin/media-settings" className="admin-menu-card">
+            <div className="menu-card-icon">🎬</div>
+            <h3>Paramètres Média</h3>
+            <p>Configurer les paramètres de traitement vidéo</p>
+          </Link>
+        </div>
       </div>
     </div>
   )

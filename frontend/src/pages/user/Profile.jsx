@@ -38,20 +38,72 @@ const Profile = () => {
     }
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const fetchStats = async () => {
     try {
-      // TODO: Implémenter l'API de mise à jour du profil
-      // await api.put('/users/me', formData)
-      alert('Mise à jour du profil à implémenter')
-      setEditing(false)
+      // Récupérer les statistiques de l'utilisateur
+      const [historyRes, playlistsRes] = await Promise.allSettled([
+        api.get('/history'),
+        api.get('/playlists')
+      ])
+      
+      const historyCount = historyRes.status === 'fulfilled' 
+        ? (Array.isArray(historyRes.value.data) ? historyRes.value.data.length : historyRes.value.data?.videos?.length || 0)
+        : 0
+      const playlistsCount = playlistsRes.status === 'fulfilled' 
+        ? (playlistsRes.value.data?.length || 0)
+        : 0
+      
+      return {
+        videosWatched: historyCount,
+        playlists: playlistsCount,
+        favorites: 0 // À implémenter quand l'API sera disponible
+      }
     } catch (error) {
-      console.error('Erreur lors de la mise à jour:', error)
+      console.error('Erreur lors de la récupération des statistiques:', error)
+      return { videosWatched: 0, playlists: 0, favorites: 0 }
     }
   }
 
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      // Essayer de mettre à jour le profil
+      try {
+        await api.put('/users/me', formData)
+        alert('Profil mis à jour avec succès !')
+        fetchProfile() // Recharger le profil
+        setEditing(false)
+      } catch (updateError) {
+        // Si l'endpoint n'existe pas, informer l'utilisateur
+        if (updateError.response?.status === 404 || updateError.response?.status === 405) {
+          alert('La mise à jour du profil n\'est pas encore disponible. Cette fonctionnalité sera bientôt implémentée.')
+        } else {
+          throw updateError
+        }
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour:', error)
+      alert('Erreur lors de la mise à jour du profil')
+    }
+  }
+
+  const [userStats, setUserStats] = useState({ videosWatched: 0, playlists: 0, favorites: 0 })
+
+  useEffect(() => {
+    if (user && !loading) {
+      fetchStats().then(setUserStats)
+    }
+  }, [user, loading])
+
   if (loading) {
-    return <div className="profile-page">Chargement...</div>
+    return (
+      <div className="profile-page">
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Chargement du profil...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -108,18 +160,18 @@ const Profile = () => {
         </div>
 
         <div className="profile-stats">
-          <h3>Statistiques</h3>
+          <h3>📊 Statistiques</h3>
           <div className="stats-grid">
             <div className="stat-item">
-              <span className="stat-value">-</span>
+              <span className="stat-value">{userStats.videosWatched}</span>
               <span className="stat-label">Vidéos regardées</span>
             </div>
             <div className="stat-item">
-              <span className="stat-value">-</span>
+              <span className="stat-value">{userStats.playlists}</span>
               <span className="stat-label">Playlists</span>
             </div>
             <div className="stat-item">
-              <span className="stat-value">-</span>
+              <span className="stat-value">{userStats.favorites}</span>
               <span className="stat-label">Favoris</span>
             </div>
           </div>
@@ -130,4 +182,5 @@ const Profile = () => {
 }
 
 export default Profile
+
 
