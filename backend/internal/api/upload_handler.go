@@ -121,6 +121,7 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 	// Générer la miniature depuis la vidéo
 	thumbnailPath, err := h.processor.GenerateThumbnail(videoPath, videoID)
 	if err != nil {
+		fmt.Printf("Erreur lors de la génération de la miniature depuis la vidéo: %v\n", err)
 		// Si la génération depuis la vidéo échoue, créer une miniature textuelle basée sur le titre
 		thumbnailPath, err = h.generateTextThumbnail(videoID, title)
 		if err != nil {
@@ -136,23 +137,68 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 	duration, err := h.processor.GetVideoDuration(videoPath)
 	if err == nil {
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("duration", duration)
+	} else {
+		fmt.Printf("Erreur lors de la récupération de la durée: %v\n", err)
 	}
 
-	// Créer le format progressif
-	progressivePath, err := h.processor.TranscodeToProgressive(videoPath, videoID, "720p")
-	if err == nil {
+	// Qualités à générer (du plus bas au plus haut pour permettre le fallback)
+	qualities := []string{"360p", "480p", "720p", "1080p"}
+	
+	// Générer les formats progressifs (MP4) pour toutes les qualités
+	for _, quality := range qualities {
+		progressivePath, err := h.processor.TranscodeToProgressive(videoPath, videoID, quality)
+		if err != nil {
+			fmt.Printf("Erreur lors du transcodage progressif %s: %v\n", quality, err)
+			continue
+		}
+		
 		format := models.VideoFormat{
 			ID:       uuid.New(),
 			VideoID:  videoID,
 			Format:   "progressive",
 			FilePath: progressivePath,
-			Quality:  "720p",
+			Quality:  quality,
 		}
-		h.db.Create(&format)
+		if err := h.db.Create(&format).Error; err != nil {
+			fmt.Printf("Erreur lors de la création du format progressif %s: %v\n", quality, err)
+		} else {
+			fmt.Printf("Format progressif %s créé avec succès\n", quality)
+		}
 	}
 
-	// Mettre à jour le statut
-	h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
+	// Générer le format HLS (pour le streaming adaptatif)
+	// On génère seulement 720p en HLS pour commencer (peut être étendu)
+	hlsManifest, hlsDir, err := h.processor.TranscodeToHLS(videoPath, videoID, "720p")
+	if err != nil {
+		fmt.Printf("Erreur lors du transcodage HLS: %v\n", err)
+	} else {
+		format := models.VideoFormat{
+			ID:           uuid.New(),
+			VideoID:      videoID,
+			Format:       "hls",
+			FilePath:     hlsDir,
+			ManifestPath: hlsManifest,
+			Quality:      "720p",
+		}
+		if err := h.db.Create(&format).Error; err != nil {
+			fmt.Printf("Erreur lors de la création du format HLS: %v\n", err)
+		} else {
+			fmt.Printf("Format HLS créé avec succès\n")
+		}
+	}
+
+	// Vérifier qu'au moins un format a été créé
+	var formatCount int64
+	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
+	
+	if formatCount == 0 {
+		fmt.Printf("AUCUN FORMAT CRÉÉ POUR LA VIDÉO %s - La vidéo ne sera pas lisible\n", videoID)
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
+	} else {
+		fmt.Printf("Traitement terminé: %d format(s) créé(s) pour la vidéo %s\n", formatCount, videoID)
+		// Mettre à jour le statut seulement si au moins un format a été créé
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
+	}
 }
 
 func (h *UploadHandler) UploadThumbnail(c *gin.Context) {

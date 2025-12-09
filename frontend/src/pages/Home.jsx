@@ -133,7 +133,9 @@ const Home = () => {
         setCategories([])
         setVideosByCategory({})
       }
-      
+    } catch (err) {
+      // Gestion des erreurs générales
+      console.error('Erreur générale lors de la récupération des données:', err)
       // Ne pas afficher d'erreur si c'est juste qu'il n'y a pas de vidéos
       if (err.response?.status !== 404 && err.response?.status !== 401) {
         setError('Impossible de charger les vidéos. Veuillez réessayer plus tard.')

@@ -202,14 +202,21 @@ func (p *Processor) TranscodeToProgressive(videoPath string, videoID uuid.UUID, 
 		bitrate = "2500k"
 	}
 
+	// Détecter et gérer tous les formats d'entrée (AVI, MKV, MOV, MP4, WebM, etc.)
+	// FFmpeg gère automatiquement la conversion
 	cmd := exec.Command(
 		p.ffmpegPath,
 		"-i", videoPath,
-		"-c:v", "libx264",
-		"-c:a", "aac",
-		"-b:v", bitrate,
-		"-s", resolution,
-		"-movflags", "+faststart",
+		"-c:v", "libx264",           // Codec vidéo H.264 (compatible web)
+		"-preset", "medium",          // Équilibre vitesse/qualité
+		"-crf", "23",                 // Qualité constante (23 = bon équilibre)
+		"-c:a", "aac",                // Codec audio AAC (compatible web)
+		"-b:a", "128k",               // Bitrate audio
+		"-b:v", bitrate,              // Bitrate vidéo selon la qualité
+		"-s", resolution,             // Résolution
+		"-movflags", "+faststart",    // Optimisation pour streaming web
+		"-pix_fmt", "yuv420p",        // Format de pixels compatible (nécessaire pour web)
+		"-y",                         // Écraser le fichier de sortie s'il existe
 		outputPath,
 	)
 
