@@ -65,11 +65,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// Route continue-watching (chemin différent pour éviter le conflit avec /videos/:id)
 		api.GET("/continue-watching", videoHandler.GetContinueWatching)
 		
+		// Catégories (publiques - accessibles sans authentification)
+		api.GET("/categories", categoryHandler.ListCategories)
+		
 		// Vidéos publiques
 		videos := api.Group("/videos")
 		{
 			videos.GET("", videoHandler.ListVideos)
 			videos.GET("/:id/stream", streamHandler.StreamVideo)
+			videos.GET("/:id/subtitles/:subtitleId", streamHandler.StreamSubtitle)
 			videos.GET("/:id", videoHandler.GetVideo)
 		}
 	}
@@ -86,13 +90,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			videos.PUT("/:id", videoHandler.UpdateVideo)
 			videos.DELETE("/:id", videoHandler.DeleteVideo)
 			videos.POST("/:id/download", videoHandler.DownloadFromStream)
-		}
-
-		// Upload (admin seulement)
-		upload := protected.Group("/videos")
-		upload.Use(middleware.AdminMiddleware(db))
-		{
-			upload.POST("/upload", uploadHandler.UploadVideo)
 		}
 
 		// Extraction DVD (admin seulement)
@@ -128,12 +125,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		users := protected.Group("/users")
 		{
 			users.GET("/me", authHandler.GetProfile)
-		}
-
-		// Catégories (lecture pour tous)
-		categories := protected.Group("/categories")
-		{
-			categories.GET("", categoryHandler.ListCategories)
 		}
 	}
 
@@ -201,6 +192,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			scrapers.POST("/search", scraperHandler.Search)
 			scrapers.GET("/details", scraperHandler.GetTorrentDetails)
 		}
+
+		// Upload vidéo (admin seulement)
+		admin.POST("/videos/upload", uploadHandler.UploadVideo)
 	}
 
 	// Handler pour les routes non trouvées (debug)

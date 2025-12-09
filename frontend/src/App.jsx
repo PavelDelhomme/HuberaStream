@@ -4,13 +4,15 @@ import Navigation from './components/Navigation'
 import Home from './pages/Home'
 import VideoPlayer from './pages/VideoPlayer'
 import Search from './pages/Search'
-import Playlists from './pages/Playlists'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import History from './pages/History'
-import Profile from './pages/Profile'
-import Favorites from './pages/Favorites'
-import DVDExtract from './pages/DVDExtract'
+import Login from './pages/auth/Login'
+import Register from './pages/auth/Register'
+import History from './pages/user/History'
+import Profile from './pages/user/Profile'
+import Favorites from './pages/user/Favorites'
+import Playlists from './pages/user/Playlists'
+import DVDExtract from './pages/video/DVDExtract'
+import VideoPlayerPage from './pages/video/VideoPlayer'
+import Upload from './pages/video/Upload'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminTorrents from './pages/admin/AdminTorrents'
@@ -18,6 +20,7 @@ import AdminCategories from './pages/admin/AdminCategories'
 import AdminTorrentConfigs from './pages/admin/AdminTorrentConfigs'
 import AdminTorrentClients from './pages/admin/AdminTorrentClients'
 import AdminMediaSettings from './pages/admin/AdminMediaSettings'
+import AdminVideos from './pages/admin/AdminVideos'
 import Upload from './pages/Upload'
 import { AuthProvider } from './context/AuthContext'
 import './App.css'
@@ -31,7 +34,7 @@ function App() {
           <main className="main-content">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/video/:id" element={<VideoPlayer />} />
+              <Route path="/video/:id" element={<VideoPlayerPage />} />
               <Route path="/search" element={<Search />} />
               <Route path="/playlists" element={<Playlists />} />
               <Route path="/history" element={<History />} />
@@ -47,6 +50,7 @@ function App() {
               <Route path="/admin/torrent-configs" element={<AdminTorrentConfigs />} />
               <Route path="/admin/torrent-clients" element={<AdminTorrentClients />} />
               <Route path="/admin/media-settings" element={<AdminMediaSettings />} />
+              <Route path="/admin/videos" element={<AdminVideos />} />
               <Route path="/upload" element={<Upload />} />
             </Routes>
           </main>

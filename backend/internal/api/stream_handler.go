@@ -93,3 +93,53 @@ func (h *StreamHandler) StreamVideo(c *gin.Context) {
 	}
 }
 
+// StreamSubtitle sert un fichier de sous-titre
+func (h *StreamHandler) StreamSubtitle(c *gin.Context) {
+	videoIDParam := c.Param("id")
+	subtitleIDParam := c.Param("subtitleId")
+	
+	videoID, err := uuid.Parse(videoIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
+	
+	subtitleID, err := uuid.Parse(subtitleIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de sous-titre invalide"})
+		return
+	}
+	
+	// Vérifier que la vidéo existe
+	var video models.Video
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+	
+	// Récupérer le sous-titre
+	var subtitle models.Subtitle
+	if err := h.db.Where("id = ? AND video_id = ?", subtitleID, videoID).First(&subtitle).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Sous-titre non trouvé"})
+		return
+	}
+	
+	// Vérifier si le fichier existe
+	if _, err := os.Stat(subtitle.FilePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Fichier de sous-titre non trouvé"})
+		return
+	}
+	
+	// Servir le fichier avec le bon Content-Type
+	if strings.HasSuffix(subtitle.FilePath, ".vtt") {
+		c.Header("Content-Type", "text/vtt")
+	} else if strings.HasSuffix(subtitle.FilePath, ".srt") {
+		c.Header("Content-Type", "text/srt")
+	} else {
+		c.Header("Content-Type", "text/plain")
+	}
+	
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.File(subtitle.FilePath)
+}
+

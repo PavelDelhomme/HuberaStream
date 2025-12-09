@@ -92,9 +92,17 @@ const AdminDashboard = () => {
       </div>
 
       <div className="admin-menu">
+        <Link to="/admin/videos" className="admin-menu-card">
+          <h2>📹 Gérer Vidéos</h2>
+          <p>Gérer toutes les vidéos de la plateforme</p>
+        </Link>
         <Link to="/admin/users" className="admin-menu-card">
           <h2>👥 Utilisateurs</h2>
           <p>Gérer les utilisateurs et leurs permissions</p>
+        </Link>
+        <Link to="/admin/categories" className="admin-menu-card">
+          <h2>📂 Catégories</h2>
+          <p>Gérer les catégories et sous-catégories</p>
         </Link>
         <Link to="/admin/torrents" className="admin-menu-card">
           <h2>📥 Torrents</h2>
@@ -111,10 +119,6 @@ const AdminDashboard = () => {
         <Link to="/admin/media-settings" className="admin-menu-card">
           <h2>🎬 Paramètres Média</h2>
           <p>Configurer le transcodage et le stockage</p>
-        </Link>
-        <Link to="/admin/categories" className="admin-menu-card">
-          <h2>📂 Catégories</h2>
-          <p>Gérer les catégories et sous-catégories</p>
         </Link>
       </div>
     </div>

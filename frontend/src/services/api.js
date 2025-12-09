@@ -9,12 +9,22 @@ const getApiBaseURL = () => {
     return envURL
   }
   // Utiliser Nginx comme reverse proxy (port 3300)
-  // Si accès direct depuis le navigateur, utiliser le chemin relatif
-  if (window.location.port === '3300' || window.location.hostname === 'localhost') {
+  // Si accès depuis le navigateur (localhost ou IP locale), utiliser le chemin relatif
+  const hostname = window.location.hostname
+  const port = window.location.port
+  
+  // Détecter si on est sur localhost ou une IP locale (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+  const isLocalNetwork = hostname === 'localhost' || 
+                         hostname === '127.0.0.1' ||
+                         hostname.startsWith('192.168.') ||
+                         hostname.startsWith('10.') ||
+                         /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)
+  
+  if (port === '3300' || isLocalNetwork) {
     return '/api'
   }
-  // Sinon, utiliser l'URL complète
-  return 'http://localhost:3300/api'
+  // Sinon, utiliser l'URL complète avec le hostname actuel
+  return `${window.location.protocol}//${hostname}:${port || '3300'}/api`
 }
 
 const api = axios.create({

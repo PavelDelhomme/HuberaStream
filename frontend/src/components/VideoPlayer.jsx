@@ -2,10 +2,12 @@ import React, { useRef, useEffect, useState } from 'react'
 import ReactPlayer from 'react-player'
 import './VideoPlayer.css'
 
-const VideoPlayer = ({ video, formats, onTimeUpdate }) => {
+const VideoPlayer = ({ video, formats, subtitles, onTimeUpdate }) => {
   const playerRef = useRef(null)
   const [currentFormat, setCurrentFormat] = useState('progressive')
   const [currentQuality, setCurrentQuality] = useState(null)
+  const [currentSubtitle, setCurrentSubtitle] = useState(null)
+  const [showSubtitles, setShowSubtitles] = useState(false)
 
   useEffect(() => {
     // Déterminer le meilleur format disponible
@@ -81,9 +83,19 @@ const VideoPlayer = ({ video, formats, onTimeUpdate }) => {
               attributes: {
                 controlsList: 'nodownload',
               },
+              tracks: subtitles && subtitles.length > 0 ? subtitles.map((sub, index) => ({
+                kind: 'subtitles',
+                src: `/api/videos/${video.id}/subtitles/${sub.id}`,
+                srcLang: sub.language,
+                label: sub.language_name || sub.language,
+                default: sub.is_default || index === 0,
+              })) : undefined,
               hlsOptions: {
                 xhrSetup: (xhr, url) => {
-                  xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('token')}`)
+                  const token = localStorage.getItem('token')
+                  if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+                  }
                 },
               },
             },
@@ -91,31 +103,65 @@ const VideoPlayer = ({ video, formats, onTimeUpdate }) => {
         />
       </div>
 
-      {formats && formats.length > 1 && (
-        <div className="video-quality-selector">
-          <label htmlFor="quality-select">Qualité: </label>
-          <select
-            id="quality-select"
-            value={currentQuality || ''}
-            onChange={(e) => {
-              const quality = e.target.value
-              setCurrentQuality(quality)
-              const format = formats.find(f => f.quality === quality && f.format === currentFormat)
-              if (format) {
-                setCurrentFormat(format.format)
-              }
-            }}
-          >
-            {formats
-              .filter(f => f.format === currentFormat)
-              .map((format) => (
-                <option key={format.id} value={format.quality || ''}>
-                  {format.quality || 'Auto'}
+      <div className="video-controls-bar">
+        {formats && formats.length > 1 && (
+          <div className="video-quality-selector">
+            <label htmlFor="quality-select">Qualité: </label>
+            <select
+              id="quality-select"
+              value={currentQuality || ''}
+              onChange={(e) => {
+                const quality = e.target.value
+                setCurrentQuality(quality)
+                const format = formats.find(f => f.quality === quality && f.format === currentFormat)
+                if (format) {
+                  setCurrentFormat(format.format)
+                }
+              }}
+            >
+              {formats
+                .filter(f => f.format === currentFormat)
+                .map((format) => (
+                  <option key={format.id} value={format.quality || ''}>
+                    {format.quality || 'Auto'}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+        
+        {subtitles && subtitles.length > 0 && (
+          <div className="video-subtitle-selector">
+            <label htmlFor="subtitle-select">Sous-titres: </label>
+            <select
+              id="subtitle-select"
+              value={currentSubtitle || 'none'}
+              onChange={(e) => {
+                const subId = e.target.value
+                setCurrentSubtitle(subId === 'none' ? null : subId)
+                setShowSubtitles(subId !== 'none')
+                // Mettre à jour les tracks du lecteur
+                if (playerRef.current && playerRef.current.getInternalPlayer) {
+                  const player = playerRef.current.getInternalPlayer()
+                  if (player && player.textTracks) {
+                    for (let i = 0; i < player.textTracks.length; i++) {
+                      const track = player.textTracks[i]
+                      track.mode = subId === 'none' ? 'hidden' : (track.id === subId ? 'showing' : 'hidden')
+                    }
+                  }
+                }
+              }}
+            >
+              <option value="none">Aucun</option>
+              {subtitles.map((sub) => (
+                <option key={sub.id} value={sub.id}>
+                  {sub.language_name || sub.language}
                 </option>
               ))}
-          </select>
-        </div>
-      )}
+            </select>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

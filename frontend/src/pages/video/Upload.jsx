@@ -114,11 +114,27 @@ const Upload = () => {
         })
       }
 
-      alert('Vidéo uploadée avec succès!')
-      navigate(`/video/${response.data.video_id}`)
+      alert('✅ Vidéo uploadée avec succès!')
+      // Réinitialiser le formulaire
+      setFormData({
+        title: '',
+        description: '',
+        category_id: '',
+        sub_category_id: '',
+        is_public: true
+      })
+      setVideoFile(null)
+      setThumbnailFile(null)
+      // Optionnel: rediriger vers la vidéo ou rester sur la page
+      if (response.data.video_id) {
+        setTimeout(() => {
+          navigate(`/video/${response.data.video_id}`)
+        }, 2000)
+      }
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de l\'upload')
+      const errorMessage = error.response?.data?.error || error.message || 'Erreur lors de l\'upload'
+      alert(`Erreur: ${errorMessage}`)
     } finally {
       setUploading(false)
       setProgress(0)
@@ -136,10 +152,23 @@ const Upload = () => {
               type="file"
               id="video"
               accept="video/*"
-              onChange={(e) => setVideoFile(e.target.files[0])}
+              onChange={(e) => {
+                const file = e.target.files[0]
+                setVideoFile(file)
+                // Auto-remplir le titre si vide
+                if (file && !formData.title) {
+                  const fileName = file.name.replace(/\.[^/.]+$/, "") // Enlever l'extension
+                  setFormData({ ...formData, title: fileName })
+                }
+              }}
               required
               disabled={uploading}
             />
+            {videoFile && (
+              <span className="file-info">
+                📹 {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
+              </span>
+            )}
           </div>
 
           <div className="form-group">

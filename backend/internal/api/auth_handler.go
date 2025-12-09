@@ -128,6 +128,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"id":       user.ID,
 			"username": user.Username,
 			"email":    user.Email,
+			"role":     string(user.Role),
+			"is_active": user.IsActive,
 		},
 	})
 }
@@ -146,9 +148,11 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":       user.ID,
-		"username": user.Username,
-		"email":    user.Email,
+		"id":        user.ID,
+		"username":  user.Username,
+		"email":     user.Email,
+		"role":      string(user.Role),
+		"is_active": user.IsActive,
 		"created_at": user.CreatedAt,
 	})
 }

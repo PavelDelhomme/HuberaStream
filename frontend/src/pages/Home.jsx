@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom'
 import VideoGrid from '../components/VideoGrid'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { filterValidVideos } from '../utils/videoUtils'
 import './Home.css'
 
 const Home = () => {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [continueWatching, setContinueWatching] = useState([])
   const [trendingVideos, setTrendingVideos] = useState([])
   const [recentVideos, setRecentVideos] = useState([])
@@ -30,15 +31,18 @@ const Home = () => {
         try {
           const continueResponse = await api.get('/continue-watching')
           const historyItems = continueResponse.data.videos || []
-          setContinueWatching(historyItems.map(item => {
-            if (item.Video) {
-              return { ...item.Video, watchPosition: item.Position }
-            }
-            if (item.video) {
-              return { ...item.video, watchPosition: item.position }
-            }
-            return item
-          }))
+          const validVideos = filterValidVideos(
+            historyItems.map(item => {
+              if (item.Video) {
+                return { ...item.Video, watchPosition: item.Position }
+              }
+              if (item.video) {
+                return { ...item.video, watchPosition: item.position }
+              }
+              return item
+            })
+          )
+          setContinueWatching(validVideos)
         } catch (err) {
           console.debug('Aucune vidéo en cours de visionnage:', err.response?.status)
           setContinueWatching([])
@@ -52,7 +56,7 @@ const Home = () => {
         const recentResponse = await api.get('/videos', {
           params: { page: 1, limit: 12, is_public: true }
         })
-        setRecentVideos(recentResponse.data.videos || [])
+        setRecentVideos(filterValidVideos(recentResponse.data.videos || []))
       } catch (err) {
         console.error('Erreur lors de la récupération des vidéos récentes:', err)
         setRecentVideos([])
@@ -63,8 +67,9 @@ const Home = () => {
         const popularResponse = await api.get('/videos', {
           params: { page: 1, limit: 12, sort: 'views', is_public: true }
         })
-        setPopularVideos(popularResponse.data.videos || [])
-        setTrendingVideos(popularResponse.data.videos?.slice(0, 8) || [])
+        const validPopularVideos = filterValidVideos(popularResponse.data.videos || [])
+        setPopularVideos(validPopularVideos)
+        setTrendingVideos(validPopularVideos.slice(0, 8))
       } catch (err) {
         console.error('Erreur lors de la récupération des vidéos populaires:', err)
         setPopularVideos([])
@@ -90,7 +95,7 @@ const Home = () => {
                   is_public: true
                 }
               })
-              categoryVideos[category.id] = response.data.videos || []
+              categoryVideos[category.id] = filterValidVideos(response.data.videos || [])
             } catch (err) {
               categoryVideos[category.id] = []
             }
@@ -100,10 +105,8 @@ const Home = () => {
           setVideosByCategory({})
         }
       } catch (err) {
-        // Si erreur 401, c'est normal si pas connecté - on continue sans catégories
-        if (err.response?.status !== 401) {
-          console.error('Erreur lors de la récupération des catégories:', err)
-        }
+        // Gérer les erreurs silencieusement - les catégories sont maintenant publiques
+        console.debug('Erreur lors de la récupération des catégories:', err)
         setCategories([])
         setVideosByCategory({})
       }
@@ -153,23 +156,35 @@ const Home = () => {
     )
   }
 
+  // Vérifier s'il y a des vidéos à afficher
+  const hasAnyVideos = 
+    trendingVideos.length > 0 || 
+    popularVideos.length > 0 || 
+    recentVideos.length > 0 || 
+    continueWatching.length > 0 ||
+    Object.values(videosByCategory).some(videos => videos && videos.length > 0)
+
   return (
     <div className="home-container">
-      {/* Hero Section avec vidéo en vedette */}
-      {trendingVideos.length > 0 && (
-        <div className="hero-section">
-          <div className="hero-content">
-            <h1 className="hero-title">Bienvenue sur StreamMake</h1>
-            <p className="hero-subtitle">Votre plateforme de streaming personnelle</p>
-            {!user && (
-              <div className="hero-actions">
-                <Link to="/register" className="btn-hero-primary">Commencer</Link>
-                <Link to="/login" className="btn-hero-secondary">Se connecter</Link>
-              </div>
-            )}
-          </div>
+      {/* Hero Section - Toujours affichée */}
+      <div className="hero-section">
+        <div className="hero-content">
+          <h1 className="hero-title">Bienvenue sur StreamMake</h1>
+          <p className="hero-subtitle">Votre plateforme de streaming personnelle</p>
+          {!user && (
+            <div className="hero-actions">
+              <Link to="/register" className="btn-hero-primary">Commencer</Link>
+              <Link to="/login" className="btn-hero-secondary">Se connecter</Link>
+            </div>
+          )}
+          {user && (user.role === 'admin' || isAdmin()) && (
+            <div className="hero-actions">
+              <Link to="/admin" className="btn-hero-primary">⚙️ Administration</Link>
+              <Link to="/upload" className="btn-hero-secondary">⬆️ Upload Vidéo</Link>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Section: Continuer à regarder */}
       {user && continueWatching.length > 0 && (
@@ -228,12 +243,60 @@ const Home = () => {
         )
       })}
 
+      {/* Section Admin - Toujours visible pour les admins */}
+      {user && (user.role === 'admin' || isAdmin()) && (
+        <div className="section-container admin-quick-access">
+          <div className="section-header">
+            <h2 className="section-title">⚙️ Administration</h2>
+            <Link to="/admin" className="section-link">Voir tout</Link>
+          </div>
+          <div className="admin-cards-grid">
+            <Link to="/admin" className="admin-card">
+              <div className="admin-card-icon">📊</div>
+              <h3>Tableau de bord</h3>
+              <p>Statistiques et vue d'ensemble</p>
+            </Link>
+            <Link to="/upload" className="admin-card">
+              <div className="admin-card-icon">⬆️</div>
+              <h3>Upload Vidéo</h3>
+              <p>Téléverser une nouvelle vidéo</p>
+            </Link>
+            <Link to="/admin/users" className="admin-card">
+              <div className="admin-card-icon">👥</div>
+              <h3>Utilisateurs</h3>
+              <p>Gérer les utilisateurs</p>
+            </Link>
+            <Link to="/admin/torrents" className="admin-card">
+              <div className="admin-card-icon">📥</div>
+              <h3>Torrents</h3>
+              <p>Gérer les téléchargements</p>
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Message si aucune vidéo */}
-      {recentVideos.length === 0 && categories.length === 0 && (
+      {!loading && !hasAnyVideos && (
         <div className="empty-state">
           <p>🎬 Aucune vidéo disponible pour le moment</p>
-          {user && user.role === 'admin' && (
-            <Link to="/upload" className="btn-primary">Uploader une vidéo</Link>
+          <p className="empty-state-hint">
+            {user && (user.role === 'admin' || isAdmin())
+              ? "En tant qu'administrateur, vous pouvez uploader des vidéos pour commencer à remplir votre bibliothèque."
+              : user 
+              ? "Aucune vidéo n'est disponible pour le moment. Attendez qu'un administrateur ajoute du contenu."
+              : "Connectez-vous pour voir vos vidéos ou attendez qu'un administrateur ajoute du contenu."}
+          </p>
+          {user && (user.role === 'admin' || isAdmin()) && (
+            <div className="empty-state-actions">
+              <Link to="/admin" className="btn-hero-primary">⚙️ Administration</Link>
+              <Link to="/upload" className="btn-hero-secondary">⬆️ Uploader une vidéo</Link>
+            </div>
+          )}
+          {!user && (
+            <div className="empty-state-actions">
+              <Link to="/login" className="btn-hero-primary">Se connecter</Link>
+              <Link to="/register" className="btn-hero-secondary">S'inscrire</Link>
+            </div>
           )}
         </div>
       )}

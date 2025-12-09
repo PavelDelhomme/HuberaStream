@@ -38,6 +38,7 @@ type Video struct {
 
 	// Relations
 	Formats      []VideoFormat `gorm:"foreignKey:VideoID" json:"formats,omitempty"`
+	Subtitles    []Subtitle    `gorm:"foreignKey:VideoID" json:"subtitles,omitempty"`
 	Tags         []VideoTag    `gorm:"many2many:video_tags;" json:"tags,omitempty"`
 	Playlists    []Playlist    `gorm:"many2many:playlist_videos;" json:"playlists,omitempty"`
 }
@@ -61,5 +62,16 @@ type VideoTag struct {
 	Name      string    `gorm:"uniqueIndex;not null" json:"name"`
 	Videos    []Video   `gorm:"many2many:video_tags;" json:"videos,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type Subtitle struct {
+	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	VideoID   uuid.UUID `gorm:"type:uuid;not null" json:"video_id"`
+	Language  string    `gorm:"not null" json:"language"` // fr, en, es, etc.
+	LanguageName string `json:"language_name"` // Français, English, etc.
+	FilePath  string    `gorm:"not null" json:"file_path"` // Chemin vers le fichier .vtt ou .srt
+	IsDefault bool      `gorm:"default:false" json:"is_default"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 

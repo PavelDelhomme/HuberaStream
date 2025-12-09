@@ -4,17 +4,18 @@ import { useAuth } from '../context/AuthContext'
 import './Navigation.css'
 
 const Navigation = () => {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
   const [showAdminMenu, setShowAdminMenu] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [showSearchBar, setShowSearchBar] = useState(false)
   const adminMenuRef = useRef(null)
   const userMenuRef = useRef(null)
   const mobileMenuRef = useRef(null)
+  const searchInputRef = useRef(null)
 
   // Fermer les menus quand on clique ailleurs
   useEffect(() => {
@@ -28,20 +29,37 @@ const Navigation = () => {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
         setShowMobileMenu(false)
       }
+      // Fermer la barre de recherche si on clique ailleurs (mais pas sur le toggle)
+      if (showSearchBar && 
+          !event.target.closest('.search-container') && 
+          !event.target.closest('.search-toggle-button')) {
+        setShowSearchBar(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [showSearchBar])
 
   // Fermer le menu mobile quand on change de page
   useEffect(() => {
     setShowMobileMenu(false)
   }, [location.pathname])
 
+  // Focus sur l'input de recherche quand la barre s'ouvre
+  useEffect(() => {
+    if (showSearchBar && searchInputRef.current) {
+      setTimeout(() => {
+        searchInputRef.current?.focus()
+      }, 100)
+    }
+  }, [showSearchBar])
+
   const handleSearch = (e) => {
     e.preventDefault()
+    e.stopPropagation()
     if (searchQuery.trim()) {
       navigate(`/search?q=${encodeURIComponent(searchQuery)}`)
+      setShowSearchBar(false)
     }
   }
 
@@ -130,7 +148,7 @@ const Navigation = () => {
               >
                 👤 Mon Profil
               </Link>
-              {user.role === 'admin' && (
+              {(user?.role === 'admin' || isAdmin()) && (
                 <>
                   <div className="mobile-menu-divider"></div>
                   <Link 
@@ -156,35 +174,72 @@ const Navigation = () => {
           </div>
         )}
 
-        <form className={`nav-search ${showMobileSearch ? 'show' : ''}`} onSubmit={(e) => {
-          handleSearch(e)
-          setShowMobileSearch(false)
-        }}>
-          <input
-            type="text"
-            placeholder="Rechercher des vidéos..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
-          <button type="submit" className="search-button" aria-label="Rechercher">
-            🔍
-          </button>
-        </form>
+        {/* Barre de recherche animée */}
+        <div className={`search-container ${showSearchBar ? 'active' : ''}`}>
+          <form className="nav-search" onSubmit={(e) => {
+            handleSearch(e)
+            setShowSearchBar(false)
+          }}>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Rechercher des vidéos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+              onBlur={(e) => {
+                // Ne pas fermer si on clique sur le bouton ou le toggle
+                if (!e.relatedTarget?.closest('.search-button') && 
+                    !e.relatedTarget?.closest('.search-toggle-button')) {
+                  // Petit délai pour permettre le clic sur le bouton
+                  setTimeout(() => {
+                    if (!document.activeElement?.closest('.search-container') &&
+                        !document.activeElement?.closest('.search-toggle-button')) {
+                      setShowSearchBar(false)
+                    }
+                  }, 200)
+                }
+              }}
+            />
+            <button type="submit" className="search-button" aria-label="Rechercher">
+              🔍
+            </button>
+          </form>
+        </div>
 
-        {/* Bouton recherche mobile */}
+        {/* Bouton recherche qui ouvre la barre */}
         <button 
-          className="mobile-search-toggle"
-          onClick={() => setShowMobileSearch(!showMobileSearch)}
+          className={`search-toggle-button ${showSearchBar ? 'active' : ''}`}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setShowSearchBar(prev => {
+              const newState = !prev
+              console.log('Toggle search bar:', newState)
+              return newState
+            })
+          }}
+          type="button"
           aria-label="Rechercher"
         >
           🔍
         </button>
 
+        {/* Bouton Upload visible pour les admins */}
+        {user && (user.role === 'admin' || isAdmin()) && (
+          <Link 
+            to="/upload" 
+            className="nav-link nav-link-upload"
+            title="Uploader une vidéo"
+          >
+            ⬆️ Upload
+          </Link>
+        )}
+
         <div className="nav-links">
           {user ? (
             <>
-              {user.role === 'admin' && (
+              {(user?.role === 'admin' || isAdmin()) && (
                 <div className="nav-dropdown" ref={adminMenuRef}>
                   <button
                     className={`nav-link nav-link-admin ${isActive('/admin') ? 'active' : ''}`}
@@ -211,18 +266,31 @@ const Navigation = () => {
                       <Link to="/admin/categories" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
                         📂 Catégories
                       </Link>
-                      <Link to="/admin/torrent-clients" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
-                        ⚙️ Clients Torrent
-                      </Link>
-                      <Link to="/admin/media-settings" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
-                        🎬 Paramètres Média
-                      </Link>
                       <div className="dropdown-divider"></div>
+                      <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
+                      <Link to="/admin/videos" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
+                        📹 Gérer Vidéos
+                      </Link>
                       <Link to="/upload" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
                         ⬆️ Upload Vidéo
                       </Link>
                       <Link to="/dvd-extract" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
                         📀 Extraire DVD
+                      </Link>
+                      <div className="dropdown-divider"></div>
+                      <span className="dropdown-section-title">📥 Torrents</span>
+                      <Link to="/admin/torrents" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
+                        📥 Gérer Torrents
+                      </Link>
+                      <Link to="/admin/torrent-configs" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
+                        ⚙️ Configurations
+                      </Link>
+                      <Link to="/admin/torrent-clients" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
+                        ⚙️ Clients Torrent
+                      </Link>
+                      <div className="dropdown-divider"></div>
+                      <Link to="/admin/media-settings" className="dropdown-item" onClick={() => setShowAdminMenu(false)}>
+                        🎬 Paramètres Média
                       </Link>
                     </div>
                   )}
@@ -239,8 +307,13 @@ const Navigation = () => {
                 </button>
                 {showUserMenu && (
                   <div className="dropdown-menu user-dropdown">
-                    <span className="dropdown-username">{user.username}</span>
-                    {user.role === 'admin' && (
+                    <span className="dropdown-username">
+                      {user.username}
+                      {(user?.role === 'admin' || isAdmin()) && (
+                        <span className="admin-badge">👑 Admin</span>
+                      )}
+                    </span>
+                    {(user?.role === 'admin' || isAdmin()) && (
                       <>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">⚙️ Administration</span>
@@ -250,20 +323,35 @@ const Navigation = () => {
                         <Link to="/admin/users" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                           👥 Utilisateurs
                         </Link>
+                        <Link to="/admin/categories" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                          📂 Catégories
+                        </Link>
+                        <div className="dropdown-divider"></div>
+                        <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
+                        <Link to="/admin/videos" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                          📹 Gérer Vidéos
+                        </Link>
+                        <Link to="/upload" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                          ⬆️ Upload Vidéo
+                        </Link>
+                        <Link to="/dvd-extract" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                          📀 Extraire DVD
+                        </Link>
+                        <div className="dropdown-divider"></div>
+                        <span className="dropdown-section-title">📥 Torrents</span>
                         <Link to="/admin/torrents" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
-                          📥 Torrents
+                          📥 Gérer Torrents
                         </Link>
                         <Link to="/admin/torrent-clients" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                           ⚙️ Clients Torrent
                         </Link>
                         <Link to="/admin/torrent-configs" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
-                          📥 Configurations Torrent
+                          ⚙️ Configurations
                         </Link>
+                        <div className="dropdown-divider"></div>
+                        <span className="dropdown-section-title">🎛️ Paramètres</span>
                         <Link to="/admin/media-settings" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
                           🎬 Paramètres Média
-                        </Link>
-                        <Link to="/admin/categories" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
-                          📂 Catégories
                         </Link>
                         <div className="dropdown-divider"></div>
                       </>

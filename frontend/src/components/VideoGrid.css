@@ -17,9 +17,32 @@
 }
 
 .video-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 24px;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 16px;
+  padding: 10px 0 20px 0;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+
+.video-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.video-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.video-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.video-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .video-card {
@@ -29,12 +52,15 @@
   transition: all 0.3s ease;
   text-decoration: none;
   color: inherit;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
+  flex: 0 0 280px; /* Largeur fixe pour le défilement horizontal */
+  min-width: 280px;
 }
 
 .video-card:hover {
-  transform: translateY(-8px) scale(1.02);
+  transform: scale(1.1);
+  z-index: 10;
 }
 
 .video-card:hover .video-thumbnail {
@@ -130,13 +156,18 @@
 }
 
 @media (max-width: 768px) {
-  .video-grid {
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px;
+  .video-card {
+    flex: 0 0 180px;
+    min-width: 180px;
   }
   
   .video-grid-container {
     padding: 12px;
+  }
+  
+  .section-title {
+    font-size: 20px;
+    margin-bottom: 16px;
   }
 }
 

@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api test-all
+.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api test-all test-upload install-torrents
 
 # Variables
 PROJECT_NAME := streammake
@@ -23,6 +23,7 @@ help:
 	@echo "${YELLOW}  test${NC}           Exécuter les tests backend"
 	@echo "${YELLOW}  test-api${NC}      Tester l'API (CORS, login, etc.)"
 	@echo "${YELLOW}  test-all${NC}      Exécuter tous les tests complets de l'application"
+	@echo "${YELLOW}  test-upload${NC}   Tester l'upload de vidéos"
 	@echo "${YELLOW}  install-deps${NC}  Installer les dépendances backend Go"
 	@echo "${YELLOW}  status${NC}        Afficher le statut des services Docker"
 	@echo "${YELLOW}  shell-backend${NC}  Accéder au shell du conteneur backend"
@@ -83,6 +84,10 @@ test-api:
 test-all:
 	@echo "${GREEN}Tests complets de l'application...${NC}"
 	@./scripts/test-all.sh
+
+test-upload:
+	@echo "${GREEN}Test de l'upload de vidéos...${NC}"
+	@./scripts/test-upload.sh
 
 install-deps:
 	@echo "${GREEN}Installation des dépendances Go...${NC}"

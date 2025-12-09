@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"streammake/internal/config"
 	"streammake/internal/models"
@@ -41,9 +42,16 @@ func (h *VideoHandler) CreateVideo(c *gin.Context) {
 		return
 	}
 
+	// Valider le titre (ne doit pas être "null" ou vide)
+	title := strings.TrimSpace(req.Title)
+	if title == "" || title == "null" || title == "Null" || title == "NULL" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Le titre de la vidéo ne peut pas être vide ou 'null'"})
+		return
+	}
+
 	video := models.Video{
 		ID:            uuid.New(),
-		Title:         req.Title,
+		Title:         title,
 		Description:   req.Description,
 		UserID:        userUUID,
 		Status:        models.VideoStatusPending,
@@ -62,7 +70,22 @@ func (h *VideoHandler) CreateVideo(c *gin.Context) {
 
 func (h *VideoHandler) ListVideos(c *gin.Context) {
 	var videos []models.Video
-	query := h.db.Preload("User").Preload("Formats").Where("status = ?", models.VideoStatusReady)
+	query := h.db.Preload("User").Preload("Formats")
+	
+	// Si pas de paramètre status, afficher seulement les vidéos prêtes (pour les non-admins)
+	// Les admins peuvent voir toutes les vidéos
+	userID, exists := c.Get("user_id")
+	isAdmin := false
+	if exists {
+		var user models.User
+		if err := h.db.Where("id = ?", userID).First(&user).Error; err == nil {
+			isAdmin = user.Role == models.RoleAdmin
+		}
+	}
+	
+	if !isAdmin {
+		query = query.Where("status = ?", models.VideoStatusReady)
+	}
 
 	// Pagination
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -98,9 +121,17 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 		return
 	}
 
+	// Filtrer les vidéos avec titre "null" ou vide
+	var validVideos []models.Video
+	for _, video := range videos {
+		if video.Title != "" && video.Title != "null" && video.Title != "Null" && video.Title != "NULL" {
+			validVideos = append(validVideos, video)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"videos": videos,
-		"total":  total,
+		"videos": validVideos,
+		"total":  int64(len(validVideos)),
 		"page":   page,
 		"limit":  limit,
 	})
@@ -166,7 +197,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	}
 
 	var video models.Video
-	if err := h.db.Preload("User").Preload("Formats").Preload("Tags").Where("id = ?", videoID).First(&video).Error; err != nil {
+	if err := h.db.Preload("User").Preload("Formats").Preload("Subtitles").Preload("Tags").Where("id = ?", videoID).First(&video).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 		return
 	}
@@ -206,11 +237,12 @@ func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 	}
 
 	var req struct {
-		Title         string     `json:"title"`
-		Description   string     `json:"description"`
-		CategoryID    *uuid.UUID `json:"category_id"`
-		SubCategoryID *uuid.UUID `json:"sub_category_id"`
-		IsPublic      *bool      `json:"is_public"`
+		Title         string      `json:"title"`
+		Description   string      `json:"description"`
+		CategoryID    *uuid.UUID  `json:"category_id"`
+		SubCategoryID *uuid.UUID  `json:"sub_category_id"`
+		IsPublic      *bool       `json:"is_public"`
+		Status        *string     `json:"status"` // Pour permettre le changement de statut
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -232,6 +264,18 @@ func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 	}
 	if req.IsPublic != nil {
 		video.IsPublic = *req.IsPublic
+	}
+
+	// Permettre le changement de statut (admin seulement)
+	if req.Status != nil {
+		status := models.VideoStatus(*req.Status)
+		// Valider le statut
+		if status == models.VideoStatusPending || 
+		   status == models.VideoStatusProcessing || 
+		   status == models.VideoStatusReady || 
+		   status == models.VideoStatusError {
+			video.Status = status
+		}
 	}
 
 	if err := h.db.Save(&video).Error; err != nil {

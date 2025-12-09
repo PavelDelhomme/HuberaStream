@@ -56,6 +56,47 @@
   cursor: not-allowed;
 }
 
+/* Wrapper pour le champ mot de passe avec bouton toggle */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input {
+  padding-right: 45px; /* Espace pour le bouton */
+}
+
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: #aaaaaa;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, transform 0.2s;
+  outline: none;
+  z-index: 1;
+}
+
+.password-toggle:hover {
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.password-toggle:active {
+  transform: scale(0.95);
+}
+
+.password-toggle:focus {
+  color: #1c62b9;
+}
+
 .auth-button {
   width: 100%;
   padding: 12px;

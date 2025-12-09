@@ -1,9 +1,13 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
+import { filterValidVideos } from '../utils/videoUtils'
 import './VideoGrid.css'
 
 const VideoGrid = ({ videos, title }) => {
-  if (!videos || videos.length === 0) {
+  // Filtrer les vidéos invalides (null, sans ID, titre "null", etc.)
+  const validVideos = filterValidVideos(videos || [])
+
+  if (validVideos.length === 0) {
     return (
       <div className="video-grid-container">
         {title && <h2 className="section-title">{title}</h2>}
@@ -16,7 +20,7 @@ const VideoGrid = ({ videos, title }) => {
     <div className="video-grid-container">
       {title && <h2 className="section-title">{title}</h2>}
       <div className="video-grid">
-        {videos.map((video) => (
+        {validVideos.map((video) => (
           <Link key={video.id} to={`/video/${video.id}`} className="video-card">
             <div className="video-thumbnail">
               {video.thumbnail_path ? (

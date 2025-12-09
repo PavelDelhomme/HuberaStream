@@ -4,6 +4,7 @@ import VideoPlayer from '../components/VideoPlayer'
 import VideoGrid from '../components/VideoGrid'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { filterValidVideos } from '../utils/videoUtils'
 import './VideoPlayerPage.css'
 
 const VideoPlayerPage = () => {
@@ -43,7 +44,7 @@ const VideoPlayerPage = () => {
           limit: 12,
         },
       })
-      setRelatedVideos(response.data.videos || [])
+      setRelatedVideos(filterValidVideos(response.data.videos || []))
     } catch (err) {
       console.error('Erreur lors de la récupération des vidéos similaires:', err)
     }
@@ -81,6 +82,7 @@ const VideoPlayerPage = () => {
         <VideoPlayer
           video={video}
           formats={video.formats}
+          subtitles={video.subtitles}
           onTimeUpdate={handleTimeUpdate}
         />
         <div className="video-details">
