@@ -264,9 +264,19 @@ const Upload = () => {
             </div>
           )}
 
-          <button type="submit" disabled={uploading} className="submit-button">
-            {uploading ? 'Upload en cours...' : 'Uploader'}
-          </button>
+          <div className="form-actions">
+            <button 
+              type="button" 
+              onClick={() => navigate(-1)} 
+              className="cancel-button"
+              disabled={uploading}
+            >
+              ← Retour
+            </button>
+            <button type="submit" disabled={uploading} className="submit-button">
+              {uploading ? 'Upload en cours...' : 'Uploader'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
