@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './Playlists.css'
 
 const Playlists = () => {
@@ -62,7 +63,7 @@ const Playlists = () => {
   if (loading) {
     return (
       <div className="playlists-container">
-        <div className="loading">Chargement des listes...</div>
+        <LoadingSpinner message="Chargement des listes..." />
       </div>
     )
   }

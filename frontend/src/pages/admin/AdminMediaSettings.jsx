@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminMediaSettings.css'
 
 const AdminMediaSettings = () => {
@@ -55,7 +56,11 @@ const AdminMediaSettings = () => {
   }
 
   if (loading) {
-    return <div className="admin-media-settings">Chargement...</div>
+    return (
+      <div className="admin-media-settings">
+        <LoadingSpinner message="Chargement des paramètres..." />
+      </div>
+    )
   }
 
   return (

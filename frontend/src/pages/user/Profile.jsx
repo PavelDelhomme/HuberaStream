@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './Profile.css'
 
 const Profile = () => {
@@ -98,10 +99,7 @@ const Profile = () => {
   if (loading) {
     return (
       <div className="profile-page">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Chargement du profil...</p>
-        </div>
+        <LoadingSpinner message="Chargement du profil..." />
       </div>
     )
   }

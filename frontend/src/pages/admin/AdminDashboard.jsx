@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminDashboard.css'
 
 const AdminDashboard = () => {
@@ -70,10 +71,7 @@ const AdminDashboard = () => {
   if (loading) {
     return (
       <div className="admin-dashboard">
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Chargement du tableau de bord...</p>
-        </div>
+        <LoadingSpinner message="Chargement du tableau de bord..." />
       </div>
     )
   }

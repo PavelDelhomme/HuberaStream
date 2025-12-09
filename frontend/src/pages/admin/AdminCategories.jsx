@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminCategories.css'
 
 const AdminCategories = () => {
@@ -55,7 +56,11 @@ const AdminCategories = () => {
   }
 
   if (loading) {
-    return <div className="admin-categories">Chargement...</div>
+    return (
+      <div className="admin-categories">
+        <LoadingSpinner message="Chargement des catégories..." />
+      </div>
+    )
   }
 
   return (

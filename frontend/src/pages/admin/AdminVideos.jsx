@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
 import { filterValidVideos } from '../../utils/videoUtils'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminVideos.css'
 
 const AdminVideos = () => {
@@ -89,7 +90,7 @@ const AdminVideos = () => {
   if (loading) {
     return (
       <div className="admin-videos">
-        <div className="loading">Chargement des vidéos...</div>
+        <LoadingSpinner message="Chargement des vidéos..." />
       </div>
     )
   }

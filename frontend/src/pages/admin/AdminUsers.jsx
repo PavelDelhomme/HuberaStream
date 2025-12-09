@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminUsers.css'
 
 const AdminUsers = () => {
@@ -77,7 +78,11 @@ const AdminUsers = () => {
   }
 
   if (loading) {
-    return <div className="admin-users">Chargement...</div>
+    return (
+      <div className="admin-users">
+        <LoadingSpinner message="Chargement des utilisateurs..." />
+      </div>
+    )
   }
 
   const pendingCount = users.filter(u => !u.is_active).length

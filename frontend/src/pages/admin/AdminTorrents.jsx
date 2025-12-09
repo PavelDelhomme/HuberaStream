@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminTorrents.css'
 
 const AdminTorrents = () => {
@@ -95,7 +96,11 @@ const AdminTorrents = () => {
   }
 
   if (loading) {
-    return <div className="admin-torrents">Chargement...</div>
+    return (
+      <div className="admin-torrents">
+        <LoadingSpinner message="Chargement des torrents..." />
+      </div>
+    )
   }
 
   return (
