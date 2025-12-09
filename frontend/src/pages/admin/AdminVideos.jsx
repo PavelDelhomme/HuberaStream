@@ -114,6 +114,27 @@ const AdminVideos = () => {
     }
   }
 
+  const handleCleanInvalidVideos = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer toutes les vidéos invalides (titre null, sans format, etc.) ?')) {
+      return
+    }
+
+    try {
+      setCleaning(true)
+      const response = await api.post('/admin/videos/clean-invalid')
+      alert(`Nettoyage terminé: ${response.data.deleted_count} vidéo(s) supprimée(s)`)
+      if (response.data.errors && response.data.errors.length > 0) {
+        console.error('Erreurs lors du nettoyage:', response.data.errors)
+      }
+      fetchVideos() // Recharger la liste
+    } catch (err) {
+      console.error('Erreur lors du nettoyage:', err)
+      alert('Erreur lors du nettoyage des vidéos invalides: ' + (err.response?.data?.error || err.message))
+    } finally {
+      setCleaning(false)
+    }
+  }
+
   useEffect(() => {
     fetchVideos()
   }, [searchQuery, filterStatus])
