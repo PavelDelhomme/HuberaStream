@@ -297,6 +297,12 @@
   border-radius: 8px;
   transition: all 0.2s;
   font-size: 14px;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
   cursor: pointer;
   border: none;
   background: none;
