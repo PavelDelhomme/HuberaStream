@@ -316,11 +316,8 @@ const Navigation = () => {
                         <span className="admin-badge">👑 Admin</span>
                       )}
                     </span>
-                    {(() => {
-                      // Vérifier si l'utilisateur est admin - toujours afficher le menu admin si admin
-                      const userIsAdmin = user?.role === 'admin' || (isAdmin && typeof isAdmin === 'function' && isAdmin());
-                      if (!userIsAdmin) return null;
-                      return (
+                    {/* Menu Administration - Afficher si admin */}
+                    {(user?.role === 'admin' || (isAdmin && isAdmin())) && (
                       <>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">⚙️ Administration</span>
