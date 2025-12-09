@@ -317,7 +317,20 @@ const Navigation = () => {
                       )}
                     </span>
                     {/* Menu Administration - Afficher si admin */}
-                    {(user?.role === 'admin' || (isAdmin && isAdmin())) && (
+                    {(() => {
+                      // Debug: afficher les valeurs pour comprendre le problème
+                      const userRole = user?.role;
+                      const isAdminResult = isAdmin ? isAdmin() : false;
+                      const shouldShow = userRole === 'admin' || isAdminResult;
+                      console.log('Navigation Debug:', {
+                        user,
+                        userRole,
+                        isAdminResult,
+                        shouldShow,
+                        isAdminFunction: typeof isAdmin
+                      });
+                      return shouldShow;
+                    })() && (
                       <>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">⚙️ Administration</span>
