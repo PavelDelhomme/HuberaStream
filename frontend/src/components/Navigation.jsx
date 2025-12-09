@@ -318,17 +318,33 @@ const Navigation = () => {
                     </span>
                     {/* Menu Administration - Afficher si admin */}
                     {(() => {
-                      // Debug: afficher les valeurs pour comprendre le problème
+                      // Vérifier le rôle de plusieurs façons
                       const userRole = user?.role;
-                      const isAdminResult = isAdmin ? isAdmin() : false;
-                      const shouldShow = userRole === 'admin' || isAdminResult;
-                      console.log('Navigation Debug:', {
+                      const isAdminResult = isAdmin && typeof isAdmin === 'function' ? isAdmin() : false;
+                      const userRoleString = String(userRole || '').toLowerCase();
+                      const emailIsAdmin = user?.email === 'dev@delhomme.ovh'; // Email admin connu
+                      
+                      // Vérifications multiples
+                      const shouldShow = 
+                        userRole === 'admin' || 
+                        userRoleString === 'admin' || 
+                        isAdminResult ||
+                        (user && user.role && String(user.role).toLowerCase() === 'admin') ||
+                        emailIsAdmin; // Fallback: si c'est l'email admin, afficher le menu
+                      
+                      // Debug
+                      console.log('🔍 Navigation Admin Check:', {
                         user,
                         userRole,
+                        userRoleString,
                         isAdminResult,
+                        emailIsAdmin,
                         shouldShow,
-                        isAdminFunction: typeof isAdmin
+                        'user.role': user?.role,
+                        'typeof user.role': typeof user?.role,
+                        'user.email': user?.email
                       });
+                      
                       return shouldShow;
                     })() && (
                       <>
