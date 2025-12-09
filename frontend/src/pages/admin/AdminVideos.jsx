@@ -58,19 +58,19 @@ const AdminVideos = () => {
       console.log('AdminVideos: Nombre de vidéos récupérées:', allVideos.length)
       console.log('AdminVideos: Premières vidéos:', allVideos.slice(0, 3))
       
-      // Pour les admins, filtrer les vidéos invalides (sans ID ou avec titre "null")
+      // Pour les admins, voir TOUTES les vidéos (même celles en cours de traitement ou avec titre vide)
+      // Filtrer seulement les vidéos vraiment invalides (sans ID)
       let validVideos = allVideos.filter(v => {
-        if (!v || !v.id) return false
-        // Filtrer les vidéos avec titre "null" (string)
-        if (v.title === 'null' || v.title === 'Null' || v.title === 'NULL') {
+        if (!v || !v.id) {
+          console.log('AdminVideos: Vidéo sans ID filtrée:', v)
           return false
         }
-        // Filtrer les titres vides (sauf si en cours de traitement)
-        if (!v.title || (typeof v.title === 'string' && v.title.trim() === '' && v.status !== 'processing')) {
-          return false
-        }
+        // Pour les admins, accepter toutes les vidéos même avec titre "null" ou vide
+        // Ils doivent pouvoir voir et gérer toutes les vidéos
         return true
       })
+      
+      console.log('AdminVideos: Nombre de vidéos après filtrage:', validVideos.length)
       
       // Filtrer par statut si nécessaire
       let filteredVideos = validVideos
