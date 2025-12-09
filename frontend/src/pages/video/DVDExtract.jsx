@@ -50,16 +50,24 @@ const DVDExtract = () => {
     setError('')
     try {
       const response = await api.get('/dvd/detect')
-      if (response.data.device) {
+      // Vérifier si la détection a réussi
+      if (response.data.success && response.data.device) {
         setDevice(response.data.device)
         setStep(2)
       } else {
-        setError(response.data.message || 'Aucun lecteur DVD détecté.')
+        // La détection a échoué mais la requête a réussi (200)
+        const errorMessage = response.data.message || 
+                            response.data.error || 
+                            'Aucun lecteur DVD détecté.'
+        setError(errorMessage)
       }
     } catch (error) {
+      // Erreur réseau ou authentification
       const errorMessage = error.response?.data?.message || 
                           error.response?.data?.error || 
-                          'Aucun lecteur DVD détecté. Assurez-vous qu\'un DVD/CD est inséré dans le lecteur et que le conteneur Docker a accès aux devices.'
+                          (error.response?.status === 401 || error.response?.status === 403
+                            ? 'Vous devez être connecté en tant qu\'administrateur pour accéder à cette fonctionnalité.'
+                            : 'Aucun lecteur DVD détecté. Assurez-vous qu\'un DVD/CD est inséré dans le lecteur et que le conteneur Docker a accès aux devices.')
       setError(errorMessage)
       console.error('Erreur détection DVD:', error)
     } finally {

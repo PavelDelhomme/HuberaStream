@@ -34,9 +34,13 @@ func NewDVDHandler(db *gorm.DB, cfg *config.Config) *DVDHandler {
 func (h *DVDHandler) DetectDVD(c *gin.Context) {
 	device, err := h.extractor.DetectDVDDevice()
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		// Retourner 200 avec un message d'erreur plutôt que 404
+		// pour que le frontend puisse gérer l'erreur correctement
+		c.JSON(http.StatusOK, gin.H{
+			"device": "",
 			"error": "Aucun lecteur DVD détecté",
 			"message": err.Error(),
+			"success": false,
 		})
 		return
 	}
@@ -44,6 +48,7 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"device": device,
 		"message": "Lecteur DVD détecté",
+		"success": true,
 	})
 }
 
