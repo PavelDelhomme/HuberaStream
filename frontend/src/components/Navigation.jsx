@@ -348,13 +348,9 @@ const Navigation = () => {
                           to="/admin" 
                           className="dropdown-item" 
                           onClick={(e) => {
-                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
-                            // Navigation manuelle pour s'assurer que ça fonctionne
-                            setTimeout(() => {
-                              navigate('/admin');
-                            }, 0);
+                            navigate('/admin');
                           }}
                         >
                           📊 Tableau de bord
@@ -365,6 +361,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/users');
                           }}
                         >
                           👥 Utilisateurs
@@ -375,6 +372,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/categories');
                           }}
                         >
                           📂 Catégories
@@ -387,6 +385,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/videos');
                           }}
                         >
                           📹 Gérer Vidéos
@@ -397,6 +396,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/upload');
                           }}
                         >
                           ⬆️ Upload Vidéo
@@ -407,6 +407,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/dvd-extract');
                           }}
                         >
                           📀 Extraire DVD
@@ -419,6 +420,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/torrents');
                           }}
                         >
                           📥 Gérer Torrents
@@ -429,6 +431,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/torrent-clients');
                           }}
                         >
                           ⚙️ Clients Torrent
@@ -439,6 +442,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/torrent-configs');
                           }}
                         >
                           ⚙️ Configurations
@@ -451,6 +455,7 @@ const Navigation = () => {
                           onClick={(e) => {
                             e.stopPropagation();
                             setShowUserMenu(false);
+                            navigate('/admin/media-settings');
                           }}
                         >
                           🎬 Paramètres Média
