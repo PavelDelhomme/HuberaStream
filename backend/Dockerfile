@@ -27,6 +27,7 @@ RUN apk add --no-cache \
     ffmpeg \
     ffmpeg-dev \
     file \
+    util-linux \
     ca-certificates \
     tzdata
 

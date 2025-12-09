@@ -50,10 +50,18 @@ const DVDExtract = () => {
     setError('')
     try {
       const response = await api.get('/dvd/detect')
-      setDevice(response.data.device)
-      setStep(2)
+      if (response.data.device) {
+        setDevice(response.data.device)
+        setStep(2)
+      } else {
+        setError(response.data.message || 'Aucun lecteur DVD détecté.')
+      }
     } catch (error) {
-      setError('Aucun lecteur DVD détecté. Assurez-vous qu\'un DVD est inséré dans le lecteur.')
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'Aucun lecteur DVD détecté. Assurez-vous qu\'un DVD/CD est inséré dans le lecteur et que le conteneur Docker a accès aux devices.'
+      setError(errorMessage)
+      console.error('Erreur détection DVD:', error)
     } finally {
       setLoading(false)
     }
@@ -63,15 +71,23 @@ const DVDExtract = () => {
     setLoading(true)
     setError('')
     try {
-      const response = await api.get(`/dvd/info?device=${device}`)
-      setDvdInfo(response.data)
-      setTitle(response.data.title || 'DVD Extraite')
-      setSelectedVideoTrack(0)
-      setSelectedAudioTracks(response.data.audio_tracks.length > 0 ? [0] : [])
-      setSelectedSubtitleTracks([])
-      setStep(3)
+      const response = await api.get(`/dvd/info?device=${encodeURIComponent(device)}`)
+      if (response.data && (response.data.video_tracks || response.data.audio_tracks)) {
+        setDvdInfo(response.data)
+        setTitle(response.data.title || 'DVD Extraite')
+        setSelectedVideoTrack(0)
+        setSelectedAudioTracks(response.data.audio_tracks && response.data.audio_tracks.length > 0 ? [0] : [])
+        setSelectedSubtitleTracks([])
+        setStep(3)
+      } else {
+        setError('Aucune information trouvée sur le DVD. Vérifiez que le DVD est bien inséré et lisible.')
+      }
     } catch (error) {
-      setError('Erreur lors de la lecture du DVD. Vérifiez que le DVD est bien inséré.')
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          'Erreur lors de la lecture du DVD. Vérifiez que le DVD est bien inséré et lisible.'
+      setError(errorMessage)
+      console.error('Erreur lecture DVD:', error)
     } finally {
       setLoading(false)
     }

@@ -53,7 +53,39 @@ func NewDVDExtractor() *DVDExtractor {
 
 // DetectDVDDevice détecte le lecteur DVD disponible
 func (e *DVDExtractor) DetectDVDDevice() (string, error) {
-	// Essayer différents chemins de lecteurs DVD courants
+	// Méthode 1: Utiliser lsblk pour détecter les lecteurs optiques
+	cmd := exec.Command("lsblk", "-d", "-n", "-o", "NAME,TYPE")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 && fields[1] == "rom" {
+				deviceName := fields[0]
+				devicePath := fmt.Sprintf("/dev/%s", deviceName)
+				// Vérifier que le device existe et est accessible
+				if info, err := os.Stat(devicePath); err == nil && !info.IsDir() {
+					// Vérifier avec file si disponible
+					fileCmd := exec.Command("file", devicePath)
+					fileOutput, fileErr := fileCmd.Output()
+					if fileErr == nil {
+						outputStr := strings.ToLower(string(fileOutput))
+						if strings.Contains(outputStr, "iso") || 
+						   strings.Contains(outputStr, "dvd") ||
+						   strings.Contains(outputStr, "cd-rom") ||
+						   strings.Contains(outputStr, "block special") {
+							return devicePath, nil
+						}
+					} else {
+						// Si file n'est pas disponible, accepter le device
+						return devicePath, nil
+					}
+				}
+			}
+		}
+	}
+
+	// Méthode 2: Essayer différents chemins de lecteurs DVD courants
 	possibleDevices := []string{
 		"/dev/dvd",
 		"/dev/cdrom",
@@ -75,7 +107,17 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 				// C'est un point de montage, vérifier s'il contient des fichiers DVD
 				files, err := os.ReadDir(device)
 				if err == nil && len(files) > 0 {
-					return device, nil
+					// Vérifier la présence de fichiers typiques d'un DVD
+					hasVideoTS := false
+					for _, file := range files {
+						if file.Name() == "VIDEO_TS" || file.Name() == "video_ts" {
+							hasVideoTS = true
+							break
+						}
+					}
+					if hasVideoTS {
+						return device, nil
+					}
 				}
 			} else {
 				// C'est un device file, vérifier avec la commande file
@@ -85,17 +127,20 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 					outputStr := strings.ToLower(string(output))
 					if strings.Contains(outputStr, "iso") || 
 					   strings.Contains(outputStr, "dvd") ||
-					   strings.Contains(outputStr, "cd-rom") {
+					   strings.Contains(outputStr, "cd-rom") ||
+					   strings.Contains(outputStr, "block special") {
 						return device, nil
 					}
 				}
-				// Si file n'est pas disponible, accepter le device
-				return device, nil
+				// Si file n'est pas disponible, vérifier les permissions
+				if info.Mode()&os.ModeDevice != 0 {
+					return device, nil
+				}
 			}
 		}
 	}
 
-	return "", fmt.Errorf("aucun lecteur DVD détecté. Assurez-vous qu'un DVD est inséré et que le lecteur est accessible")
+	return "", fmt.Errorf("aucun lecteur DVD détecté. Assurez-vous qu'un DVD/CD est inséré et que le lecteur est accessible. Vérifiez aussi que le conteneur Docker a accès aux devices (/dev/dvd, /dev/cdrom, etc.)")
 }
 
 // GetDVDInfo récupère les informations du DVD (pistes audio/vidéo/sous-titres)
