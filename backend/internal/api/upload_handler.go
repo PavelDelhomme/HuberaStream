@@ -2,9 +2,13 @@ package api
 
 import (
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"streammake/internal/config"
@@ -179,5 +183,60 @@ func (h *UploadHandler) UploadThumbnail(c *gin.Context) {
 		"message":        "Miniature uploadée avec succès",
 		"thumbnail_path": thumbnailPath,
 	})
+}
+
+// generateTextThumbnail génère une miniature textuelle basée sur le titre
+func (h *UploadHandler) generateTextThumbnail(videoID uuid.UUID, title string) (string, error) {
+	// Dimensions de la miniature (format 16:9)
+	width := 1280
+	height := 720
+
+	// Créer une image avec un fond dégradé
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	
+	// Fond dégradé (rouge vers noir, style Netflix)
+	for y := 0; y < height; y++ {
+		ratio := float64(y) / float64(height)
+		// Dégradé de rouge (#ff0000) vers noir (#000000)
+		r := uint8(255 * (1 - ratio*0.7)) // Réduire plus rapidement pour un dégradé plus sombre
+		g := uint8(0)
+		b := uint8(0)
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{r, g, b, 255})
+		}
+	}
+
+	// Si pas de titre valide, utiliser un texte par défaut
+	if title == "" || title == "null" || title == "Null" || title == "NULL" {
+		title = "Vidéo sans titre"
+	}
+
+	// Créer le chemin de la miniature
+	thumbnailName := fmt.Sprintf("%s.jpg", videoID.String())
+	thumbnailPath := filepath.Join(h.cfg.ThumbnailStoragePath, thumbnailName)
+
+	// S'assurer que le dossier existe
+	if err := os.MkdirAll(h.cfg.ThumbnailStoragePath, 0755); err != nil {
+		return "", fmt.Errorf("erreur lors de la création du dossier: %w", err)
+	}
+
+	// Créer le fichier
+	file, err := os.Create(thumbnailPath)
+	if err != nil {
+		return "", fmt.Errorf("erreur lors de la création du fichier: %w", err)
+	}
+	defer file.Close()
+
+	// Encoder en JPEG
+	if err := jpeg.Encode(file, img, &jpeg.Options{Quality: 90}); err != nil {
+		return "", fmt.Errorf("erreur lors de l'encodage JPEG: %w", err)
+	}
+
+	// Note: Pour ajouter du texte sur l'image, on pourrait utiliser une bibliothèque comme
+	// github.com/golang/freetype, mais cela nécessiterait une police TTF.
+	// Pour l'instant, on génère une image avec un fond dégradé rouge/noir style Netflix.
+	// Le texte peut être ajouté plus tard si nécessaire avec une bibliothèque de rendu de texte.
+
+	return thumbnailPath, nil
 }
 

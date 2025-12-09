@@ -75,21 +75,32 @@ const Upload = () => {
       return
     }
 
+    // Valider et nettoyer le titre
+    let cleanTitle = formData.title ? formData.title.trim() : ''
+    if (cleanTitle === '' || cleanTitle === 'null' || cleanTitle === 'Null' || cleanTitle === 'NULL') {
+      // Utiliser le nom du fichier sans extension
+      const fileName = videoFile.name.replace(/\.[^/.]+$/, '')
+      cleanTitle = fileName && fileName.trim() !== '' ? fileName : 'Vidéo sans titre'
+    }
+    
+    // Mettre à jour le titre nettoyé
+    const finalFormData = { ...formData, title: cleanTitle }
+
     setUploading(true)
     setProgress(0)
 
     try {
       const uploadData = new FormData()
       uploadData.append('video', videoFile)
-      uploadData.append('title', formData.title)
-      uploadData.append('description', formData.description)
-      if (formData.category_id) {
-        uploadData.append('category_id', formData.category_id)
+      uploadData.append('title', finalFormData.title)
+      uploadData.append('description', finalFormData.description || '')
+      if (finalFormData.category_id) {
+        uploadData.append('category_id', finalFormData.category_id)
       }
-      if (formData.sub_category_id) {
-        uploadData.append('sub_category_id', formData.sub_category_id)
+      if (finalFormData.sub_category_id) {
+        uploadData.append('sub_category_id', finalFormData.sub_category_id)
       }
-      uploadData.append('is_public', formData.is_public)
+      uploadData.append('is_public', finalFormData.is_public)
 
       const response = await api.post('/admin/videos/upload', uploadData, {
         headers: {
@@ -154,11 +165,19 @@ const Upload = () => {
               accept="video/*"
               onChange={(e) => {
                 const file = e.target.files[0]
-                setVideoFile(file)
-                // Auto-remplir le titre si vide
-                if (file && !formData.title) {
-                  const fileName = file.name.replace(/\.[^/.]+$/, "") // Enlever l'extension
-                  setFormData({ ...formData, title: fileName })
+                if (file) {
+                  setVideoFile(file)
+                  // Extraire le nom du fichier sans extension pour le titre
+                  const fileName = file.name.replace(/\.[^/.]+$/, '')
+                  // Nettoyer le titre pour éviter "null"
+                  const cleanTitle = fileName && fileName.trim() !== '' && fileName !== 'null' 
+                    ? fileName 
+                    : 'Vidéo sans titre'
+                  
+                  // Auto-remplir le titre si vide
+                  if (!formData.title || formData.title.trim() === '' || formData.title === 'null') {
+                    setFormData({ ...formData, title: cleanTitle })
+                  }
                 }
               }}
               required
