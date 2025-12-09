@@ -43,11 +43,16 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	}
 
 	// Récupérer les métadonnées
-	title := c.PostForm("title")
-	if title == "" {
-		title = file.Filename
+	title := strings.TrimSpace(c.PostForm("title"))
+	// Valider et nettoyer le titre
+	if title == "" || title == "null" || title == "Null" || title == "NULL" {
+		// Utiliser le nom du fichier sans extension comme titre
+		title = strings.TrimSuffix(file.Filename, filepath.Ext(file.Filename))
+		if title == "" {
+			title = "Vidéo sans titre"
+		}
 	}
-	description := c.PostForm("description")
+	description := strings.TrimSpace(c.PostForm("description"))
 	categoryIDStr := c.PostForm("category_id")
 	subCategoryIDStr := c.PostForm("sub_category_id")
 	isPublic := c.PostForm("is_public") != "false"
@@ -104,9 +109,22 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 }
 
 func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
-	// Générer la miniature
+	// Récupérer le titre de la vidéo pour générer une miniature textuelle si nécessaire
+	var videoModel models.Video
+	h.db.Where("id = ?", videoID).First(&videoModel)
+	title := videoModel.Title
+
+	// Générer la miniature depuis la vidéo
 	thumbnailPath, err := h.processor.GenerateThumbnail(videoPath, videoID)
-	if err == nil {
+	if err != nil {
+		// Si la génération depuis la vidéo échoue, créer une miniature textuelle basée sur le titre
+		thumbnailPath, err = h.generateTextThumbnail(videoID, title)
+		if err != nil {
+			fmt.Printf("Erreur lors de la génération de la miniature textuelle: %v\n", err)
+		}
+	}
+	
+	if thumbnailPath != "" {
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("thumbnail_path", thumbnailPath)
 	}
 
