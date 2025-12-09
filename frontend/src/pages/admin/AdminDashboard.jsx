@@ -41,9 +41,13 @@ const AdminDashboard = () => {
 
   const fetchStats = async () => {
     try {
+      setLoading(true)
+      console.log('AdminDashboard: Début du chargement des stats...')
+      
       // Essayer de récupérer les stats depuis l'API admin
       try {
         const response = await api.get('/admin/stats')
+        console.log('AdminDashboard: Stats récupérées depuis /admin/stats:', response.data)
         setStats(response.data)
       } catch (statsError) {
         // Si l'endpoint n'existe pas, calculer les stats depuis les autres endpoints
@@ -67,7 +71,7 @@ const AdminDashboard = () => {
         setStats(stats)
       }
     } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques:', error)
+      console.error('AdminDashboard: Erreur lors de la récupération des statistiques:', error)
       // Stats par défaut en cas d'erreur
       setStats({
         total_users: 0,
@@ -77,6 +81,7 @@ const AdminDashboard = () => {
         total_categories: 0
       })
     } finally {
+      console.log('AdminDashboard: Fin du chargement des stats, setLoading(false)')
       setLoading(false)
     }
   }
