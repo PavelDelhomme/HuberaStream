@@ -107,6 +107,14 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 		}
 	}
 
+	// Filtre par utilisateur (pour afficher les vidéos d'un utilisateur spécifique)
+	if userIDParam := c.Query("user_id"); userIDParam != "" {
+		userUUID, err := uuid.Parse(userIDParam)
+		if err == nil {
+			query = query.Where("user_id = ?", userUUID)
+		}
+	}
+
 	// Recherche
 	if search := c.Query("search"); search != "" {
 		query = query.Where("title ILIKE ? OR description ILIKE ?", "%"+search+"%", "%"+search+"%")

@@ -13,8 +13,10 @@ const Home = () => {
   const [trendingVideos, setTrendingVideos] = useState([])
   const [recentVideos, setRecentVideos] = useState([])
   const [popularVideos, setPopularVideos] = useState([])
+  const [userVideos, setUserVideos] = useState([]) // Vidéos uploadées par l'utilisateur
   const [categories, setCategories] = useState([])
   const [videosByCategory, setVideosByCategory] = useState({})
+  const [adminStats, setAdminStats] = useState(null) // Stats pour la section admin
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -56,6 +58,27 @@ const Home = () => {
         setContinueWatching([])
       }
 
+      // Récupérer les vidéos uploadées par l'utilisateur (si connecté)
+      if (user) {
+        try {
+          const userVideosResponse = await api.get('/videos', {
+            params: { 
+              page: 1, 
+              limit: 12,
+              user_id: user.id,
+              status: 'all' // Voir toutes les vidéos de l'utilisateur
+            }
+          })
+          const userVids = filterValidVideos(userVideosResponse.data.videos || [])
+          setUserVideos(userVids)
+        } catch (err) {
+          console.debug('Aucune vidéo uploadée par l\'utilisateur:', err.response?.status)
+          setUserVideos([])
+        }
+      } else {
+        setUserVideos([])
+      }
+
       // Récupérer les vidéos récentes (publiques seulement)
       try {
         const recentResponse = await api.get('/videos', {
@@ -87,33 +110,61 @@ const Home = () => {
         const cats = categoriesResponse.data || []
         setCategories(cats)
 
-        // Récupérer les vidéos par catégorie (seulement si connecté)
-        if (user) {
-          const categoryVideos = {}
-          for (const category of cats.slice(0, 6)) {
-            try {
-              const response = await api.get('/videos', {
-                params: { 
-                  page: 1, 
-                  limit: 12,
-                  category_id: category.id,
-                  is_public: true
-                }
-              })
-              categoryVideos[category.id] = filterValidVideos(response.data.videos || [])
-            } catch (err) {
-              categoryVideos[category.id] = []
-            }
+        // Récupérer les vidéos par catégorie (pour tous les utilisateurs)
+        const categoryVideos = {}
+        for (const category of cats.slice(0, 6)) {
+          try {
+            const response = await api.get('/videos', {
+              params: { 
+                page: 1, 
+                limit: 12,
+                category_id: category.id,
+                is_public: true
+              }
+            })
+            categoryVideos[category.id] = filterValidVideos(response.data.videos || [])
+          } catch (err) {
+            categoryVideos[category.id] = []
           }
-          setVideosByCategory(categoryVideos)
-        } else {
-          setVideosByCategory({})
         }
+        setVideosByCategory(categoryVideos)
       } catch (err) {
         // Gérer les erreurs silencieusement - les catégories sont maintenant publiques
         console.debug('Erreur lors de la récupération des catégories:', err)
         setCategories([])
         setVideosByCategory({})
+      }
+
+      // Récupérer les stats admin (si admin)
+      if (user && (user.role === 'admin' || isAdmin())) {
+        try {
+          const statsResponse = await api.get('/admin/stats')
+          setAdminStats(statsResponse.data)
+        } catch (err) {
+          // Si l'endpoint n'existe pas, calculer les stats depuis les autres endpoints
+          try {
+            const [usersRes, videosRes, torrentsRes, categoriesRes] = await Promise.allSettled([
+              api.get('/admin/users?page=1&limit=1'),
+              api.get('/videos?page=1&limit=1&status=all'),
+              api.get('/admin/torrents'),
+              api.get('/categories')
+            ])
+            
+            const stats = {
+              total_users: usersRes.status === 'fulfilled' ? (usersRes.value.data?.total || usersRes.value.data?.users?.length || 0) : 0,
+              total_videos: videosRes.status === 'fulfilled' ? (videosRes.value.data?.total || videosRes.value.data?.videos?.length || 0) : 0,
+              total_torrents: torrentsRes.status === 'fulfilled' ? (torrentsRes.value.data?.torrents?.length || 0) : 0,
+              active_torrents: torrentsRes.status === 'fulfilled' 
+                ? (torrentsRes.value.data?.torrents?.filter(t => t.status === 'downloading' || t.status === 'seeding')?.length || 0) 
+                : 0,
+              total_categories: categoriesRes.status === 'fulfilled' ? (categoriesRes.value.data?.length || 0) : 0
+            }
+            setAdminStats(stats)
+          } catch (statsErr) {
+            console.debug('Impossible de récupérer les stats admin:', statsErr)
+            setAdminStats(null)
+          }
+        }
       }
       
     } catch (err) {
@@ -164,6 +215,7 @@ const Home = () => {
     popularVideos.length > 0 || 
     recentVideos.length > 0 || 
     continueWatching.length > 0 ||
+    userVideos.length > 0 ||
     Object.values(videosByCategory).some(videos => videos && videos.length > 0)
 
   return (
@@ -187,6 +239,17 @@ const Home = () => {
           )}
         </div>
       </div>
+
+      {/* Section: Mes Vidéos (pour l'utilisateur connecté) */}
+      {user && userVideos.length > 0 && (
+        <div className="section-container">
+          <div className="section-header">
+            <h2 className="section-title">📤 Mes Vidéos</h2>
+            <Link to="/admin/videos" className="section-link">Gérer mes vidéos</Link>
+          </div>
+          <VideoGrid videos={userVideos} title="" />
+        </div>
+      )}
 
       {/* Section: Continuer à regarder */}
       {user && continueWatching.length > 0 && (
@@ -245,13 +308,49 @@ const Home = () => {
         )
       })}
 
-      {/* Section Admin - Toujours visible pour les admins */}
+      {/* Section Admin - Enrichie avec stats et actions */}
       {user && (user.role === 'admin' || isAdmin()) && (
         <div className="section-container admin-quick-access">
           <div className="section-header">
             <h2 className="section-title">⚙️ Administration</h2>
-            <Link to="/admin" className="section-link">Voir tout</Link>
+            <Link to="/admin" className="section-link">Tableau de bord complet →</Link>
           </div>
+          
+          {/* Stats rapides */}
+          {adminStats && (
+            <div className="admin-stats-grid">
+              <div className="admin-stat-card">
+                <div className="stat-icon">👥</div>
+                <div className="stat-content">
+                  <div className="stat-value">{adminStats.total_users || 0}</div>
+                  <div className="stat-label">Utilisateurs</div>
+                </div>
+              </div>
+              <div className="admin-stat-card">
+                <div className="stat-icon">🎬</div>
+                <div className="stat-content">
+                  <div className="stat-value">{adminStats.total_videos || 0}</div>
+                  <div className="stat-label">Vidéos</div>
+                </div>
+              </div>
+              <div className="admin-stat-card">
+                <div className="stat-icon">📥</div>
+                <div className="stat-content">
+                  <div className="stat-value">{adminStats.active_torrents || 0}</div>
+                  <div className="stat-label">Torrents actifs</div>
+                </div>
+              </div>
+              <div className="admin-stat-card">
+                <div className="stat-icon">📂</div>
+                <div className="stat-content">
+                  <div className="stat-value">{adminStats.total_categories || 0}</div>
+                  <div className="stat-label">Catégories</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions rapides */}
           <div className="admin-cards-grid">
             <Link to="/admin" className="admin-card">
               <div className="admin-card-icon">📊</div>
@@ -263,10 +362,20 @@ const Home = () => {
               <h3>Upload Vidéo</h3>
               <p>Téléverser une nouvelle vidéo</p>
             </Link>
+            <Link to="/admin/videos" className="admin-card">
+              <div className="admin-card-icon">🎬</div>
+              <h3>Gérer Vidéos</h3>
+              <p>Modifier et supprimer des vidéos</p>
+            </Link>
             <Link to="/admin/users" className="admin-card">
               <div className="admin-card-icon">👥</div>
               <h3>Utilisateurs</h3>
               <p>Gérer les utilisateurs</p>
+            </Link>
+            <Link to="/admin/categories" className="admin-card">
+              <div className="admin-card-icon">📂</div>
+              <h3>Catégories</h3>
+              <p>Gérer les catégories</p>
             </Link>
             <Link to="/admin/torrents" className="admin-card">
               <div className="admin-card-icon">📥</div>
