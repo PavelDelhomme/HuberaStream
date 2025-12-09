@@ -42,9 +42,7 @@ const AdminVideos = () => {
       if (searchQuery) {
         params.search = searchQuery
       }
-      console.log('AdminVideos: Récupération des vidéos avec params:', params)
       const response = await api.get('/videos', { params })
-      console.log('AdminVideos: Réponse API complète:', response.data)
       
       // Extraire les vidéos de la réponse
       let allVideos = []
@@ -56,14 +54,10 @@ const AdminVideos = () => {
         allVideos = response.data.data.videos
       }
       
-      console.log('AdminVideos: Nombre de vidéos récupérées:', allVideos.length)
-      console.log('AdminVideos: Premières vidéos:', allVideos.slice(0, 3))
-      
       // Pour les admins, voir TOUTES les vidéos (même celles en cours de traitement ou avec titre vide)
       // Filtrer seulement les vidéos vraiment invalides (sans ID)
       let validVideos = allVideos.filter(v => {
         if (!v || !v.id) {
-          console.log('AdminVideos: Vidéo sans ID filtrée:', v)
           return false
         }
         // Pour les admins, accepter toutes les vidéos même avec titre "null" ou vide
@@ -71,15 +65,12 @@ const AdminVideos = () => {
         return true
       })
       
-      console.log('AdminVideos: Nombre de vidéos après filtrage:', validVideos.length)
-      
       // Filtrer par statut si nécessaire
       let filteredVideos = validVideos
       if (filterStatus !== 'all') {
         filteredVideos = validVideos.filter(v => v.status === filterStatus)
       }
       
-      console.log('AdminVideos: Vidéos après filtrage par statut:', filteredVideos.length)
       setVideos(filteredVideos)
     } catch (err) {
       console.error('AdminVideos: Erreur lors de la récupération des vidéos:', err)
