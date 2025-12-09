@@ -43,25 +43,32 @@ const AdminVideos = () => {
       }
       console.log('AdminVideos: Récupération des vidéos avec params:', params)
       const response = await api.get('/videos', { params })
-      console.log('AdminVideos: Réponse API:', response.data)
+      console.log('AdminVideos: Réponse API complète:', response.data)
       
-      // Ne pas filtrer les vidéos "null" pour les admins - ils doivent voir toutes les vidéos
-      let allVideos = response.data.videos || response.data || []
-      
-      // Si c'est un tableau, utiliser directement, sinon extraire videos
-      if (!Array.isArray(allVideos)) {
-        allVideos = allVideos.videos || []
+      // Extraire les vidéos de la réponse
+      let allVideos = []
+      if (Array.isArray(response.data)) {
+        allVideos = response.data
+      } else if (response.data && Array.isArray(response.data.videos)) {
+        allVideos = response.data.videos
+      } else if (response.data && response.data.data && Array.isArray(response.data.data.videos)) {
+        allVideos = response.data.data.videos
       }
       
-      console.log('AdminVideos: Vidéos récupérées:', allVideos.length)
+      console.log('AdminVideos: Nombre de vidéos récupérées:', allVideos.length)
+      console.log('AdminVideos: Premières vidéos:', allVideos.slice(0, 3))
+      
+      // Pour les admins, ne pas filtrer les vidéos "null" - ils doivent voir toutes les vidéos
+      // Filtrer seulement les vidéos vraiment invalides (sans ID)
+      let validVideos = allVideos.filter(v => v && v.id)
       
       // Filtrer par statut si nécessaire
-      let filteredVideos = allVideos
+      let filteredVideos = validVideos
       if (filterStatus !== 'all') {
-        filteredVideos = allVideos.filter(v => v.status === filterStatus)
+        filteredVideos = validVideos.filter(v => v.status === filterStatus)
       }
       
-      console.log('AdminVideos: Vidéos après filtrage:', filteredVideos.length)
+      console.log('AdminVideos: Vidéos après filtrage par statut:', filteredVideos.length)
       setVideos(filteredVideos)
     } catch (err) {
       console.error('AdminVideos: Erreur lors de la récupération des vidéos:', err)
