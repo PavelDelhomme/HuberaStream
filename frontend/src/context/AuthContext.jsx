@@ -6,6 +6,20 @@ const AuthContext = createContext(null)
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
+    // En mode développement avec hot reload, retourner des valeurs par défaut
+    // au lieu de lancer une erreur pour éviter les crashes
+    if (import.meta.env.DEV) {
+      console.warn('useAuth appelé en dehors d\'un AuthProvider - valeurs par défaut utilisées')
+      return {
+        user: null,
+        token: null,
+        loading: true,
+        login: async () => ({ success: false, error: 'AuthProvider non disponible' }),
+        register: async () => ({ success: false, error: 'AuthProvider non disponible' }),
+        logout: () => {},
+        isAdmin: () => false
+      }
+    }
     throw new Error('useAuth doit être utilisé dans un AuthProvider')
   }
   return context

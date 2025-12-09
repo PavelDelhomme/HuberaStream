@@ -4,7 +4,22 @@ import { useAuth } from '../context/AuthContext'
 import './Navigation.css'
 
 const Navigation = () => {
-  const { user, logout, isAdmin } = useAuth()
+  // Protection contre les erreurs lors du hot reload
+  let authContext
+  try {
+    authContext = useAuth()
+  } catch (error) {
+    console.warn('Navigation: Erreur lors de l\'accès au contexte d\'authentification:', error)
+    // Valeurs par défaut si le contexte n'est pas disponible
+    authContext = {
+      user: null,
+      token: null,
+      loading: true,
+      logout: () => {},
+      isAdmin: () => false
+    }
+  }
+  const { user, logout, isAdmin } = authContext
   const navigate = useNavigate()
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
