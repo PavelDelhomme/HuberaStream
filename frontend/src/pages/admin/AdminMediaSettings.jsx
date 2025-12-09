@@ -6,7 +6,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminMediaSettings.css'
 
 const AdminMediaSettings = () => {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState({
@@ -25,12 +25,16 @@ const AdminMediaSettings = () => {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user || user.role !== 'admin') {
+    if (!user) {
       navigate('/login')
       return
     }
+    if (!isAdmin()) {
+      navigate('/')
+      return
+    }
     fetchSettings()
-  }, [user, authLoading, navigate])
+  }, [user, authLoading, isAdmin, navigate])
 
   const fetchSettings = async () => {
     try {

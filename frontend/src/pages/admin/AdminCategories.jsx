@@ -6,7 +6,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminCategories.css'
 
 const AdminCategories = () => {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,6 +19,7 @@ const AdminCategories = () => {
   })
 
   useEffect(() => {
+    if (authLoading) return
     if (!user) {
       navigate('/login')
       return
@@ -28,7 +29,7 @@ const AdminCategories = () => {
       return
     }
     fetchCategories()
-  }, [user, isAdmin, navigate])
+  }, [user, authLoading, isAdmin, navigate])
 
   const fetchCategories = async () => {
     try {

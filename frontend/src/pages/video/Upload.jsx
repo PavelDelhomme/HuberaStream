@@ -30,7 +30,8 @@ const Upload = () => {
       return
     }
     // Vérifier que l'utilisateur est admin
-    if (user.role !== 'admin') {
+    const { isAdmin } = useAuth()
+    if (!isAdmin()) {
       navigate('/')
       return
     }

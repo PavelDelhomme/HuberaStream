@@ -6,7 +6,7 @@ import LoadingSpinner from '../../components/LoadingSpinner'
 import './AdminTorrentConfigs.css'
 
 const AdminTorrentConfigs = () => {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [configs, setConfigs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -23,6 +23,7 @@ const AdminTorrentConfigs = () => {
   const [categories, setCategories] = useState([])
 
   useEffect(() => {
+    if (authLoading) return
     if (!user) {
       navigate('/login')
       return
@@ -33,7 +34,7 @@ const AdminTorrentConfigs = () => {
     }
     fetchConfigs()
     fetchCategories()
-  }, [user, isAdmin, navigate])
+  }, [user, authLoading, isAdmin, navigate])
 
   const fetchConfigs = async () => {
     try {
