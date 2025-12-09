@@ -84,7 +84,48 @@ const VideoPlayerPage = () => {
   if (error || !video) {
     return (
       <div className="video-player-page">
-        <div className="error">{error || 'Vidéo non trouvée'}</div>
+        <div className="error-container">
+          <div className="error-icon">⚠️</div>
+          <div className="error-message">{error || 'Vidéo non trouvée'}</div>
+          {error && error.includes('traitement') && (
+            <button 
+              onClick={() => {
+                setError(null)
+                setLoading(true)
+                fetchVideo()
+              }} 
+              className="retry-button"
+            >
+              🔄 Réessayer
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+  
+  // Afficher un message si la vidéo est en cours de traitement
+  if (video && video.status === 'processing') {
+    return (
+      <div className="video-player-page">
+        <div className="processing-container">
+          <div className="processing-icon">⏳</div>
+          <h2>Vidéo en cours de traitement</h2>
+          <p>Votre vidéo est en cours de traitement. Elle sera disponible dans quelques instants.</p>
+          <div className="video-info">
+            <h3>{video.title}</h3>
+            {video.description && <p>{video.description}</p>}
+          </div>
+          <button 
+            onClick={() => {
+              setLoading(true)
+              fetchVideo()
+            }} 
+            className="refresh-button"
+          >
+            🔄 Actualiser
+          </button>
+        </div>
       </div>
     )
   }
