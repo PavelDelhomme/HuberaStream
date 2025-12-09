@@ -14,6 +14,7 @@ const AdminVideos = () => {
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [cleaning, setCleaning] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
