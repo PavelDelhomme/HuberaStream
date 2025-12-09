@@ -133,9 +133,8 @@ const Home = () => {
         setCategories([])
         setVideosByCategory({})
       }
-
-      // Récupérer les stats admin (si admin)
-      if (user && (user.role === 'admin' || isAdmin())) {
+      
+    } catch (err) {
         try {
           const statsResponse = await api.get('/admin/stats')
           setAdminStats(statsResponse.data)
