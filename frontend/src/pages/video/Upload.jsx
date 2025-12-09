@@ -251,7 +251,7 @@ const Upload = () => {
                 onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
                 disabled={uploading}
               />
-              Vidéo publique
+              <span className="checkbox-text">Vidéo publique</span>
             </label>
           </div>
 
