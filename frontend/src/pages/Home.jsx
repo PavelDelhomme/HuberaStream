@@ -134,39 +134,6 @@ const Home = () => {
         setVideosByCategory({})
       }
       
-    } catch (err) {
-        try {
-          const statsResponse = await api.get('/admin/stats')
-          setAdminStats(statsResponse.data)
-        } catch (err) {
-          // Si l'endpoint n'existe pas, calculer les stats depuis les autres endpoints
-          try {
-            const [usersRes, videosRes, torrentsRes, categoriesRes] = await Promise.allSettled([
-              api.get('/admin/users?page=1&limit=1'),
-              api.get('/videos?page=1&limit=1&status=all'),
-              api.get('/admin/torrents'),
-              api.get('/categories')
-            ])
-            
-            const stats = {
-              total_users: usersRes.status === 'fulfilled' ? (usersRes.value.data?.total || usersRes.value.data?.users?.length || 0) : 0,
-              total_videos: videosRes.status === 'fulfilled' ? (videosRes.value.data?.total || videosRes.value.data?.videos?.length || 0) : 0,
-              total_torrents: torrentsRes.status === 'fulfilled' ? (torrentsRes.value.data?.torrents?.length || 0) : 0,
-              active_torrents: torrentsRes.status === 'fulfilled' 
-                ? (torrentsRes.value.data?.torrents?.filter(t => t.status === 'downloading' || t.status === 'seeding')?.length || 0) 
-                : 0,
-              total_categories: categoriesRes.status === 'fulfilled' ? (categoriesRes.value.data?.length || 0) : 0
-            }
-            setAdminStats(stats)
-          } catch (statsErr) {
-            console.debug('Impossible de récupérer les stats admin:', statsErr)
-            setAdminStats(null)
-          }
-        }
-      }
-      
-    } catch (err) {
-      console.error('Erreur générale lors de la récupération des données:', err)
       // Ne pas afficher d'erreur si c'est juste qu'il n'y a pas de vidéos
       if (err.response?.status !== 404 && err.response?.status !== 401) {
         setError('Impossible de charger les vidéos. Veuillez réessayer plus tard.')
