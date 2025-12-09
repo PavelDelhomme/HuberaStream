@@ -4,6 +4,7 @@ import VideoGrid from '../components/VideoGrid'
 import api from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { filterValidVideos } from '../utils/videoUtils'
+import LoadingSpinner from '../components/LoadingSpinner'
 import './Home.css'
 
 const Home = () => {

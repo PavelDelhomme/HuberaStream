@@ -5,6 +5,7 @@ import VideoGrid from '../../components/VideoGrid'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { filterValidVideos } from '../../utils/videoUtils'
+import LoadingSpinner from '../../components/LoadingSpinner'
 import './VideoPlayerPage.css'
 
 const VideoPlayerPage = () => {
@@ -63,7 +64,7 @@ const VideoPlayerPage = () => {
   if (loading) {
     return (
       <div className="video-player-page">
-        <div className="loading">Chargement de la vidéo...</div>
+        <LoadingSpinner message="Chargement de la vidéo..." />
       </div>
     )
   }

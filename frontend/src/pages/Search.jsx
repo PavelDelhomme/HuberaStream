@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import VideoGrid from '../components/VideoGrid'
 import api from '../services/api'
 import { filterValidVideos } from '../utils/videoUtils'
+import LoadingSpinner from '../components/LoadingSpinner'
 import './Search.css'
 
 const Search = () => {
@@ -50,7 +51,7 @@ const Search = () => {
   if (loading) {
     return (
       <div className="search-container">
-        <div className="loading">Recherche en cours...</div>
+        <LoadingSpinner message="Recherche en cours..." />
       </div>
     )
   }
