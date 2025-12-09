@@ -126,10 +126,7 @@ const Home = () => {
   if (loading) {
     return (
       <div className="home-container">
-        <div className="loading-spinner">
-          <div className="spinner"></div>
-          <p>Chargement...</p>
-        </div>
+        <LoadingSpinner message="Chargement..." />
       </div>
     )
   }
