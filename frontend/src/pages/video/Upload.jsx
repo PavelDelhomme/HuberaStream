@@ -5,7 +5,7 @@ import api from '../../services/api'
 import './Upload.css'
 
 const Upload = () => {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     title: '',
@@ -30,13 +30,12 @@ const Upload = () => {
       return
     }
     // Vérifier que l'utilisateur est admin
-    const { isAdmin } = useAuth()
     if (!isAdmin()) {
       navigate('/')
       return
     }
     fetchCategories()
-  }, [user, authLoading, navigate])
+  }, [user, authLoading, isAdmin, navigate])
 
   React.useEffect(() => {
     if (formData.category_id) {
