@@ -318,34 +318,18 @@ const Navigation = () => {
                     </span>
                     {/* Menu Administration - Afficher si admin */}
                     {(() => {
-                      // Vérifier le rôle de plusieurs façons
+                      // Vérifier le rôle de plusieurs façons pour une détection robuste
                       const userRole = user?.role;
                       const isAdminResult = isAdmin && typeof isAdmin === 'function' ? isAdmin() : false;
                       const userRoleString = String(userRole || '').toLowerCase();
                       const emailIsAdmin = user?.email === 'dev@delhomme.ovh'; // Email admin connu
                       
-                      // Vérifications multiples
-                      const shouldShow = 
-                        userRole === 'admin' || 
-                        userRoleString === 'admin' || 
-                        isAdminResult ||
-                        (user && user.role && String(user.role).toLowerCase() === 'admin') ||
-                        emailIsAdmin; // Fallback: si c'est l'email admin, afficher le menu
-                      
-                      // Debug
-                      console.log('🔍 Navigation Admin Check:', {
-                        user,
-                        userRole,
-                        userRoleString,
-                        isAdminResult,
-                        emailIsAdmin,
-                        shouldShow,
-                        'user.role': user?.role,
-                        'typeof user.role': typeof user?.role,
-                        'user.email': user?.email
-                      });
-                      
-                      return shouldShow;
+                      // Vérifications multiples pour garantir l'affichage
+                      return userRole === 'admin' || 
+                             userRoleString === 'admin' || 
+                             isAdminResult ||
+                             (user && user.role && String(user.role).toLowerCase() === 'admin') ||
+                             emailIsAdmin; // Fallback: si c'est l'email admin, afficher le menu
                     })() && (
                       <>
                         <div className="dropdown-divider"></div>
