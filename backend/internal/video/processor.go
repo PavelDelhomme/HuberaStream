@@ -104,16 +104,22 @@ func (p *Processor) TranscodeToHLS(videoPath string, videoID uuid.UUID, quality 
 		bitrate = "2500k"
 	}
 
+	// Détecter et gérer tous les formats d'entrée pour HLS
 	cmd := exec.Command(
 		p.ffmpegPath,
 		"-i", videoPath,
-		"-c:v", "libx264",
-		"-c:a", "aac",
-		"-b:v", bitrate,
-		"-s", resolution,
-		"-hls_time", "10",
-		"-hls_playlist_type", "vod",
+		"-c:v", "libx264",              // Codec vidéo H.264
+		"-preset", "medium",             // Équilibre vitesse/qualité
+		"-crf", "23",                    // Qualité constante
+		"-c:a", "aac",                   // Codec audio AAC
+		"-b:a", "128k",                  // Bitrate audio
+		"-b:v", bitrate,                 // Bitrate vidéo
+		"-s", resolution,                // Résolution
+		"-pix_fmt", "yuv420p",           // Format de pixels compatible
+		"-hls_time", "10",               // Durée des segments (10 secondes)
+		"-hls_playlist_type", "vod",     // Type de playlist (Video On Demand)
 		"-hls_segment_filename", segmentPattern,
+		"-y",                            // Écraser si existe
 		manifestPath,
 	)
 
