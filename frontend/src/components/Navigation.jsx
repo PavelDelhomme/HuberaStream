@@ -407,7 +407,7 @@ const Navigation = () => {
                   <span className="dropdown-arrow">▼</span>
                 </button>
                 {showUserMenu && (
-                  <div className="dropdown-menu user-dropdown">
+                  <div className="dropdown-menu user-dropdown" onClick={(e) => e.stopPropagation()}>
                     <span className="dropdown-username">
                       {user.username}
                       {(() => {
@@ -435,160 +435,181 @@ const Navigation = () => {
                       <>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">⚙️ Administration</span>
-                        <Link 
-                          to="/admin" 
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin');
                           }}
                         >
                           📊 Tableau de bord
-                        </Link>
-                        <Link 
-                          to="/admin/users" 
+                        </button>
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/users');
                           }}
                         >
                           👥 Utilisateurs
-                        </Link>
-                        <Link 
-                          to="/admin/categories" 
+                        </button>
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/categories');
                           }}
                         >
                           📂 Catégories
-                        </Link>
+                        </button>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
-                        <Link 
-                          to="/admin/videos" 
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/videos');
                           }}
                         >
                           📹 Gérer Vidéos
-                        </Link>
-                        <Link 
-                          to="/upload" 
+                        </button>
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/upload');
                           }}
                         >
                           ⬆️ Upload Vidéo
-                        </Link>
-                        <Link 
-                          to="/dvd-extract" 
+                        </button>
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/dvd-extract');
                           }}
                         >
                           📀 Extraire DVD
-                        </Link>
+                        </button>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">📥 Torrents</span>
-                        <Link 
-                          to="/admin/torrents" 
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/torrents');
                           }}
                         >
                           📥 Gérer Torrents
-                        </Link>
-                        <Link 
-                          to="/admin/torrent-clients" 
+                        </button>
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/torrent-clients');
                           }}
                         >
                           ⚙️ Clients Torrent
-                        </Link>
-                        <Link 
-                          to="/admin/torrent-configs" 
+                        </button>
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/torrent-configs');
                           }}
                         >
                           ⚙️ Configurations
-                        </Link>
+                        </button>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎛️ Paramètres</span>
-                        <Link 
-                          to="/admin/media-settings" 
+                        <button
+                          type="button"
                           className="dropdown-item" 
                           onClick={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowUserMenu(false);
                             navigate('/admin/media-settings');
                           }}
                         >
                           🎬 Paramètres Média
-                        </Link>
+                        </button>
                         <div className="dropdown-divider"></div>
                       </>
                     )}
-                    <Link 
-                      to="/profile" 
+                    <button
+                      type="button"
                       className="dropdown-item" 
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         setShowUserMenu(false);
                         navigate('/profile');
                       }}
                     >
                       👤 Mon Profil
-                    </Link>
-                    <Link 
-                      to="/favorites" 
+                    </button>
+                    <button
+                      type="button"
                       className="dropdown-item" 
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         setShowUserMenu(false);
                         navigate('/favorites');
                       }}
                     >
                       ⭐ Favoris
-                    </Link>
-                    <Link 
-                      to="/history" 
+                    </button>
+                    <button
+                      type="button"
                       className="dropdown-item" 
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         setShowUserMenu(false);
                         navigate('/history');
                       }}
                     >
                       📺 Historique
-                    </Link>
+                    </button>
                     <div className="dropdown-divider"></div>
-                    <button onClick={handleLogout} className="dropdown-item dropdown-item-danger">
+                    <button 
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleLogout();
+                      }} 
+                      className="dropdown-item dropdown-item-danger"
+                    >
                       🚪 Déconnexion
                     </button>
                   </div>
