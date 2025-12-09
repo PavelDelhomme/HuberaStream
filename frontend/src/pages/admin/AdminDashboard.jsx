@@ -13,16 +13,29 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     // Attendre que le chargement de l'authentification soit terminé
-    if (authLoading) return
+    if (authLoading) {
+      console.log('AdminDashboard: En attente du chargement de l\'authentification...')
+      return
+    }
+    
+    console.log('AdminDashboard: authLoading terminé, user:', user, 'isAdmin:', isAdmin ? isAdmin() : 'non défini')
     
     if (!user) {
+      console.log('AdminDashboard: Pas d\'utilisateur, redirection vers /login')
       navigate('/login')
       return
     }
-    if (!isAdmin()) {
+    
+    const adminCheck = isAdmin()
+    console.log('AdminDashboard: Vérification admin - user.role:', user?.role, 'isAdmin():', adminCheck)
+    
+    if (!adminCheck) {
+      console.log('AdminDashboard: Utilisateur n\'est pas admin, redirection vers /')
       navigate('/')
       return
     }
+    
+    console.log('AdminDashboard: Utilisateur est admin, chargement des stats...')
     fetchStats()
   }, [user, authLoading, isAdmin, navigate])
 
