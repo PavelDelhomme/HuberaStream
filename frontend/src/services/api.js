@@ -52,26 +52,23 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Ne pas supprimer le token si on est sur la page d'accueil ou de login
-    // L'AuthContext gérera la vérification du token au chargement
+    // Ne pas supprimer le token automatiquement
+    // L'AuthContext gère la vérification et le nettoyage du token
+    // Cet intercepteur ne fait que propager l'erreur
+    // Exception : ne pas supprimer le token si c'est la requête de vérification initiale (/users/me)
     if (error.response?.status === 401) {
       const currentPath = window.location.pathname
-      // Ne pas supprimer le token si on est sur la page d'accueil ou de login
-      // Cela permet à AuthContext de vérifier le token correctement
-      if (currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
+      const isInitialAuthCheck = error.config?.url?.includes('/users/me')
+      
+      // Ne jamais supprimer le token pendant la vérification initiale
+      // AuthContext gérera cela
+      if (isInitialAuthCheck || currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
         // Laisser AuthContext gérer la vérification
         return Promise.reject(error)
       }
-      // Pour les autres pages, supprimer le token seulement si on n'est pas en train de charger
-      // (pour éviter de supprimer le token pendant la vérification initiale)
-      if (!currentPath.includes('/login') && !currentPath.includes('/register')) {
-        // Vérifier si le token existe encore (pour éviter de supprimer pendant le chargement initial)
-        const token = localStorage.getItem('token')
-        if (token && error.config?.url !== '/users/me') {
-          // Ne pas supprimer le token si c'est la requête de vérification initiale
-          // AuthContext gérera cela
-        }
-      }
+      
+      // Pour les autres erreurs 401 sur d'autres pages, AuthContext gérera aussi
+      // On ne supprime pas le token ici pour éviter les conflits
     }
     return Promise.reject(error)
   }
