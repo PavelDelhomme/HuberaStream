@@ -217,8 +217,48 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 		return
 	}
 
-	// Incrémenter les vues
-	h.db.Model(&video).Update("views", video.Views+1)
+	// Vérifier les permissions d'accès
+	userID, exists := c.Get("user_id")
+	isAdmin := false
+	isOwner := false
+	
+	if exists {
+		userIDStr, ok := userID.(string)
+		if ok {
+			userUUID, err := uuid.Parse(userIDStr)
+			if err == nil {
+				// Vérifier si c'est le propriétaire
+				if video.UserID == userUUID {
+					isOwner = true
+				}
+				
+				// Vérifier si c'est un admin
+				var user models.User
+				if err := h.db.Where("id = ?", userUUID).First(&user).Error; err == nil {
+					isAdmin = user.Role == models.RoleAdmin
+				}
+			}
+		}
+	}
+
+	// Si la vidéo n'est pas prête, seuls le propriétaire et les admins peuvent la voir
+	if video.Status != models.VideoStatusReady {
+		if !isOwner && !isAdmin {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+			return
+		}
+	}
+
+	// Si la vidéo n'est pas publique, seuls le propriétaire et les admins peuvent la voir
+	if !video.IsPublic && !isOwner && !isAdmin {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+
+	// Incrémenter les vues seulement si la vidéo est prête et publique
+	if video.Status == models.VideoStatusReady && video.IsPublic {
+		h.db.Model(&video).Update("views", video.Views+1)
+	}
 
 	c.JSON(http.StatusOK, video)
 }

@@ -125,7 +125,7 @@ const Upload = () => {
         })
       }
 
-      alert('✅ Vidéo uploadée avec succès!')
+      alert('✅ Vidéo uploadée avec succès! Le traitement peut prendre quelques instants.')
       // Réinitialiser le formulaire
       setFormData({
         title: '',
@@ -136,11 +136,12 @@ const Upload = () => {
       })
       setVideoFile(null)
       setThumbnailFile(null)
-      // Optionnel: rediriger vers la vidéo ou rester sur la page
+      // Rediriger vers la vidéo après un court délai pour permettre la création en base
       if (response.data.video_id) {
+        // Attendre un peu pour que la vidéo soit créée en base
         setTimeout(() => {
           navigate(`/video/${response.data.video_id}`)
-        }, 2000)
+        }, 1000)
       }
     } catch (error) {
       console.error('Erreur:', error)

@@ -26,12 +26,24 @@ const VideoPlayerPage = () => {
   const fetchVideo = async () => {
     try {
       setLoading(true)
-      const response = await api.get(`/videos/${id}`)
-      setVideo(response.data)
       setError(null)
+      const response = await api.get(`/videos/${id}`)
+      
+      // Vérifier que la vidéo existe et a un ID valide
+      if (!response.data || !response.data.id) {
+        throw new Error('Vidéo invalide')
+      }
+      
+      setVideo(response.data)
     } catch (err) {
       console.error('Erreur lors de la récupération de la vidéo:', err)
-      setError('Vidéo non trouvée')
+      const errorMessage = err.response?.data?.error || err.message || 'Vidéo non trouvée'
+      setError(errorMessage)
+      
+      // Si la vidéo est en cours de traitement, afficher un message spécifique
+      if (err.response?.status === 404) {
+        setError('Cette vidéo est en cours de traitement ou n\'existe pas encore. Veuillez réessayer dans quelques instants.')
+      }
     } finally {
       setLoading(false)
     }

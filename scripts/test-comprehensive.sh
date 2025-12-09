@@ -372,16 +372,36 @@ if [ -n "$ADMIN_TOKEN" ]; then
     test_request "POST" "/admin/videos/clean-invalid" "" "200" "Nettoyage des vidéos invalides" "$ADMIN_TOKEN" "true"
     
     # Test d'upload (simulation - sans fichier réel)
+    echo -n "  Test: Route upload accessible... "
     UPLOAD_TEST=$(curl -s -w "\n%{http_code}" -X POST "$API_URL/admin/videos/upload" \
         -H "Authorization: Bearer $ADMIN_TOKEN" \
-        -F "video=@/dev/null" 2>/dev/null || echo "400")
+        -F "video=@/dev/null" \
+        -F "title=Test Video Upload" \
+        -F "is_public=true" 2>/dev/null || echo -e "\n000")
     UPLOAD_CODE=$(echo "$UPLOAD_TEST" | tail -n1)
-    if [ "$UPLOAD_CODE" = "400" ] || [ "$UPLOAD_CODE" = "422" ] || [ "$UPLOAD_CODE" = "201" ]; then
-        echo -e "${GREEN}✓${NC} Route upload accessible (code: $UPLOAD_CODE)"
+    UPLOAD_BODY=$(echo "$UPLOAD_TEST" | sed '$d')
+    
+    if [ "$UPLOAD_CODE" = "400" ] || [ "$UPLOAD_CODE" = "422" ]; then
+        echo -e "${GREEN}✓${NC} (HTTP $UPLOAD_CODE - attendu pour fichier invalide)"
         ((TESTS_PASSED++))
+    elif [ "$UPLOAD_CODE" = "201" ]; then
+        echo -e "${GREEN}✓${NC} (HTTP $UPLOAD_CODE)"
+        ((TESTS_PASSED++))
+        # Extraire l'ID de la vidéo uploadée
+        UPLOADED_VIDEO_ID=$(extract_uuid "$UPLOAD_BODY" "video_id")
+        if [ -n "$UPLOADED_VIDEO_ID" ]; then
+            echo "    Vidéo uploadée: $UPLOADED_VIDEO_ID"
+            # Tester l'accès à la vidéo uploadée (même en traitement)
+            test_request "GET" "/videos/$UPLOADED_VIDEO_ID" "" "200" "Accès à la vidéo uploadée (admin)" "$ADMIN_TOKEN" "true"
+        fi
     else
         echo -e "${YELLOW}⚠${NC} Route upload retourne: $UPLOAD_CODE"
         ((TESTS_SKIPPED++))
+    fi
+    
+    # Test d'accès aux vidéos en traitement (admin)
+    if [ -n "$TEST_VIDEO_ID" ]; then
+        test_request "GET" "/videos/$TEST_VIDEO_ID" "" "200" "Accès à une vidéo par ID (admin)" "$ADMIN_TOKEN" "true"
     fi
 fi
 
