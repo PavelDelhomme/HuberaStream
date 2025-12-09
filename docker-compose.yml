@@ -46,7 +46,7 @@ services:
       - /dev/sr0:/dev/sr0:rw
       - /dev/sr1:/dev/sr1:rw
       - /dev/sr2:/dev/sr2:rw
-    privileged: true  # Nécessaire pour accéder aux devices
+    privileged: true # Nécessaire pour accéder aux devices
     volumes:
       - video_storage:/app/storage/videos
       - thumbnail_storage:/app/storage/thumbnails
