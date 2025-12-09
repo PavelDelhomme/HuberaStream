@@ -23,11 +23,9 @@ const Navigation = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchQuery, setSearchQuery] = useState('')
-  const [showAdminMenu, setShowAdminMenu] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [showSearchBar, setShowSearchBar] = useState(false)
-  const adminMenuRef = useRef(null)
   const userMenuRef = useRef(null)
   const mobileMenuRef = useRef(null)
   const searchInputRef = useRef(null)
@@ -46,9 +44,6 @@ const Navigation = () => {
         return
       }
       
-      if (adminMenuRef.current && !adminMenuRef.current.contains(event.target)) {
-        setShowAdminMenu(false)
-      }
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowUserMenu(false)
       }
@@ -70,7 +65,7 @@ const Navigation = () => {
       clearTimeout(timeoutId)
       document.removeEventListener('click', handleClickOutside, true)
     }
-  }, [showSearchBar, showAdminMenu, showUserMenu])
+  }, [showSearchBar, showUserMenu])
 
   // Fermer le menu mobile quand on change de page
   useEffect(() => {
@@ -271,147 +266,6 @@ const Navigation = () => {
         <div className="nav-links">
           {user ? (
             <>
-              {(user?.role === 'admin' || isAdmin()) && (
-                <div className="nav-dropdown" ref={adminMenuRef}>
-                  <button
-                    className={`nav-link nav-link-admin ${isActive('/admin') ? 'active' : ''}`}
-                    onClick={() => setShowAdminMenu(!showAdminMenu)}
-                    style={{ border: 'none', cursor: 'pointer' }}
-                  >
-                    ⚙️ Admin
-                    <span className="dropdown-arrow">▼</span>
-                  </button>
-                  {showAdminMenu && (
-                    <div className="dropdown-menu admin-dropdown" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin');
-                        }}
-                      >
-                        📊 Tableau de bord
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/users');
-                        }}
-                      >
-                        👥 Utilisateurs
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/categories');
-                        }}
-                      >
-                        📂 Catégories
-                      </button>
-                      <div className="dropdown-divider"></div>
-                      <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/videos');
-                        }}
-                      >
-                        📹 Gérer Vidéos
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/upload');
-                        }}
-                      >
-                        ⬆️ Upload Vidéo
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/dvd-extract');
-                        }}
-                      >
-                        📀 Extraire DVD
-                      </button>
-                      <div className="dropdown-divider"></div>
-                      <span className="dropdown-section-title">📥 Torrents</span>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/torrents');
-                        }}
-                      >
-                        📥 Gérer Torrents
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/torrent-clients');
-                        }}
-                      >
-                        ⚙️ Clients Torrent
-                      </button>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/torrent-configs');
-                        }}
-                      >
-                        ⚙️ Configurations
-                      </button>
-                      <div className="dropdown-divider"></div>
-                      <button
-                        type="button"
-                        className="dropdown-item" 
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowAdminMenu(false);
-                          navigate('/admin/media-settings');
-                        }}
-                      >
-                        🎬 Paramètres Média
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
               <div className="nav-dropdown" ref={userMenuRef}>
                 <button
                   className="user-menu-button"
