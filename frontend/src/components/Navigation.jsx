@@ -334,52 +334,143 @@ const Navigation = () => {
                       <>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">⚙️ Administration</span>
-                        <Link to="/admin" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           📊 Tableau de bord
                         </Link>
-                        <Link to="/admin/users" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/users" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           👥 Utilisateurs
                         </Link>
-                        <Link to="/admin/categories" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/categories" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           📂 Catégories
                         </Link>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
-                        <Link to="/admin/videos" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/videos" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           📹 Gérer Vidéos
                         </Link>
-                        <Link to="/upload" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/upload" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           ⬆️ Upload Vidéo
                         </Link>
-                        <Link to="/dvd-extract" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/dvd-extract" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           📀 Extraire DVD
                         </Link>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">📥 Torrents</span>
-                        <Link to="/admin/torrents" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/torrents" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           📥 Gérer Torrents
                         </Link>
-                        <Link to="/admin/torrent-clients" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/torrent-clients" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           ⚙️ Clients Torrent
                         </Link>
-                        <Link to="/admin/torrent-configs" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/torrent-configs" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           ⚙️ Configurations
                         </Link>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎛️ Paramètres</span>
-                        <Link to="/admin/media-settings" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                        <Link 
+                          to="/admin/media-settings" 
+                          className="dropdown-item" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                          }}
+                        >
                           🎬 Paramètres Média
                         </Link>
                         <div className="dropdown-divider"></div>
                       </>
                     )}
-                    <Link to="/profile" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                    <Link 
+                      to="/profile" 
+                      className="dropdown-item" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUserMenu(false);
+                      }}
+                    >
                       👤 Mon Profil
                     </Link>
-                    <Link to="/favorites" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                    <Link 
+                      to="/favorites" 
+                      className="dropdown-item" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUserMenu(false);
+                      }}
+                    >
                       ⭐ Favoris
                     </Link>
-                    <Link to="/history" className="dropdown-item" onClick={() => setShowUserMenu(false)}>
+                    <Link 
+                      to="/history" 
+                      className="dropdown-item" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowUserMenu(false);
+                      }}
+                    >
                       📺 Historique
                     </Link>
                     <div className="dropdown-divider"></div>
