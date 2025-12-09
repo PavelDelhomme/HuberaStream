@@ -28,7 +28,9 @@ function App() {
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="App">
-          <Navigation />
+          <React.Suspense fallback={<div>Chargement...</div>}>
+            <Navigation />
+          </React.Suspense>
           <main className="main-content">
             <Routes>
               <Route path="/" element={<Home />} />
