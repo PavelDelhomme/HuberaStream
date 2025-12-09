@@ -35,24 +35,37 @@ const AdminVideos = () => {
       setError(null)
       const params = {
         page: 1,
-        limit: 100,
+        limit: 1000, // Augmenter la limite pour voir toutes les vidéos
+        status: 'all', // Demander toutes les vidéos, pas seulement celles prêtes
       }
       if (searchQuery) {
         params.search = searchQuery
       }
+      console.log('AdminVideos: Récupération des vidéos avec params:', params)
       const response = await api.get('/videos', { params })
-      const validVideos = filterValidVideos(response.data.videos || [])
+      console.log('AdminVideos: Réponse API:', response.data)
       
-      // Filtrer par statut si nécessaire
-      let filteredVideos = validVideos
-      if (filterStatus !== 'all') {
-        filteredVideos = validVideos.filter(v => v.status === filterStatus)
+      // Ne pas filtrer les vidéos "null" pour les admins - ils doivent voir toutes les vidéos
+      let allVideos = response.data.videos || response.data || []
+      
+      // Si c'est un tableau, utiliser directement, sinon extraire videos
+      if (!Array.isArray(allVideos)) {
+        allVideos = allVideos.videos || []
       }
       
+      console.log('AdminVideos: Vidéos récupérées:', allVideos.length)
+      
+      // Filtrer par statut si nécessaire
+      let filteredVideos = allVideos
+      if (filterStatus !== 'all') {
+        filteredVideos = allVideos.filter(v => v.status === filterStatus)
+      }
+      
+      console.log('AdminVideos: Vidéos après filtrage:', filteredVideos.length)
       setVideos(filteredVideos)
     } catch (err) {
-      console.error('Erreur lors de la récupération des vidéos:', err)
-      setError('Erreur lors de la récupération des vidéos')
+      console.error('AdminVideos: Erreur lors de la récupération des vidéos:', err)
+      setError('Erreur lors de la récupération des vidéos: ' + (err.response?.data?.error || err.message))
     } finally {
       setLoading(false)
     }

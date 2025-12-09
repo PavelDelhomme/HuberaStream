@@ -83,7 +83,14 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 		}
 	}
 	
-	if !isAdmin {
+	// Filtre par statut si fourni
+	statusFilter := c.Query("status")
+	if statusFilter == "all" && isAdmin {
+		// Les admins peuvent voir toutes les vidéos si status=all
+	} else if statusFilter != "" && statusFilter != "all" {
+		query = query.Where("status = ?", statusFilter)
+	} else if !isAdmin {
+		// Les non-admins voient seulement les vidéos prêtes
 		query = query.Where("status = ?", models.VideoStatusReady)
 	}
 
