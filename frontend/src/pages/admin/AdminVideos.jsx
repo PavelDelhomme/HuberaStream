@@ -131,6 +131,13 @@ const AdminVideos = () => {
       <div className="admin-videos-header">
         <h1>🎬 Gestion des Vidéos</h1>
         <div className="admin-videos-actions">
+          <button 
+            onClick={handleCleanInvalidVideos} 
+            className="admin-action-button clean"
+            disabled={cleaning}
+          >
+            {cleaning ? '🧹 Nettoyage...' : '🧹 Nettoyer les vidéos invalides'}
+          </button>
           <Link to="/upload" className="admin-action-button primary">
             ⬆️ Upload Vidéo
           </Link>
