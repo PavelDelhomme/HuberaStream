@@ -21,7 +21,6 @@ import AdminTorrentConfigs from './pages/admin/AdminTorrentConfigs'
 import AdminTorrentClients from './pages/admin/AdminTorrentClients'
 import AdminMediaSettings from './pages/admin/AdminMediaSettings'
 import AdminVideos from './pages/admin/AdminVideos'
-import Upload from './pages/Upload'
 import { AuthProvider } from './context/AuthContext'
 import './App.css'
 
