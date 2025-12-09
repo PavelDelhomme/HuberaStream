@@ -192,6 +192,22 @@
   color: #ff0000;
 }
 
+/* Section vide (quand pas de vidéos) */
+.section-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-empty p {
+  margin: 0;
+}
+
 .empty-state {
   text-align: center;
   padding: 100px 20px;

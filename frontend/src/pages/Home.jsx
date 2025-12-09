@@ -16,7 +16,6 @@ const Home = () => {
   const [userVideos, setUserVideos] = useState([]) // Vidéos uploadées par l'utilisateur
   const [categories, setCategories] = useState([])
   const [videosByCategory, setVideosByCategory] = useState({})
-  const [adminStats, setAdminStats] = useState(null) // Stats pour la section admin
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -231,12 +230,6 @@ const Home = () => {
               <Link to="/login" className="btn-hero-secondary">Se connecter</Link>
             </div>
           )}
-          {user && (user.role === 'admin' || isAdmin()) && (
-            <div className="hero-actions">
-              <Link to="/admin" className="btn-hero-primary">⚙️ Administration</Link>
-              <Link to="/upload" className="btn-hero-secondary">⬆️ Upload Vidéo</Link>
-            </div>
-          )}
         </div>
       </div>
 
@@ -262,155 +255,70 @@ const Home = () => {
         </div>
       )}
 
-      {/* Section: Tendances */}
-      {trendingVideos.length > 0 && (
-        <div className="section-container">
-          <div className="section-header">
-            <h2 className="section-title">🔥 Tendances</h2>
-          </div>
+      {/* Section: Tendances - Toujours affichée style Netflix */}
+      <div className="section-container">
+        <div className="section-header">
+          <h2 className="section-title">🔥 Tendances</h2>
+        </div>
+        {trendingVideos.length > 0 ? (
           <VideoGrid videos={trendingVideos} title="" />
-        </div>
-      )}
-
-      {/* Section: Populaires */}
-      {popularVideos.length > 0 && (
-        <div className="section-container">
-          <div className="section-header">
-            <h2 className="section-title">⭐ Populaires</h2>
+        ) : (
+          <div className="section-empty">
+            <p>Aucune vidéo tendance pour le moment</p>
           </div>
+        )}
+      </div>
+
+      {/* Section: Populaires - Toujours affichée style Netflix */}
+      <div className="section-container">
+        <div className="section-header">
+          <h2 className="section-title">⭐ Populaires</h2>
+        </div>
+        {popularVideos.length > 0 ? (
           <VideoGrid videos={popularVideos} title="" />
-        </div>
-      )}
-
-      {/* Section: Vidéos récentes */}
-      {recentVideos.length > 0 && (
-        <div className="section-container">
-          <div className="section-header">
-            <h2 className="section-title">📺 Nouveautés</h2>
+        ) : (
+          <div className="section-empty">
+            <p>Aucune vidéo populaire pour le moment</p>
           </div>
-          <VideoGrid videos={recentVideos} title="" />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Sections par catégorie */}
+      {/* Section: Vidéos récentes - Toujours affichée style Netflix */}
+      <div className="section-container">
+        <div className="section-header">
+          <h2 className="section-title">📺 Nouveautés</h2>
+        </div>
+        {recentVideos.length > 0 ? (
+          <VideoGrid videos={recentVideos} title="" />
+        ) : (
+          <div className="section-empty">
+            <p>Aucune nouvelle vidéo pour le moment</p>
+          </div>
+        )}
+      </div>
+
+      {/* Sections par catégorie - Toujours affichées style Netflix */}
       {categories.map((category) => {
         const videos = videosByCategory[category.id] || []
-        if (videos.length === 0) return null
         
         return (
           <div key={category.id} className="section-container">
             <div className="section-header">
               <h2 className="section-title">📂 {category.name}</h2>
-              <Link to={`/search?category=${category.id}`} className="section-link">Voir tout</Link>
+              {videos.length > 0 && (
+                <Link to={`/search?category=${category.id}`} className="section-link">Voir tout</Link>
+              )}
             </div>
-            <VideoGrid videos={videos} title="" />
+            {videos.length > 0 ? (
+              <VideoGrid videos={videos} title="" />
+            ) : (
+              <div className="section-empty">
+                <p>Aucune vidéo dans cette catégorie pour le moment</p>
+              </div>
+            )}
           </div>
         )
       })}
-
-      {/* Section Admin - Enrichie avec stats et actions */}
-      {user && (user.role === 'admin' || isAdmin()) && (
-        <div className="section-container admin-quick-access">
-          <div className="section-header">
-            <h2 className="section-title">⚙️ Administration</h2>
-            <Link to="/admin" className="section-link">Tableau de bord complet →</Link>
-          </div>
-          
-          {/* Stats rapides */}
-          {adminStats && (
-            <div className="admin-stats-grid">
-              <div className="admin-stat-card">
-                <div className="stat-icon">👥</div>
-                <div className="stat-content">
-                  <div className="stat-value">{adminStats.total_users || 0}</div>
-                  <div className="stat-label">Utilisateurs</div>
-                </div>
-              </div>
-              <div className="admin-stat-card">
-                <div className="stat-icon">🎬</div>
-                <div className="stat-content">
-                  <div className="stat-value">{adminStats.total_videos || 0}</div>
-                  <div className="stat-label">Vidéos</div>
-                </div>
-              </div>
-              <div className="admin-stat-card">
-                <div className="stat-icon">📥</div>
-                <div className="stat-content">
-                  <div className="stat-value">{adminStats.active_torrents || 0}</div>
-                  <div className="stat-label">Torrents actifs</div>
-                </div>
-              </div>
-              <div className="admin-stat-card">
-                <div className="stat-icon">📂</div>
-                <div className="stat-content">
-                  <div className="stat-value">{adminStats.total_categories || 0}</div>
-                  <div className="stat-label">Catégories</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Actions rapides */}
-          <div className="admin-cards-grid">
-            <Link to="/admin" className="admin-card">
-              <div className="admin-card-icon">📊</div>
-              <h3>Tableau de bord</h3>
-              <p>Statistiques et vue d'ensemble</p>
-            </Link>
-            <Link to="/upload" className="admin-card">
-              <div className="admin-card-icon">⬆️</div>
-              <h3>Upload Vidéo</h3>
-              <p>Téléverser une nouvelle vidéo</p>
-            </Link>
-            <Link to="/admin/videos" className="admin-card">
-              <div className="admin-card-icon">🎬</div>
-              <h3>Gérer Vidéos</h3>
-              <p>Modifier et supprimer des vidéos</p>
-            </Link>
-            <Link to="/admin/users" className="admin-card">
-              <div className="admin-card-icon">👥</div>
-              <h3>Utilisateurs</h3>
-              <p>Gérer les utilisateurs</p>
-            </Link>
-            <Link to="/admin/categories" className="admin-card">
-              <div className="admin-card-icon">📂</div>
-              <h3>Catégories</h3>
-              <p>Gérer les catégories</p>
-            </Link>
-            <Link to="/admin/torrents" className="admin-card">
-              <div className="admin-card-icon">📥</div>
-              <h3>Torrents</h3>
-              <p>Gérer les téléchargements</p>
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {/* Message si aucune vidéo */}
-      {!loading && !hasAnyVideos && (
-        <div className="empty-state">
-          <p>🎬 Aucune vidéo disponible pour le moment</p>
-          <p className="empty-state-hint">
-            {user && (user.role === 'admin' || isAdmin())
-              ? "En tant qu'administrateur, vous pouvez uploader des vidéos pour commencer à remplir votre bibliothèque."
-              : user 
-              ? "Aucune vidéo n'est disponible pour le moment. Attendez qu'un administrateur ajoute du contenu."
-              : "Connectez-vous pour voir vos vidéos ou attendez qu'un administrateur ajoute du contenu."}
-          </p>
-          {user && (user.role === 'admin' || isAdmin()) && (
-            <div className="empty-state-actions">
-              <Link to="/admin" className="btn-hero-primary">⚙️ Administration</Link>
-              <Link to="/upload" className="btn-hero-secondary">⬆️ Uploader une vidéo</Link>
-            </div>
-          )}
-          {!user && (
-            <div className="empty-state-actions">
-              <Link to="/login" className="btn-hero-primary">Se connecter</Link>
-              <Link to="/register" className="btn-hero-secondary">S'inscrire</Link>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
