@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import VideoPlayer from '../components/VideoPlayer'
-import VideoGrid from '../components/VideoGrid'
-import api from '../services/api'
-import { useAuth } from '../context/AuthContext'
-import { filterValidVideos } from '../utils/videoUtils'
+import VideoPlayer from '../../components/VideoPlayer'
+import VideoGrid from '../../components/VideoGrid'
+import api from '../../services/api'
+import { useAuth } from '../../context/AuthContext'
+import { filterValidVideos } from '../../utils/videoUtils'
 import './VideoPlayerPage.css'
 
 const VideoPlayerPage = () => {
