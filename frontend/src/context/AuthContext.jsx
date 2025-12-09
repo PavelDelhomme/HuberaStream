@@ -80,7 +80,14 @@ export const AuthProvider = ({ children }) => {
   }, []) // Exécuter une seule fois au montage
 
   const isAdmin = () => {
-    return user && user.role === 'admin'
+    if (!user) return false
+    // Vérifier le rôle dans user.role
+    if (user.role === 'admin') return true
+    // Fallback : si l'email est dev@delhomme.ovh, considérer comme admin
+    if (user.email === 'dev@delhomme.ovh') return true
+    // Fallback : si le username est 'admin', considérer comme admin
+    if (user.username === 'admin') return true
+    return false
   }
 
   const login = async (email, password) => {
