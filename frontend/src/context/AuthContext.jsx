@@ -41,14 +41,35 @@ export const AuthProvider = ({ children }) => {
           api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
           
           // Vérifier que le token est valide en récupérant l'utilisateur
-          // Utiliser un timeout pour éviter que la requête bloque trop longtemps
-          const response = await api.get('/users/me', {
-            timeout: 5000, // 5 secondes de timeout
-            // Ne pas intercepter cette requête pour éviter les conflits
-            validateStatus: (status) => status < 500 // Accepter les erreurs 401/403 mais pas 500+
-          })
+          // Utiliser un timeout plus long et plusieurs tentatives
+          let response
+          let lastError
           
-          if (response.status === 200 && response.data) {
+          // Essayer jusqu'à 3 fois avec des timeouts progressifs
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              response = await api.get('/users/me', {
+                timeout: (attempt + 1) * 10000, // 10s, 20s, 30s
+                validateStatus: (status) => status < 500
+              })
+              
+              if (response.status === 200 && response.data) {
+                break // Succès, sortir de la boucle
+              }
+            } catch (err) {
+              lastError = err
+              // Si c'est une erreur d'authentification (401/403), arrêter immédiatement
+              if (err.response?.status === 401 || err.response?.status === 403) {
+                throw err
+              }
+              // Sinon, attendre un peu avant de réessayer
+              if (attempt < 2) {
+                await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
+              }
+            }
+          }
+          
+          if (response && response.status === 200 && response.data) {
             setUser(response.data)
             setToken(storedToken)
           } else {
@@ -64,11 +85,13 @@ export const AuthProvider = ({ children }) => {
             setToken(null)
             setUser(null)
           } else {
-            // Pour les autres erreurs (réseau, timeout), garder le token
-            // L'utilisateur pourra réessayer
-            console.warn('Erreur lors de la vérification du token (réseau/timeout):', error)
-            // Garder le token mais ne pas définir l'utilisateur
-            // L'utilisateur devra se reconnecter si nécessaire
+            // Pour les autres erreurs (réseau, timeout), garder le token ET définir un utilisateur temporaire
+            // Cela évite les redirections intempestives
+            console.warn('Erreur réseau lors de la vérification du token, conservation du token:', error)
+            // Garder le token - l'utilisateur sera vérifié lors de la prochaine requête
+            setToken(storedToken)
+            // Ne pas définir user pour l'instant, mais ne pas non plus nettoyer le token
+            // Cela permettra aux requêtes suivantes de fonctionner si le serveur est disponible
           }
         }
       }

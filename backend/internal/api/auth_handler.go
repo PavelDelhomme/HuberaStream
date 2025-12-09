@@ -108,12 +108,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-		// Générer le token JWT
+		// Générer le token JWT avec une expiration de 7 jours pour une meilleure UX
+		// Les tokens peuvent être révoqués côté serveur si nécessaire
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":  user.ID.String(),
 			"username": user.Username,
 			"role":     string(user.Role),
-			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+			"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 jours au lieu de 24 heures
+			"iat":      time.Now().Unix(),                          // Issued at
 		})
 
 	tokenString, err := token.SignedString([]byte(h.cfg.JWTSecret))
