@@ -181,6 +181,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			torrents.GET("/:id/status", torrentHandler.GetTorrentStatus)
 			torrents.POST("/:id/pause", torrentHandler.PauseTorrent)
 			torrents.POST("/:id/resume", torrentHandler.ResumeTorrent)
+			torrents.POST("/:id/toggle-library", torrentHandler.ToggleAddToLibrary)
 			torrents.PUT("/:id", torrentHandler.UpdateTorrent)
 			torrents.DELETE("/:id", torrentHandler.DeleteTorrent)
 			torrents.POST("/download-1337x", torrentHandler.DownloadFrom1337x)

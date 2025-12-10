@@ -156,22 +156,35 @@ const AdminTorrents = () => {
     }
   }
 
-  const handleDownloadFrom1337x = async (torrentURL, name) => {
-    if (!window.confirm(`Télécharger "${name}" ?`)) {
+  const handleDownloadFrom1337x = async (torrentURL, name, addToLibrary = false) => {
+    const action = addToLibrary ? 'Ajouter à la bibliothèque' : 'Télécharger'
+    if (!window.confirm(`${action} "${name}" ?\n\n${addToLibrary ? '✅ Le torrent sera téléchargé et la vidéo sera automatiquement ajoutée à la bibliothèque (visible sur l\'accueil)' : 'Le torrent sera téléchargé mais ne sera pas automatiquement ajouté à la bibliothèque'}`)) {
       return
     }
     try {
       await api.post('/admin/torrents/download-1337x', {
         torrent_url: torrentURL,
         category_id: null,
-        sub_category_id: null
+        sub_category_id: null,
+        add_to_library: addToLibrary
       })
-      alert('Torrent ajouté avec succès !')
+      alert(addToLibrary ? '✅ Torrent ajouté à la bibliothèque ! Il sera téléchargé et la vidéo sera visible sur l\'accueil une fois le traitement terminé.' : 'Torrent ajouté avec succès !')
       fetchTorrents()
       setActiveTab('list')
     } catch (error) {
       console.error('Erreur:', error)
       alert('Erreur lors du téléchargement: ' + (error.response?.data?.error || error.message))
+    }
+  }
+
+  const handleToggleAddToLibrary = async (torrentId) => {
+    try {
+      const response = await api.post(`/admin/torrents/${torrentId}/toggle-library`)
+      alert(response.data.message || 'Flag "Ajouter à la bibliothèque" mis à jour')
+      fetchTorrents()
+    } catch (error) {
+      console.error('Erreur:', error)
+      alert('Erreur: ' + (error.response?.data?.error || error.message))
     }
   }
 
@@ -357,6 +370,13 @@ const AdminTorrents = () => {
                       </button>
                     )}
                     <button
+                      onClick={() => handleToggleAddToLibrary(torrent.id)}
+                      className={`action-btn library ${torrent.add_to_library ? 'active' : ''}`}
+                      title={torrent.add_to_library ? 'Retirer de la bibliothèque' : 'Ajouter à la bibliothèque'}
+                    >
+                      {torrent.add_to_library ? '📚✓' : '📚'}
+                    </button>
+                    <button
                       onClick={() => handleDeleteTorrent(torrent.id)}
                       className="action-btn delete"
                       title="Supprimer"
@@ -366,6 +386,11 @@ const AdminTorrents = () => {
                   </div>
                 </div>
                 <div className="torrent-info">
+                  {torrent.add_to_library && (
+                    <div className="library-badge">
+                      📚 Ajouté à la bibliothèque - La vidéo sera visible sur l'accueil une fois le traitement terminé
+                    </div>
+                  )}
                   <div className="torrent-progress">
                     <div className="progress-bar">
                       <div
@@ -435,10 +460,18 @@ const AdminTorrents = () => {
                 </div>
                 <div className="result-actions">
                   <button
-                    onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name)}
+                    onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name, false)}
                     className="download-btn"
+                    title="Télécharger le torrent"
                   >
                     ⬇️ Télécharger
+                  </button>
+                  <button
+                    onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name, true)}
+                    className="download-btn library-btn"
+                    title="Ajouter à la bibliothèque (téléchargement + ajout automatique à l'accueil)"
+                  >
+                    📚 Ajouter à la bibliothèque
                   </button>
                 </div>
               </div>
@@ -523,10 +556,18 @@ const AdminTorrents = () => {
                   </div>
                   <div className="result-actions">
                     <button
-                      onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name)}
+                      onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name, false)}
                       className="download-btn"
+                      title="Télécharger le torrent"
                     >
                       ⬇️ Télécharger
+                    </button>
+                    <button
+                      onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name, true)}
+                      className="download-btn library-btn"
+                      title="Ajouter à la bibliothèque (téléchargement + ajout automatique à l'accueil)"
+                    >
+                      📚 Ajouter à la bibliothèque
                     </button>
                   </div>
                 </div>

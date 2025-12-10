@@ -38,8 +38,20 @@ func NewPostProcessor(db *gorm.DB, cfg *config.Config) *PostProcessor {
 
 // ProcessCompletedTorrents traite les torrents terminés
 func (p *PostProcessor) ProcessCompletedTorrents(ctx context.Context) error {
+	// Traiter d'abord les torrents marqués pour la bibliothèque (priorité)
+	var libraryTorrents []models.Torrent
+	if err := p.db.Where("status = ? AND video_id IS NULL AND add_to_library = ?", models.TorrentStatusCompleted, true).
+		Find(&libraryTorrents).Error; err == nil {
+		for _, torrent := range libraryTorrents {
+			if err := p.processTorrent(ctx, &torrent); err != nil {
+				log.Printf("Erreur lors du traitement du torrent bibliothèque %s: %v", torrent.ID, err)
+			}
+		}
+	}
+
+	// Ensuite, traiter les autres torrents terminés
 	var completedTorrents []models.Torrent
-	if err := p.db.Where("status = ? AND video_id IS NULL", models.TorrentStatusCompleted).
+	if err := p.db.Where("status = ? AND video_id IS NULL AND add_to_library = ?", models.TorrentStatusCompleted, false).
 		Find(&completedTorrents).Error; err != nil {
 		return fmt.Errorf("erreur lors de la récupération des torrents terminés: %w", err)
 	}
@@ -141,11 +153,11 @@ func (p *PostProcessor) createVideoFromFile(ctx context.Context, torrent *models
 		ID:            videoID,
 		Title:         title,
 		Description:   fmt.Sprintf("Téléchargé depuis torrent: %s", torrent.Name),
-		UserID:        uuid.MustParse("00000000-0000-0000-0000-000000000000"), // Admin par défaut
+		UserID:        adminUser.ID,
 		Status:        models.VideoStatusProcessing,
 		CategoryID:    torrent.CategoryID,
 		SubCategoryID: torrent.SubCategoryID,
-		IsPublic:      true,
+		IsPublic:      isPublic, // Public si marqué pour la bibliothèque
 		Checksum:      checksum,
 	}
 

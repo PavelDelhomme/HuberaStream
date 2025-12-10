@@ -51,6 +51,7 @@ type Torrent struct {
 	Video         *Video      `gorm:"foreignKey:VideoID" json:"video,omitempty"`
 	DownloadPath  string      `gorm:"type:text" json:"download_path"`
 	Error         string      `gorm:"type:text" json:"error"`
+	AddToLibrary  bool        `gorm:"default:false" json:"add_to_library"` // Marquer pour ajout à la bibliothèque
 	CreatedAt     time.Time   `json:"created_at"`
 	UpdatedAt     time.Time   `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`

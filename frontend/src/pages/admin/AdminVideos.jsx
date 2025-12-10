@@ -97,6 +97,16 @@ const AdminVideos = () => {
   }
 
   const handleStatusChange = async (videoId, newStatus) => {
+    // DÉSACTIVÉ: Le statut est géré automatiquement par le système
+    // Les vidéos passent automatiquement de "processing" à "ready" quand le transcodage est terminé
+    alert('Le statut des vidéos est géré automatiquement par le système.\n\n' +
+          '• "processing" = Vidéo en cours de transcodage\n' +
+          '• "ready" = Vidéo prête (transcodage terminé avec succès)\n' +
+          '• "error" = Erreur lors du traitement\n\n' +
+          'Vous ne pouvez pas modifier manuellement le statut.')
+    return
+    
+    /* CODE DÉSACTIVÉ - Statut automatique
     try {
       // Note: Vous devrez peut-être créer une route spécifique pour changer le statut
       await api.put(`/videos/${videoId}`, { status: newStatus })

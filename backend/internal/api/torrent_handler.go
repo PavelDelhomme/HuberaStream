@@ -303,6 +303,7 @@ func (h *TorrentHandler) DownloadFrom1337x(c *gin.Context) {
 		TorrentURL   string     `json:"torrent_url" binding:"required"`
 		CategoryID   *uuid.UUID `json:"category_id"`
 		SubCategoryID *uuid.UUID `json:"sub_category_id"`
+		AddToLibrary bool       `json:"add_to_library"` // Nouveau champ pour marquer pour la bibliothèque
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -331,6 +332,7 @@ func (h *TorrentHandler) DownloadFrom1337x(c *gin.Context) {
 		Size:         result.Size,
 		Seeders:      result.Seeders,
 		Leechers:     result.Leechers,
+		AddToLibrary: req.AddToLibrary, // Marquer pour la bibliothèque si demandé
 	}
 
 	if err := h.db.Create(&torrent).Error; err != nil {
@@ -352,6 +354,51 @@ func (h *TorrentHandler) DownloadFrom1337x(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, torrent)
+}
+
+// ToggleAddToLibrary bascule le flag "add_to_library" d'un torrent
+func (h *TorrentHandler) ToggleAddToLibrary(c *gin.Context) {
+	id := c.Param("id")
+	torrentID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalide"})
+		return
+	}
+
+	var torrent models.Torrent
+	if err := h.db.Where("id = ?", torrentID).First(&torrent).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Torrent non trouvé"})
+		return
+	}
+
+	// Basculer le flag
+	torrent.AddToLibrary = !torrent.AddToLibrary
+	if err := h.db.Save(&torrent).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la mise à jour"})
+		return
+	}
+
+	// Si on active le flag et que le torrent n'est pas encore téléchargé, démarrer le téléchargement
+	if torrent.AddToLibrary && torrent.Status == models.TorrentStatusPending && h.torrentService != nil {
+		if err := h.torrentService.AddTorrent(c.Request.Context(), &torrent); err != nil {
+			torrent.Status = models.TorrentStatusError
+			torrent.Error = err.Error()
+			h.db.Save(&torrent)
+			c.JSON(http.StatusOK, gin.H{
+				"torrent": torrent,
+				"message": "Flag activé mais erreur lors du démarrage du téléchargement",
+				"error": err.Error(),
+			})
+			return
+		}
+		torrent.Status = models.TorrentStatusDownloading
+		h.db.Save(&torrent)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"torrent": torrent,
+		"message": fmt.Sprintf("Flag 'add_to_library' mis à jour: %v", torrent.AddToLibrary),
+	})
 }
 
 // Gestion des configurations de torrent
