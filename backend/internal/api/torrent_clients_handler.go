@@ -165,11 +165,12 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 
 	// Tester en listant les torrents
 	ctx := c.Request.Context()
-	_, err = client.ListTorrents(ctx)
+	torrents, err := client.ListTorrents(ctx)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Erreur de connexion au client",
 			"message": err.Error(),
+			"details": "Vérifiez que le client torrent est démarré et que les credentials sont corrects",
 		})
 		return
 	}
@@ -177,5 +178,6 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Connexion réussie",
 		"client_type": req.ClientType,
+		"torrents_count": len(torrents),
 	})
 }
