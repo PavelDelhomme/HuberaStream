@@ -48,7 +48,12 @@ down:
 	@echo "${YELLOW}Arrêt de tous les services...${NC}"
 	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down
 
-restart: down up
+restart:
+	@echo "${GREEN}Redémarrage de tous les services...${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart
+	@echo "${GREEN}Attente du redémarrage des services...${NC}"
+	@sleep 5
+	@echo "${GREEN}✅ Tous les services ont été redémarrés${NC}"
 
 logs:
 	@echo "${GREEN}Affichage des logs de tous les services (Ctrl+C pour quitter)...${NC}"
