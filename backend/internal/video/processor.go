@@ -29,25 +29,40 @@ func NewProcessor(storagePath, thumbnailPath string) *Processor {
 }
 
 // GenerateThumbnail génère une miniature à partir d'une vidéo
+// Essaie plusieurs positions temporelles pour trouver une bonne frame
 func (p *Processor) GenerateThumbnail(videoPath string, videoID uuid.UUID) (string, error) {
 	thumbnailName := fmt.Sprintf("%s.jpg", videoID.String())
 	thumbnailPath := filepath.Join(p.thumbnailPath, thumbnailName)
 
-	// Générer la miniature au temps 1 seconde
-	cmd := exec.Command(
-		p.ffmpegPath,
-		"-i", videoPath,
-		"-ss", "00:00:01",
-		"-vframes", "1",
-		"-q:v", "2",
-		thumbnailPath,
-	)
+	// Essayer plusieurs positions temporelles pour trouver une bonne frame
+	// Positions à essayer : 1s, 5s, 10s, 30s, 60s
+	timePositions := []string{"00:00:01", "00:00:05", "00:00:10", "00:00:30", "00:01:00"}
+	
+	var lastErr error
+	for _, timePos := range timePositions {
+		cmd := exec.Command(
+			p.ffmpegPath,
+			"-i", videoPath,
+			"-ss", timePos,
+			"-vframes", "1",
+			"-q:v", "2", // Haute qualité
+			"-vf", "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2", // Format 16:9
+			thumbnailPath,
+		)
 
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("erreur lors de la génération de la miniature: %w", err)
+		if err := cmd.Run(); err != nil {
+			lastErr = err
+			continue // Essayer la position suivante
+		}
+
+		// Vérifier que le fichier a été créé et n'est pas vide
+		if info, err := os.Stat(thumbnailPath); err == nil && info.Size() > 0 {
+			return thumbnailPath, nil
+		}
 	}
 
-	return thumbnailPath, nil
+	// Si toutes les tentatives ont échoué, retourner la dernière erreur
+	return "", fmt.Errorf("erreur lors de la génération de la miniature après plusieurs tentatives: %w", lastErr)
 }
 
 // GetVideoDuration retourne la durée d'une vidéo en secondes

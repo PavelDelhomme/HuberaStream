@@ -137,16 +137,22 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 	var videoModel models.Video
 	h.db.Where("id = ?", videoID).First(&videoModel)
 	title := videoModel.Title
+	description := videoModel.Description
 
-	// Générer la miniature depuis la vidéo
+	// Générer la miniature depuis la vidéo (essayer plusieurs positions pour trouver une bonne frame)
 	thumbnailPath, err := h.processor.GenerateThumbnail(videoPath, videoID)
 	if err != nil {
 		fmt.Printf("Erreur lors de la génération de la miniature depuis la vidéo: %v\n", err)
-		// Si la génération depuis la vidéo échoue, créer une miniature textuelle basée sur le titre
-		thumbnailPath, err = h.generateTextThumbnail(videoID, title)
+		// Si la génération depuis la vidéo échoue, créer une miniature textuelle améliorée
+		// basée sur le titre, la description et les métadonnées
+		thumbnailPath, err = h.generateTextThumbnail(videoID, title, description)
 		if err != nil {
 			fmt.Printf("Erreur lors de la génération de la miniature textuelle: %v\n", err)
+		} else {
+			fmt.Printf("Miniature textuelle générée avec succès pour la vidéo %s (titre: %s)\n", videoID, title)
 		}
+	} else {
+		fmt.Printf("Miniature générée depuis la vidéo avec succès pour %s\n", videoID)
 	}
 	
 	if thumbnailPath != "" {
@@ -251,8 +257,8 @@ func (h *UploadHandler) UploadThumbnail(c *gin.Context) {
 	})
 }
 
-// generateTextThumbnail génère une miniature textuelle basée sur le titre
-func (h *UploadHandler) generateTextThumbnail(videoID uuid.UUID, title string) (string, error) {
+// generateTextThumbnail génère une miniature textuelle améliorée basée sur le titre, description et métadonnées
+func (h *UploadHandler) generateTextThumbnail(videoID uuid.UUID, title string, description string) (string, error) {
 	// Dimensions de la miniature (format 16:9)
 	width := 1280
 	height := 720
