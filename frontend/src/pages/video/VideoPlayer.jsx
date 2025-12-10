@@ -250,13 +250,6 @@ const VideoPlayerPage = () => {
                 }
               }
             }
-              setVideo(prev => ({
-                ...prev,
-                status: 'ready',
-                progress: 100,
-                formats: prev?.formats || []
-              }))
-            }
           } else if (statusResponse.data.status === 'error') {
             console.error(`❌ Erreur lors du traitement de la vidéo ${videoId}`)
             clearInterval(pollInterval)
