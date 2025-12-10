@@ -29,7 +29,14 @@ const VideoPlayerPage = () => {
   }, [id])
 
   const fetchVideo = async () => {
+    // Éviter les appels multiples
+    if (fetchingVideo) {
+      console.log('fetchVideo déjà en cours, ignoré')
+      return
+    }
+    
     try {
+      setFetchingVideo(true)
       setLoading(true)
       setError(null)
       
@@ -141,7 +148,32 @@ const VideoPlayerPage = () => {
       setError(errorMessage)
     } finally {
       setLoading(false)
+      setFetchingVideo(false)
     }
+  }
+  
+  // Fonction utilitaire pour obtenir l'URL de la miniature
+  const getThumbnailUrl = (thumbnailPath) => {
+    if (!thumbnailPath) return null
+    
+    // Si c'est déjà une URL complète
+    if (thumbnailPath.startsWith('http')) {
+      return thumbnailPath
+    }
+    
+    // Si c'est un chemin système (commence par /app/), extraire le nom du fichier
+    if (thumbnailPath.startsWith('/app/')) {
+      const filename = thumbnailPath.split('/').pop()
+      return `/api/thumbnails/${filename}`
+    }
+    
+    // Si c'est déjà un chemin relatif, l'utiliser tel quel
+    if (thumbnailPath.startsWith('/')) {
+      return `/api${thumbnailPath}`
+    }
+    
+    // Sinon, supposer que c'est juste le nom du fichier
+    return `/api/thumbnails/${thumbnailPath}`
   }
   
   // Polling du statut pour les vidéos en traitement
@@ -289,12 +321,16 @@ const VideoPlayerPage = () => {
           <p>Votre vidéo est en cours de traitement. Elle sera disponible dans quelques instants.</p>
           
           {/* Afficher la miniature si disponible */}
-          {video.thumbnail_path && (
+          {video.thumbnail_path && getThumbnailUrl(video.thumbnail_path) && (
             <div className="processing-thumbnail" style={{ marginTop: '20px', maxWidth: '400px', margin: '20px auto' }}>
               <img 
-                src={video.thumbnail_path.startsWith('http') ? video.thumbnail_path : `/api${video.thumbnail_path}`} 
+                src={getThumbnailUrl(video.thumbnail_path)} 
                 alt={video.title || 'Vidéo en traitement'}
                 style={{ width: '100%', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}
+                onError={(e) => {
+                  // Cacher l'image si elle ne peut pas être chargée
+                  e.target.style.display = 'none'
+                }}
               />
             </div>
           )}

@@ -290,6 +290,8 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	}
 
 	// Vérifier les permissions (propriétaire ou admin)
+	// Pour les vidéos en traitement, permettre l'accès même sans authentification
+	// car le frontend a besoin de récupérer le statut pour afficher l'écran de traitement
 	userID, exists := c.Get("user_id")
 	isOwner := false
 	isAdmin := false
@@ -310,7 +312,11 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 		}
 	}
 
-	if !isOwner && !isAdmin {
+	// Permettre l'accès au statut pour les vidéos en traitement même sans authentification
+	// Cela permet au frontend d'afficher l'écran de traitement
+	if video.Status == models.VideoStatusProcessing && !isOwner && !isAdmin {
+		// Permettre l'accès au statut pour les vidéos en traitement
+	} else if !isOwner && !isAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Permission refusée"})
 		return
 	}
