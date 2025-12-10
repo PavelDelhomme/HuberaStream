@@ -15,6 +15,7 @@ const VideoPlayerPage = () => {
   const [relatedVideos, setRelatedVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [fetchingVideo, setFetchingVideo] = useState(false) // Éviter les appels multiples
 
   useEffect(() => {
     if (id && !fetchingVideo) {
