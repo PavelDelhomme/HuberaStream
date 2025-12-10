@@ -165,13 +165,13 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			Tags map[string]string `json:"tags"`
 		} `json:"format"`
 		Streams []struct {
-			Index    int    `json:"index"`
-			CodecType string `json:"codec_type"`
-			CodecName string `json:"codec_name"`
-			Language  string `json:"tags,omitempty"`
-			Duration  string `json:"duration"`
-			Width     int    `json:"width"`
-			Height    int    `json:"height"`
+			Index     int               `json:"index"`
+			CodecType string            `json:"codec_type"`
+			CodecName string            `json:"codec_name"`
+			Tags      map[string]string `json:"tags"`
+			Duration  string            `json:"duration"`
+			Width     int               `json:"width"`
+			Height    int               `json:"height"`
 		} `json:"streams"`
 	}
 

@@ -91,11 +91,11 @@ echo -e "${GREEN}✓ Connexion admin réussie${NC}"
 echo ""
 
 # Test 2: Routes publiques
-echo -e "${BLUE}[3/10] Test des routes publiques...${NC}"
+echo -e "${BLUE}[3/12] Test des routes publiques...${NC}"
 test_route "GET" "/videos" "" "200" "Liste des vidéos" false
 test_route "GET" "/continue-watching" "" "200" "Continue watching (sans auth)" false
-# Note: /categories nécessite une authentification
-test_route "GET" "/categories" "" "401" "Liste des catégories (auth requise)" false
+# Note: /categories est maintenant publique
+test_route "GET" "/categories" "" "200" "Liste des catégories (publique)" false
 echo ""
 
 # Test 3: Routes protégées
@@ -174,7 +174,7 @@ fi
 echo ""
 
 # Test 10: Vérification de l'intégrité des vidéos (checksum)
-echo -e "${BLUE}[11/12] Vérification de l'intégrité des vidéos...${NC}"
+echo -e "${BLUE}[11/14] Vérification de l'intégrité des vidéos...${NC}"
 VIDEOS_WITH_CHECKSUM=$(docker-compose exec -T postgres psql -U streammake -d streammake_db -t -c "SELECT COUNT(*) FROM videos WHERE checksum IS NOT NULL AND checksum != '';" 2>/dev/null | tr -d ' ')
 TOTAL_VIDEOS=$(docker-compose exec -T postgres psql -U streammake -d streammake_db -t -c "SELECT COUNT(*) FROM videos;" 2>/dev/null | tr -d ' ')
 
@@ -195,7 +195,7 @@ fi
 echo ""
 
 # Test 11: Vérification de l'intégrité des fichiers vidéo
-echo -e "${BLUE}[12/12] Vérification de l'intégrité des fichiers vidéo...${NC}"
+echo -e "${BLUE}[12/14] Vérification de l'intégrité des fichiers vidéo...${NC}"
 # Vérifier que les fichiers vidéo existent et correspondent aux checksums en base
 INTEGRITY_CHECK=$(docker-compose exec -T backend sh -c "cd /app && find storage/videos -type f 2>/dev/null | wc -l" 2>/dev/null | tr -d ' ')
 if [ -n "$INTEGRITY_CHECK" ]; then
@@ -205,6 +205,18 @@ if [ -n "$INTEGRITY_CHECK" ]; then
 else
     echo -e "${YELLOW}⚠ Impossible de vérifier les fichiers vidéo${NC}"
 fi
+echo ""
+
+# Test 12: Vérification des routes admin vidéos
+echo -e "${BLUE}[13/14] Vérification des routes admin vidéos...${NC}"
+test_route "GET" "/admin/videos/invalid" "" "200" "Liste des vidéos invalides (admin)" true
+test_route "POST" "/admin/videos/clean-invalid" "" "200" "Nettoyage des vidéos invalides (admin)" true
+echo ""
+
+# Test 13: Vérification des routes DVD
+echo -e "${BLUE}[14/14] Vérification des routes DVD...${NC}"
+test_route "GET" "/dvd/detect" "" "200" "Détection DVD (admin)" true
+test_route "GET" "/dvd/info?device=/dev/sr0" "" "200" "Info DVD (admin)" true
 echo ""
 
 # Résumé

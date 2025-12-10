@@ -79,12 +79,19 @@ else
 fi
 echo ""
 
-# Test 5: Vérifier la liste des vidéos
+# Test 5: Vérifier la liste des vidéos (avec status=all pour voir toutes les vidéos y compris en traitement)
 echo -e "${BLUE}[5/5] Vérification de la liste des vidéos...${NC}"
-VIDEOS_RESPONSE=$(curl -s -X GET "$API_BASE_URL/videos?page=1&limit=5" \
+VIDEOS_RESPONSE=$(curl -s -X GET "$API_BASE_URL/videos?page=1&limit=100&status=all" \
   -H "Authorization: Bearer $ADMIN_TOKEN")
 VIDEOS_COUNT=$(echo "$VIDEOS_RESPONSE" | jq '.videos | length' 2>/dev/null || echo "0")
-echo -e "${GREEN}✓ Vidéos disponibles: $VIDEOS_COUNT${NC}"
+TOTAL_VIDEOS=$(echo "$VIDEOS_RESPONSE" | jq '.total' 2>/dev/null || echo "0")
+echo -e "${GREEN}✓ Vidéos disponibles: $VIDEOS_COUNT (Total: $TOTAL_VIDEOS)${NC}"
+
+# Afficher les détails des vidéos trouvées
+if [ "$VIDEOS_COUNT" -gt 0 ]; then
+  echo -e "${BLUE}  Détails des vidéos:${NC}"
+  echo "$VIDEOS_RESPONSE" | jq -r '.videos[] | "    - \(.title) (ID: \(.id), Status: \(.status), Checksum: \(if .checksum then .checksum[0:16]+"..." else "N/A" end))"' 2>/dev/null || echo "    (Impossible d'afficher les détails)"
+fi
 echo ""
 
 echo -e "${BLUE}========================================${NC}"
