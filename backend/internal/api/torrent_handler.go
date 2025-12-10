@@ -7,6 +7,7 @@ import (
 	"streammake/internal/config"
 	"streammake/internal/models"
 	"streammake/internal/torrent"
+	"streammake/internal/scraper"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -157,12 +158,200 @@ func (h *TorrentHandler) DeleteTorrent(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Delete(&models.Torrent{}, torrentID).Error; err != nil {
+	var torrent models.Torrent
+	if err := h.db.Where("id = ?", torrentID).First(&torrent).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Torrent non trouvé"})
+		return
+	}
+
+	// Supprimer le torrent du client si le service est disponible
+	if h.torrentService != nil {
+		// Le service torrent gère la suppression
+		_ = h.torrentService.RemoveTorrent(c.Request.Context(), torrentID.String())
+	}
+
+	if err := h.db.Delete(&torrent).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la suppression"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Torrent supprimé"})
+}
+
+// PauseTorrent met en pause un torrent
+func (h *TorrentHandler) PauseTorrent(c *gin.Context) {
+	id := c.Param("id")
+	torrentID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalide"})
+		return
+	}
+
+	var torrent models.Torrent
+	if err := h.db.Where("id = ?", torrentID).First(&torrent).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Torrent non trouvé"})
+		return
+	}
+
+	if h.torrentService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Service torrent non disponible"})
+		return
+	}
+
+	if err := h.torrentService.PauseTorrent(c.Request.Context(), torrentID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	torrent.Status = models.TorrentStatusPaused
+	h.db.Save(&torrent)
+
+	c.JSON(http.StatusOK, torrent)
+}
+
+// ResumeTorrent reprend un torrent
+func (h *TorrentHandler) ResumeTorrent(c *gin.Context) {
+	id := c.Param("id")
+	torrentID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalide"})
+		return
+	}
+
+	var torrent models.Torrent
+	if err := h.db.Where("id = ?", torrentID).First(&torrent).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Torrent non trouvé"})
+		return
+	}
+
+	if h.torrentService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Service torrent non disponible"})
+		return
+	}
+
+	if err := h.torrentService.ResumeTorrent(c.Request.Context(), torrentID.String()); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	torrent.Status = models.TorrentStatusDownloading
+	h.db.Save(&torrent)
+
+	c.JSON(http.StatusOK, torrent)
+}
+
+// GetTorrentStatus récupère le statut d'un torrent depuis le client
+func (h *TorrentHandler) GetTorrentStatus(c *gin.Context) {
+	id := c.Param("id")
+	torrentID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invalide"})
+		return
+	}
+
+	var torrent models.Torrent
+	if err := h.db.Where("id = ?", torrentID).First(&torrent).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Torrent non trouvé"})
+		return
+	}
+
+	if h.torrentService == nil {
+		c.JSON(http.StatusOK, torrent)
+		return
+	}
+
+	// Récupérer le statut depuis le client torrent
+	status, err := h.torrentService.GetTorrentStatus(c.Request.Context(), torrentID.String())
+	if err != nil {
+		c.JSON(http.StatusOK, torrent) // Retourner le statut de la DB si erreur
+		return
+	}
+
+	// Mettre à jour le torrent avec les infos du client
+	torrent.Progress = status.Progress
+	torrent.Size = status.Size
+	torrent.Downloaded = status.Downloaded
+	torrent.Uploaded = status.Uploaded
+	torrent.DownloadSpeed = status.DownloadSpeed
+	torrent.UploadSpeed = status.UploadSpeed
+	torrent.Seeders = status.Seeders
+	torrent.Leechers = status.Leechers
+
+	// Mettre à jour le statut
+	switch status.Status {
+	case models.TorrentStatusDownloading:
+		torrent.Status = models.TorrentStatusDownloading
+	case models.TorrentStatusSeeding:
+		torrent.Status = models.TorrentStatusSeeding
+	case models.TorrentStatusPaused:
+		torrent.Status = models.TorrentStatusPaused
+	}
+
+	// Si le torrent est terminé (100%) et en seeding, le marquer comme completed
+	if status.Progress >= 100 && status.Status == models.TorrentStatusSeeding {
+		torrent.Status = models.TorrentStatusCompleted
+	}
+
+	h.db.Save(&torrent)
+
+	c.JSON(http.StatusOK, torrent)
+}
+
+// DownloadFrom1337x télécharge un torrent depuis 1337x
+func (h *TorrentHandler) DownloadFrom1337x(c *gin.Context) {
+	var req struct {
+		TorrentURL   string     `json:"torrent_url" binding:"required"`
+		CategoryID   *uuid.UUID `json:"category_id"`
+		SubCategoryID *uuid.UUID `json:"sub_category_id"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Récupérer les détails du torrent depuis 1337x
+	scraper1337x := scraper.New1337xScraper()
+	result, err := scraper1337x.GetTorrentDetails(c.Request.Context(), req.TorrentURL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la récupération des détails"})
+		return
+	}
+
+	// Créer le torrent
+	torrent := models.Torrent{
+		ID:           uuid.New(),
+		Name:         result.Name,
+		MagnetURL:    result.MagnetURL,
+		TorrentURL:   req.TorrentURL,
+		Source:       models.TorrentSource1337x,
+		Status:       models.TorrentStatusPending,
+		CategoryID:   req.CategoryID,
+		SubCategoryID: req.SubCategoryID,
+		Size:         result.Size,
+		Seeders:      result.Seeders,
+		Leechers:     result.Leechers,
+	}
+
+	if err := h.db.Create(&torrent).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la création"})
+		return
+	}
+
+	// Démarrer le téléchargement
+	if h.torrentService != nil {
+		if err := h.torrentService.AddTorrent(c.Request.Context(), &torrent); err != nil {
+			torrent.Status = models.TorrentStatusError
+			torrent.Error = err.Error()
+			h.db.Save(&torrent)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "torrent": torrent})
+			return
+		}
+		torrent.Status = models.TorrentStatusDownloading
+		h.db.Save(&torrent)
+	}
+
+	c.JSON(http.StatusCreated, torrent)
 }
 
 // Gestion des configurations de torrent

@@ -121,3 +121,19 @@ func (s *TorrentService) Stop() {
 	}
 }
 
+func (s *TorrentService) PauseTorrent(ctx context.Context, torrentID string) error {
+	return s.client.PauseTorrent(ctx, torrentID)
+}
+
+func (s *TorrentService) ResumeTorrent(ctx context.Context, torrentID string) error {
+	return s.client.ResumeTorrent(ctx, torrentID)
+}
+
+func (s *TorrentService) RemoveTorrent(ctx context.Context, torrentID string) error {
+	return s.client.RemoveTorrent(ctx, torrentID)
+}
+
+func (s *TorrentService) GetTorrentStatus(ctx context.Context, torrentID string) (*TorrentStatus, error) {
+	return s.client.GetTorrentStatus(ctx, torrentID)
+}
+
