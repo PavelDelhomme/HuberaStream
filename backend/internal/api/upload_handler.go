@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"image"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"streammake/internal/config"
@@ -26,13 +28,17 @@ type UploadHandler struct {
 	db        *gorm.DB
 	cfg       *config.Config
 	processor *video.Processor
+	// Suivi des traitements en cours avec context pour annulation
+	processingVideos map[uuid.UUID]context.CancelFunc
+	processingMutex  sync.RWMutex
 }
 
 func NewUploadHandler(db *gorm.DB, cfg *config.Config) *UploadHandler {
 	return &UploadHandler{
-		db:        db,
-		cfg:       cfg,
-		processor: video.NewProcessor(cfg.VideoStoragePath, cfg.ThumbnailStoragePath),
+		db:               db,
+		cfg:              cfg,
+		processor:        video.NewProcessor(cfg.VideoStoragePath, cfg.ThumbnailStoragePath),
+		processingVideos: make(map[uuid.UUID]context.CancelFunc),
 	}
 }
 
@@ -122,8 +128,16 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	// Traiter la vidéo en arrière-plan
-	go h.processVideo(videoID, videoPath)
+	// Créer un context avec annulation pour le traitement
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	// Enregistrer la fonction d'annulation
+	h.processingMutex.Lock()
+	h.processingVideos[videoID] = cancel
+	h.processingMutex.Unlock()
+
+	// Traiter la vidéo en arrière-plan avec le context
+	go h.processVideo(ctx, videoID, videoPath)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Vidéo uploadée avec succès",
@@ -132,7 +146,23 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	})
 }
 
-func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
+func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, videoPath string) {
+	// Nettoyer la fonction d'annulation à la fin du traitement
+	defer func() {
+		h.processingMutex.Lock()
+		delete(h.processingVideos, videoID)
+		h.processingMutex.Unlock()
+	}()
+
+	// Vérifier si l'annulation a été demandée avant de commencer
+	select {
+	case <-ctx.Done():
+		fmt.Printf("Traitement de la vidéo %s annulé avant le début\n", videoID)
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+		return
+	default:
+	}
+
 	// Récupérer le titre de la vidéo pour générer une miniature textuelle si nécessaire
 	var videoModel models.Video
 	h.db.Where("id = ?", videoID).First(&videoModel)
@@ -155,6 +185,15 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 		fmt.Printf("Miniature générée depuis la vidéo avec succès pour %s\n", videoID)
 	}
 	
+	// Vérifier l'annulation après génération de la miniature
+	select {
+	case <-ctx.Done():
+		fmt.Printf("Traitement de la vidéo %s annulé après génération de la miniature\n", videoID)
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+		return
+	default:
+	}
+	
 	if thumbnailPath != "" {
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("thumbnail_path", thumbnailPath)
 	}
@@ -172,6 +211,17 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 	
 	// Générer les formats progressifs (MP4) pour toutes les qualités
 	for _, quality := range qualities {
+		// Vérifier l'annulation avant chaque transcodage
+		select {
+		case <-ctx.Done():
+			fmt.Printf("Traitement de la vidéo %s annulé pendant le transcodage\n", videoID)
+			h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+			// Nettoyer les formats partiels créés
+			h.cleanupPartialFormats(videoID)
+			return
+		default:
+		}
+
 		progressivePath, err := h.processor.TranscodeToProgressive(videoPath, videoID, quality)
 		if err != nil {
 			fmt.Printf("Erreur lors du transcodage progressif %s: %v\n", quality, err)
@@ -190,6 +240,15 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 		} else {
 			fmt.Printf("Format progressif %s créé avec succès\n", quality)
 		}
+	}
+
+	// Vérifier l'annulation avant le transcodage HLS
+	select {
+	case <-ctx.Done():
+		fmt.Printf("Traitement de la vidéo %s annulé avant le transcodage HLS\n", videoID)
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+		return
+	default:
 	}
 
 	// Générer le format HLS (pour le streaming adaptatif)
@@ -213,6 +272,16 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 		}
 	}
 
+	// Vérifier l'annulation une dernière fois avant de finaliser
+	select {
+	case <-ctx.Done():
+		fmt.Printf("Traitement de la vidéo %s annulé juste avant la finalisation\n", videoID)
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+		h.cleanupPartialFormats(videoID)
+		return
+	default:
+	}
+
 	// Vérifier qu'au moins un format a été créé
 	var formatCount int64
 	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
@@ -224,6 +293,29 @@ func (h *UploadHandler) processVideo(videoID uuid.UUID, videoPath string) {
 		fmt.Printf("Traitement terminé: %d format(s) créé(s) pour la vidéo %s\n", formatCount, videoID)
 		// Mettre à jour le statut seulement si au moins un format a été créé
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
+	}
+}
+
+// cleanupPartialFormats supprime les formats partiels créés lors d'une annulation
+func (h *UploadHandler) cleanupPartialFormats(videoID uuid.UUID) {
+	var formats []models.VideoFormat
+	h.db.Where("video_id = ?", videoID).Find(&formats)
+	
+	for _, format := range formats {
+		// Supprimer le fichier si c'est un format progressif
+		if format.Format == "progressive" && format.FilePath != "" {
+			if err := os.Remove(format.FilePath); err != nil {
+				fmt.Printf("Erreur lors de la suppression du fichier %s: %v\n", format.FilePath, err)
+			}
+		}
+		// Supprimer le dossier HLS si c'est un format HLS
+		if format.Format == "hls" && format.FilePath != "" {
+			if err := os.RemoveAll(format.FilePath); err != nil {
+				fmt.Printf("Erreur lors de la suppression du dossier HLS %s: %v\n", format.FilePath, err)
+			}
+		}
+		// Supprimer l'entrée en base
+		h.db.Delete(&format)
 	}
 }
 

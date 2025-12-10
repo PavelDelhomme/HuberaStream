@@ -14,6 +14,7 @@ const (
 	VideoStatusProcessing VideoStatus = "processing"
 	VideoStatusReady      VideoStatus = "ready"
 	VideoStatusError      VideoStatus = "error"
+	VideoStatusCancelled  VideoStatus = "cancelled"
 )
 
 type Video struct {

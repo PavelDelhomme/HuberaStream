@@ -214,6 +214,9 @@ const VideoPlayerPage = () => {
           } else if (statusResponse.data.status === 'error') {
             clearInterval(pollInterval)
             setError('Erreur lors du traitement de la vidéo. Veuillez réessayer l\'upload.')
+          } else if (statusResponse.data.status === 'cancelled') {
+            clearInterval(pollInterval)
+            setError('Le traitement de la vidéo a été annulé.')
           }
         }
       } catch (err) {
@@ -288,9 +291,11 @@ const VideoPlayerPage = () => {
       <div className="video-player-page">
         <div className="error-container">
           <div className="error-icon">❌</div>
-          <h2>Vidéo invalide</h2>
+          <h2>{video.status === 'cancelled' ? 'Traitement annulé' : 'Vidéo invalide'}</h2>
           <div className="error-message">
-            Cette vidéo est invalide ou a rencontré une erreur lors du traitement. Elle ne peut pas être visionnée.
+            {video.status === 'cancelled' 
+              ? 'Le traitement de cette vidéo a été annulé. Elle ne peut pas être visionnée.'
+              : 'Cette vidéo est invalide ou a rencontré une erreur lors du traitement. Elle ne peut pas être visionnée.'}
           </div>
           <div className="video-error-details" style={{ marginTop: '20px', textAlign: 'left', maxWidth: '600px' }}>
             <p><strong>Titre:</strong> {video.title || 'Sans titre'}</p>
@@ -392,16 +397,52 @@ const VideoPlayerPage = () => {
             </p>
           </div>
           
-          <button 
-            onClick={() => {
-              setLoading(true)
-              fetchVideo()
-            }} 
-            className="refresh-button"
-            style={{ marginTop: '25px' }}
-          >
-            🔄 Actualiser
-          </button>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '25px' }}>
+            <button 
+              onClick={() => {
+                setLoading(true)
+                fetchVideo()
+              }} 
+              className="refresh-button"
+            >
+              🔄 Actualiser
+            </button>
+            {(user && (user.id === video.user_id || user.role === 'admin')) && (
+              <button 
+                onClick={async () => {
+                  if (window.confirm('Êtes-vous sûr de vouloir annuler le traitement de cette vidéo ?')) {
+                    try {
+                      await api.post(`/videos/${id}/cancel`)
+                      setError('Le traitement de la vidéo a été annulé.')
+                      // Recharger la vidéo pour mettre à jour le statut
+                      setTimeout(() => {
+                        fetchVideo()
+                      }, 1000)
+                    } catch (err) {
+                      console.error('Erreur lors de l\'annulation:', err)
+                      alert(err.response?.data?.error || 'Erreur lors de l\'annulation du traitement')
+                    }
+                  }
+                }} 
+                className="cancel-button"
+                style={{ 
+                  backgroundColor: '#e74c3c',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  transition: 'background-color 0.3s'
+                }}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#c0392b'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#e74c3c'}
+              >
+                ❌ Annuler le traitement
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )

@@ -15,12 +15,17 @@ import (
 )
 
 type VideoHandler struct {
-	db  *gorm.DB
-	cfg *config.Config
+	db            *gorm.DB
+	cfg           *config.Config
+	uploadHandler *UploadHandler // Référence pour accéder aux traitements en cours
 }
 
-func NewVideoHandler(db *gorm.DB, cfg *config.Config) *VideoHandler {
-	return &VideoHandler{db: db, cfg: cfg}
+func NewVideoHandler(db *gorm.DB, cfg *config.Config, uploadHandler *UploadHandler) *VideoHandler {
+	return &VideoHandler{
+		db:            db,
+		cfg:           cfg,
+		uploadHandler: uploadHandler,
+	}
 }
 
 type CreateVideoRequest struct {
@@ -585,4 +590,81 @@ func (h *VideoHandler) AddToWatchHistory(c *gin.Context) {
 	h.db.Save(&history)
 
 	c.JSON(http.StatusOK, history)
+}
+
+// CancelVideoProcessing annule le traitement d'une vidéo en cours
+func (h *VideoHandler) CancelVideoProcessing(c *gin.Context) {
+	videoIDParam := c.Param("id")
+	videoID, err := uuid.Parse(videoIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
+
+	// Vérifier que la vidéo existe
+	var video models.Video
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+
+	// Vérifier que la vidéo est en cours de traitement
+	if video.Status != models.VideoStatusProcessing {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "La vidéo n'est pas en cours de traitement"})
+		return
+	}
+
+	// Vérifier les permissions (propriétaire ou admin)
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentification requise"})
+		return
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok || userIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentification requise"})
+		return
+	}
+
+	userUUID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "ID utilisateur invalide"})
+		return
+	}
+
+	// Vérifier si c'est le propriétaire ou un admin
+	isOwner := video.UserID == userUUID
+	var user models.User
+	isAdmin := false
+	if err := h.db.Where("id = ?", userUUID).First(&user).Error == nil {
+		isAdmin = user.Role == models.RoleAdmin
+	}
+
+	if !isOwner && !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Vous n'avez pas la permission d'annuler cette vidéo"})
+		return
+	}
+
+	// Annuler le traitement si une goroutine est en cours
+	if h.uploadHandler != nil {
+		h.uploadHandler.processingMutex.Lock()
+		cancel, exists := h.uploadHandler.processingVideos[videoID]
+		h.uploadHandler.processingMutex.Unlock()
+
+		if exists && cancel != nil {
+			// Annuler le context pour arrêter le traitement
+			cancel()
+			fmt.Printf("Traitement de la vidéo %s annulé par l'utilisateur %s\n", videoID, userUUID)
+		}
+	}
+
+	// Mettre à jour le statut de la vidéo
+	h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Traitement de la vidéo annulé avec succès",
+		"video_id": videoID,
+		"status":   "cancelled",
+	})
 }

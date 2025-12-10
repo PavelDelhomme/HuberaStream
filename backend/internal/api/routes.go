@@ -41,13 +41,13 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	// Initialiser les handlers
 	authHandler := NewAuthHandler(db, cfg)
-	videoHandler := NewVideoHandler(db, cfg)
+	uploadHandler := NewUploadHandler(db, cfg)
+	videoHandler := NewVideoHandler(db, cfg, uploadHandler)
 	playlistHandler := NewPlaylistHandler(db)
 	streamHandler := NewStreamHandler(db, cfg)
 	adminHandler := NewAdminHandler(db, cfg)
 	categoryHandler := NewCategoryHandler(db)
 	torrentHandler := NewTorrentHandler(db, cfg)
-	uploadHandler := NewUploadHandler(db, cfg)
 	scraperHandler := NewScraperHandler(db, cfg)
 	dvdHandler := NewDVDHandler(db, cfg)
 	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
