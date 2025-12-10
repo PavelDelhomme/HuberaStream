@@ -179,9 +179,18 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		return nil, fmt.Errorf("erreur lors du parsing des données: %w", err)
 	}
 
+	// Initialiser tous les tableaux pour éviter les valeurs null en JSON
 	info := &DVDInfo{
-		Title: probeData.Format.Tags["title"],
-		Tracks: []DVDTrack{},
+		Title:          probeData.Format.Tags["title"],
+		Tracks:         []DVDTrack{},
+		VideoTracks:    []DVDTrack{},
+		AudioTracks:    []DVDTrack{},
+		SubtitleTracks: []DVDTrack{},
+	}
+
+	// Si pas de titre, utiliser un titre par défaut
+	if info.Title == "" {
+		info.Title = "DVD Extraite"
 	}
 
 	for _, stream := range probeData.Streams {
@@ -190,21 +199,41 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			Codec: stream.CodecName,
 		}
 
+		// Extraire la langue depuis les tags si disponible
+		language := ""
+		if stream.Tags != nil {
+			if lang, ok := stream.Tags["language"]; ok {
+				language = lang
+			}
+		}
+
 		switch stream.CodecType {
 		case "video":
 			track.Type = "video"
 			info.VideoTracks = append(info.VideoTracks, track)
 		case "audio":
 			track.Type = "audio"
-			track.Language = stream.Language
+			track.Language = language
 			info.AudioTracks = append(info.AudioTracks, track)
 		case "subtitle":
 			track.Type = "subtitle"
-			track.Language = stream.Language
+			track.Language = language
 			info.SubtitleTracks = append(info.SubtitleTracks, track)
 		}
 
 		info.Tracks = append(info.Tracks, track)
+	}
+
+	// S'assurer qu'il y a au moins une piste vidéo
+	if len(info.VideoTracks) == 0 {
+		// Créer une piste vidéo par défaut
+		info.VideoTracks = []DVDTrack{
+			{
+				Index: 0,
+				Type:  "video",
+				Codec: "unknown",
+			},
+		}
 	}
 
 	return info, nil
