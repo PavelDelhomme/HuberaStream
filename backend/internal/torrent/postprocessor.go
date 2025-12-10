@@ -270,7 +270,7 @@ func (p *PostProcessor) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	default:
 	}
 
-	hlsManifest, hlsDir, err := p.processor.TranscodeToHLS(videoPath, videoID, "720p")
+	_, hlsDir, err := p.processor.TranscodeToHLS(videoPath, videoID, "720p")
 	if err == nil {
 		format := models.VideoFormat{
 			ID:       uuid.New(),

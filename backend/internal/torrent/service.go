@@ -13,11 +13,12 @@ import (
 )
 
 type TorrentService struct {
-	db           *gorm.DB
-	cfg          *config.Config
-	client       TorrentClient
-	clientType   ClientType
-	updateTicker *time.Ticker
+	db            *gorm.DB
+	cfg           *config.Config
+	client        TorrentClient
+	clientType    ClientType
+	updateTicker  *time.Ticker
+	postProcessor *PostProcessor
 }
 
 func NewTorrentService(db *gorm.DB, cfg *config.Config, clientType ClientType) (*TorrentService, error) {
