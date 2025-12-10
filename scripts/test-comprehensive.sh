@@ -109,8 +109,25 @@ extract_uuid() {
 echo "📋 0. VÉRIFICATION DES SERVICES"
 echo "-------------------------------"
 
-if ! curl -s "$API_URL/categories" > /dev/null 2>&1; then
-    echo -e "${RED}✗${NC} L'API n'est pas accessible à $API_URL"
+# Vérifier que l'API est accessible (avec retry)
+MAX_RETRIES=5
+RETRY_COUNT=0
+API_ACCESSIBLE=false
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    if curl -s "$API_URL/categories" > /dev/null 2>&1; then
+        API_ACCESSIBLE=true
+        break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        echo -e "${YELLOW}⚠${NC} Tentative $RETRY_COUNT/$MAX_RETRIES - Attente de l'API..."
+        sleep 2
+    fi
+done
+
+if [ "$API_ACCESSIBLE" = false ]; then
+    echo -e "${RED}✗${NC} L'API n'est pas accessible à $API_URL après $MAX_RETRIES tentatives"
     echo "   Assurez-vous que les services Docker sont démarrés (make up)"
     exit 1
 fi
@@ -357,6 +374,8 @@ if [ -n "$ADMIN_TOKEN" ]; then
     
     if [ -n "$TEST_USER_ID" ]; then
         test_request "PUT" "/admin/users/$TEST_USER_ID" '{"is_active":true}' "200" "Modification d'un utilisateur" "$ADMIN_TOKEN" "true"
+        # Note: Les mots de passe ne sont jamais retournés pour des raisons de sécurité
+        # On peut seulement les modifier via un endpoint dédié si nécessaire
     fi
 fi
 
@@ -369,6 +388,7 @@ echo "📋 10. TESTS ADMINISTRATEUR - VIDÉOS"
 echo "-------------------------------------"
 
 if [ -n "$ADMIN_TOKEN" ]; then
+    test_request "GET" "/admin/videos/invalid" "" "200" "Liste des vidéos invalides" "$ADMIN_TOKEN" "true"
     test_request "POST" "/admin/videos/clean-invalid" "" "200" "Nettoyage des vidéos invalides" "$ADMIN_TOKEN" "true"
     
     # Test d'upload (simulation - sans fichier réel)
@@ -467,7 +487,13 @@ if [ -n "$ADMIN_TOKEN" ]; then
     test_request "GET" "/admin/torrent-clients/status" "" "200" "Statut des clients torrent" "$ADMIN_TOKEN" "true"
     test_request "GET" "/admin/torrent-clients/current" "" "200" "Client torrent actuel" "$ADMIN_TOKEN" "true"
     test_request "PUT" "/admin/torrent-clients/current" '{"client":"transmission"}' "200" "Modification du client torrent actuel" "$ADMIN_TOKEN" "true"
-    test_request "POST" "/admin/torrent-clients/test" '{"client":"transmission","host":"localhost","port":9091}' "200" "Test d'un client torrent" "$ADMIN_TOKEN" "true"
+    
+    # Test de tous les clients torrent
+    echo "  Test des clients torrent individuels:"
+    test_request "POST" "/admin/torrent-clients/test" '{"client":"transmission","host":"transmission","port":9091,"username":"","password":""}' "200" "Test Transmission" "$ADMIN_TOKEN" "true"
+    test_request "POST" "/admin/torrent-clients/test" '{"client":"qbittorrent","host":"qbittorrent","port":8080,"username":"admin","password":"adminadmin"}' "200" "Test qBittorrent" "$ADMIN_TOKEN" "true"
+    test_request "POST" "/admin/torrent-clients/test" '{"client":"deluge","host":"deluge","port":8112,"username":"","password":"deluge"}' "200" "Test Deluge" "$ADMIN_TOKEN" "true"
+    test_request "POST" "/admin/torrent-clients/test" '{"client":"rtorrent","host":"rtorrent","port":5000,"username":"","password":""}' "200" "Test rTorrent" "$ADMIN_TOKEN" "true"
 fi
 
 echo ""
@@ -480,7 +506,10 @@ echo "----------------------------------------------"
 
 if [ -n "$ADMIN_TOKEN" ]; then
     test_request "GET" "/admin/media-settings" "" "200" "Récupération des paramètres média" "$ADMIN_TOKEN" "true"
-    test_request "PUT" "/admin/media-settings" '{"default_quality":"720p","auto_transcode":true}' "200" "Modification des paramètres média" "$ADMIN_TOKEN" "true"
+    test_request "PUT" "/admin/media-settings" '{"default_quality":"720p","auto_transcode":true,"auto_download":false}' "200" "Modification des paramètres média" "$ADMIN_TOKEN" "true"
+    
+    # Test de la configuration téléchargement automatique
+    test_request "PUT" "/admin/media-settings" '{"auto_download":true,"auto_download_quality":"720p"}' "200" "Activation téléchargement automatique" "$ADMIN_TOKEN" "true"
 fi
 
 echo ""
