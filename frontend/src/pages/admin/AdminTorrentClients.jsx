@@ -316,7 +316,7 @@ const AdminTorrentClients = () => {
                                 type={showPasswords[clientType] ? 'text' : 'password'}
                                 value={config.pass || ''}
                                 onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
-                                placeholder="fSBT53tSk (temporaire)"
+                                placeholder="adminadmin"
                               />
                               <button
                                 type="button"
@@ -328,7 +328,7 @@ const AdminTorrentClients = () => {
                               </button>
                             </div>
                             <small style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
-                              Mot de passe temporaire: fSBT53tSk (voir logs Docker)
+                              Par défaut: adminadmin | URL: http://qbittorrent:8080 (interne Docker) (voir logs Docker)
                             </small>
                           </div>
                         </div>
