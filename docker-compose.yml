@@ -157,6 +157,10 @@ services:
       - PGID=1000
       - TZ=Europe/Paris
       - WEBUI_PORT=8080
+      # Variables pour la configuration automatique
+      - QBITTORRENT_URL=http://localhost:3306
+      - QBITTORRENT_USER=${QBITTORRENT_USER:-admin}
+      - QBITTORRENT_PASS=${QBITTORRENT_PASS:-adminadmin}
     volumes:
       - torrent_storage:/downloads
       - qbittorrent_config:/config
@@ -165,9 +169,9 @@ services:
     networks:
       - streammake-network
     restart: unless-stopped
-    # Note: Le mot de passe qBittorrent doit être configuré via le WebUI
-    # ou via le fichier de config après le premier démarrage
-    # Le mot de passe temporaire est affiché dans les logs au premier démarrage
+    depends_on:
+      - backend
+    # Le mot de passe sera configuré automatiquement par le backend au démarrage
 
   deluge:
     image: lscr.io/linuxserver/deluge:latest

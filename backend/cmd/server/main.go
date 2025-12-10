@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
+	"time"
 
 	"streammake/internal/api"
 	"streammake/internal/database"
 	"streammake/internal/config"
+	"streammake/internal/torrent"
 )
 
 func main() {
@@ -31,6 +34,31 @@ func main() {
 	if err := os.MkdirAll(cfg.ThumbnailStoragePath, 0755); err != nil {
 		log.Fatalf("Erreur lors de la création du dossier de stockage thumbnails: %v", err)
 	}
+
+	// Configurer automatiquement qBittorrent si nécessaire
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		
+		// Attendre un peu que qBittorrent démarre
+		time.Sleep(10 * time.Second)
+		
+		if cfg.TorrentClientQBittorrentURL != "" && cfg.TorrentClientQBittorrentPass != "" {
+			log.Printf("🔧 Configuration automatique de qBittorrent...")
+			if err := torrent.ConfigureQBittorrentFromDocker(
+				ctx,
+				"streammake-qbittorrent",
+				cfg.TorrentClientQBittorrentUser,
+				cfg.TorrentClientQBittorrentPass,
+			); err != nil {
+				log.Printf("⚠️  Erreur lors de la configuration automatique de qBittorrent: %v", err)
+				log.Printf("   Vous pouvez configurer qBittorrent manuellement via http://localhost:3306")
+			} else {
+				log.Printf("✅ qBittorrent configuré automatiquement avec succès!")
+				log.Printf("   Redémarrez qBittorrent pour que les changements prennent effet")
+			}
+		}
+	}()
 
 	// Initialiser le routeur API
 	router := api.SetupRouter(db, cfg)
