@@ -1,6 +1,6 @@
 # Status du Projet StreamMake
 
-**Dernière mise à jour**: 8 décembre 2025
+**Dernière mise à jour**: 10 décembre 2025
 
 ## 🎯 État Actuel du Projet
 
@@ -18,6 +18,27 @@
   - `docker-compose.yml` - Variables d'environnement
 - **Documentation**: Voir `docs/SOLUTION-403-RESOLU.md`
 - **Tests**: ✅ Tous les tests passent (200 OK)
+
+#### Problème Upload Vidéo et Accès Vidéos en Traitement - **RÉSOLU** ✅
+- **Date de résolution**: 10 décembre 2025
+- **Problème**: 
+  - Vidéos en traitement retournaient 404 même si elles existaient
+  - Vidéos soft-deleted n'étaient pas accessibles même en traitement
+  - Miniatures non servies correctement
+  - Polling sans retry pour rechargement vidéo complète
+- **Solution**: 
+  - Gestion des vidéos soft-deleted avec accès autorisé si en traitement
+  - `OptionalAuthMiddleware` pour routes publiques avec authentification optionnelle
+  - Handler dédié pour servir les thumbnails (`/api/thumbnails/:filename`)
+  - Polling avec retry (3 tentatives) pour rechargement vidéo complète
+  - Exclusion vidéo actuelle des vidéos similaires
+- **Fichiers modifiés**:
+  - `backend/internal/api/video_handler.go` - Gestion soft-deleted et permissions
+  - `backend/internal/api/stream_handler.go` - Handler `ServeThumbnail`
+  - `backend/internal/api/routes.go` - Route thumbnails et `OptionalAuthMiddleware`
+  - `backend/internal/middleware/auth.go` - Nouveau `OptionalAuthMiddleware`
+  - `frontend/src/pages/video/VideoPlayer.jsx` - Polling avec retry
+- **Tests**: ✅ Vidéos en traitement accessibles, thumbnails servis, polling fonctionnel
 
 ## ✅ Fonctionnalités Complétées
 
@@ -50,6 +71,14 @@
 - [x] Listes personnelles (anciennement Playlists)
 - [x] Section "Continuer à regarder" sur la page d'accueil
 - [x] Extraction DVD (admin seulement)
+- [x] Système de statut de traitement (pending, processing, ready, error, cancelled)
+- [x] Polling en temps réel pour statut de traitement avec progression
+- [x] Génération de thumbnails automatique (multiples positions, fallback textuel)
+- [x] Vérification d'intégrité avec checksums SHA256
+- [x] Gestion des vidéos invalides (détection et nettoyage)
+- [x] Annulation de traitement vidéo
+- [x] Accès aux vidéos en traitement même si soft-deleted
+- [x] Exclusion vidéo actuelle des vidéos similaires
 
 ### Streaming
 - [x] Support multi-formats (HLS, DASH, WebRTC, Progressive)
@@ -57,6 +86,12 @@
 - [x] Sélection de qualité
 - [x] Transcodage vidéo avec FFmpeg
 - [x] Génération de thumbnails
+- [x] Transcodage multi-qualités (360p, 480p, 720p, 1080p)
+- [x] Génération HLS avec plusieurs qualités
+- [x] Génération DASH avec plusieurs qualités
+- [x] Affichage progression de traitement en temps réel
+- [x] Écran de traitement avec barre de progression
+- [x] Gestion des erreurs de transcodage
 
 ### Interface d'Administration
 - [x] Tableau de bord admin avec statistiques
@@ -156,6 +191,13 @@
 - [x] **RÉSOLU** - Configuration CORS mise à jour pour inclure tous les ports
 - [x] **RÉSOLU** - Configuration SetTrustedProxies pour les proxies Docker
 
+### Upload et Traitement Vidéo
+- [x] **RÉSOLU** - Vidéos en traitement accessibles même si soft-deleted
+- [x] **RÉSOLU** - Miniatures servies correctement via handler dédié
+- [x] **RÉSOLU** - Polling avec retry pour rechargement vidéo complète
+- [x] **RÉSOLU** - Exclusion vidéo actuelle des vidéos similaires
+- [x] **RÉSOLU** - Gestion vidéos invalides avec détection et nettoyage
+
 ## 📝 Notes Techniques
 
 ### Ports Utilisés
@@ -198,23 +240,81 @@ StreamMake/
 
 ## 🔄 Prochaines Étapes Prioritaires
 
-### Priorité Haute 🔴
-1. **Tests d'intégration clients torrent** - Vérifier que les clients fonctionnent correctement
-2. **Post-traitement automatique** - Créer des vidéos depuis les torrents téléchargés
-3. **Queue de transcodage** - Gérer les transcodages en arrière-plan avec priorité
-4. **Détection fin de téléchargement** - Détecter automatiquement quand un torrent est terminé
+> **Note**: Une fois les problèmes d'upload de vidéos complètement résolus, nous nous concentrerons sur les fonctionnalités torrent et les améliorations suivantes.
+
+### Priorité Haute 🔴 (Après résolution upload)
+
+#### Intégration Torrent Complète
+1. **Post-traitement automatique** - Créer des vidéos depuis les torrents téléchargés
+   - Détection automatique de fichiers vidéo dans les torrents terminés
+   - Extraction et organisation des fichiers
+   - Création automatique d'entrées vidéo dans la base de données
+   - Association avec catégories et métadonnées
+
+2. **Queue de transcodage** - Gérer les transcodages en arrière-plan avec priorité
+   - Système de queue avec priorités (haute, normale, basse)
+   - Gestion de la charge CPU/mémoire
+   - Limite de transcodages simultanés
+   - Reprise après erreur
+
+3. **Détection automatique de fin de téléchargement**
+   - Monitoring des torrents actifs
+   - Détection changement de statut (downloading → seeding/completed)
+   - Déclenchement automatique du post-traitement
+   - Notification utilisateur/admin
+
+4. **Amélioration des parsers HTML**
+   - Parser 1337x complet et robuste
+   - Parser Nyaa amélioré avec gestion erreurs
+   - Gestion des changements de structure HTML
+   - Retry automatique en cas d'échec
 
 ### Priorité Moyenne 🟡
-5. **Amélioration parsers HTML** - Améliorer les scrapers 1337x et Nyaa
-6. **Gestion des erreurs** - Améliorer la gestion d'erreurs dans tous les services
-7. **Tests unitaires** - Ajouter des tests pour le backend
-8. **Amélioration UI** - Améliorer le lecteur et les pages de détails
+
+5. **Gestion des erreurs améliorée**
+   - Logging structuré et centralisé
+   - Retry automatique avec backoff exponentiel
+   - Notifications d'erreurs critiques
+   - Dashboard d'erreurs pour admin
+
+6. **Tests unitaires**
+   - Tests backend (handlers, services, modèles)
+   - Tests d'intégration API
+   - Tests end-to-end frontend
+   - Couverture de code > 80%
+
+7. **Amélioration UI**
+   - Lecteur vidéo amélioré (contrôles, raccourcis clavier)
+   - Page de détails vidéo enrichie
+   - Filtrage par catégories sur page d'accueil
+   - Interface admin améliorée
 
 ### Priorité Basse 🟢
-9. **Mode sombre/clair** - Ajouter le support du thème
-10. **Notifications** - Système de notifications en temps réel
-11. **Favoris** - Système de favoris pour les utilisateurs
-12. **Tests de charge** - Vérifier les performances sous charge
+
+8. **Mode sombre/clair**
+   - Toggle thème dans profil utilisateur
+   - Persistance préférence (localStorage)
+   - Thème système automatique
+   - Transition fluide entre thèmes
+
+9. **Notifications en temps réel**
+   - WebSocket pour notifications push
+   - Notifications fin de téléchargement
+   - Notifications fin de transcodage
+   - Notifications erreurs critiques
+   - Centre de notifications dans UI
+
+10. **Système de favoris**
+    - Ajout/suppression favoris
+    - Page dédiée "Mes Favoris"
+    - Export/import favoris
+    - Partage de favoris (optionnel)
+
+11. **Tests de charge**
+    - Tests avec JMeter/k6
+    - Optimisation performances
+    - Cache Redis pour requêtes fréquentes
+    - CDN pour assets statiques (optionnel)
 
 ## 📚 Documentation Disponible
 
