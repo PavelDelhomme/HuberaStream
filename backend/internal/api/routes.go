@@ -77,6 +77,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			videos.GET("", videoHandler.ListVideos)
 			videos.GET("/:id/stream", streamHandler.StreamVideo)
 			videos.GET("/:id/subtitles/:subtitleId", streamHandler.StreamSubtitle)
+			videos.GET("/:id/status", videoHandler.GetVideoStatus)
 			videos.GET("/:id", videoHandler.GetVideo)
 		}
 	}
@@ -93,7 +94,6 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			videos.PUT("/:id", videoHandler.UpdateVideo)
 			videos.DELETE("/:id", videoHandler.DeleteVideo)
 			videos.POST("/:id/download", videoHandler.DownloadFromStream)
-			videos.GET("/:id/status", videoHandler.GetVideoStatus)
 		}
 
 		// Extraction DVD (admin seulement)
