@@ -69,8 +69,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// Catégories (publiques - accessibles sans authentification)
 		api.GET("/categories", categoryHandler.ListCategories)
 		
-		// Vidéos publiques
+		// Vidéos publiques (avec authentification optionnelle)
 		videos := api.Group("/videos")
+		// Ajouter le middleware d'authentification optionnelle pour permettre l'accès aux vidéos en traitement
+		videos.Use(middleware.OptionalAuthMiddleware(cfg.JWTSecret))
 		{
 			videos.GET("", videoHandler.ListVideos)
 			videos.GET("/:id/stream", streamHandler.StreamVideo)

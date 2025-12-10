@@ -128,53 +128,19 @@ const Upload = () => {
       const videoId = response.data.video_id
       
       if (videoId) {
-        // Vérifier que la vidéo est bien créée en base avant de rediriger
-        let retries = 0
-        const maxRetries = 5
-        const checkVideo = async () => {
-          try {
-            const checkResponse = await api.get(`/videos/${videoId}`)
-            if (checkResponse.data && checkResponse.data.id) {
-              alert('✅ Vidéo uploadée avec succès! Le traitement peut prendre quelques instants.')
-              // Réinitialiser le formulaire
-              setFormData({
-                title: '',
-                description: '',
-                category_id: '',
-                sub_category_id: '',
-                is_public: true
-              })
-              setVideoFile(null)
-              setThumbnailFile(null)
-              // Rediriger vers la vidéo
-              navigate(`/video/${videoId}`)
-            } else {
-              throw new Error('Vidéo non trouvée')
-            }
-          } catch (err) {
-            retries++
-            if (retries < maxRetries) {
-              // Réessayer après 500ms
-              setTimeout(checkVideo, 500)
-            } else {
-              // Si après 5 tentatives la vidéo n'est toujours pas accessible, rediriger quand même
-              alert('✅ Vidéo uploadée avec succès! Le traitement peut prendre quelques instants.')
-              setFormData({
-                title: '',
-                description: '',
-                category_id: '',
-                sub_category_id: '',
-                is_public: true
-              })
-              setVideoFile(null)
-              setThumbnailFile(null)
-              navigate(`/video/${videoId}`)
-            }
-          }
-        }
-        
-        // Commencer la vérification après un court délai
-        setTimeout(checkVideo, 500)
+        alert('✅ Vidéo uploadée avec succès! Le traitement peut prendre quelques instants.')
+        // Réinitialiser le formulaire
+        setFormData({
+          title: '',
+          description: '',
+          category_id: '',
+          sub_category_id: '',
+          is_public: true
+        })
+        setVideoFile(null)
+        setThumbnailFile(null)
+        // Rediriger directement vers la vidéo (elle sera accessible même en traitement pour le propriétaire)
+        navigate(`/video/${videoId}`)
       } else {
         alert('✅ Vidéo uploadée avec succès!')
         setFormData({

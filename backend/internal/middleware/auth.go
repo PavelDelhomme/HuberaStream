@@ -49,3 +49,46 @@ func AuthMiddleware(secret string) gin.HandlerFunc {
 	}
 }
 
+// OptionalAuthMiddleware est un middleware d'authentification optionnelle
+// Il ne bloque pas la requête si le token est absent, mais définit user_id si un token valide est présent
+func OptionalAuthMiddleware(secret string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			// Pas de token, continuer sans authentification
+			c.Next()
+			return
+		}
+
+		// Extraire le token (format: "Bearer <token>")
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			// Format invalide, continuer sans authentification
+			c.Next()
+			return
+		}
+
+		tokenString := parts[1]
+
+		// Parser et valider le token
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return []byte(secret), nil
+		})
+
+		if err != nil || !token.Valid {
+			// Token invalide, continuer sans authentification
+			c.Next()
+			return
+		}
+
+		// Extraire les claims et les définir dans le contexte
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			c.Set("user_id", claims["user_id"])
+			c.Set("username", claims["username"])
+			c.Set("role", claims["role"])
+		}
+
+		c.Next()
+	}
+}
+

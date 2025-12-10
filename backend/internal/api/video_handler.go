@@ -218,6 +218,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	}
 
 	// Vérifier les permissions d'accès
+	// Récupérer user_id depuis le contexte (peut être vide si route publique sans token)
 	userID, exists := c.Get("user_id")
 	isAdmin := false
 	isOwner := false

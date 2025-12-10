@@ -21,20 +21,63 @@ const VideoPlayerPage = () => {
       fetchVideo()
       fetchRelatedVideos()
     }
+    
+    // Nettoyer les intervalles au démontage
+    return () => {
+      // Le cleanup sera géré dans startStatusPolling
+    }
   }, [id])
 
   const fetchVideo = async () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await api.get(`/videos/${id}`)
       
-      // Vérifier que la vidéo existe et a un ID valide
-      if (!response.data || !response.data.id) {
-        throw new Error('Vidéo invalide')
+      // Essayer d'abord de récupérer la vidéo
+      try {
+        const response = await api.get(`/videos/${id}`)
+        
+        // Vérifier que la vidéo existe et a un ID valide
+        if (!response.data || !response.data.id) {
+          throw new Error('Vidéo invalide')
+        }
+        
+        setVideo(response.data)
+        
+        // Si la vidéo est en traitement, démarrer le polling du statut
+        if (response.data.status === 'processing') {
+          startStatusPolling(id)
+        }
+      } catch (err) {
+        // Si 404, essayer de récupérer le statut (pour les vidéos en traitement)
+        if (err.response?.status === 404 && user) {
+          try {
+            const statusResponse = await api.get(`/videos/${id}/status`)
+            if (statusResponse.data) {
+              // Créer un objet vidéo minimal avec les infos du statut
+              setVideo({
+                id: statusResponse.data.video_id,
+                title: statusResponse.data.title || 'Vidéo en traitement',
+                description: statusResponse.data.description || '',
+                status: statusResponse.data.status,
+                thumbnail_path: statusResponse.data.thumbnail_path,
+                formats: [],
+                progress: statusResponse.data.progress,
+                formats_count: statusResponse.data.formats_count
+              })
+              // Démarrer le polling
+              startStatusPolling(id)
+            } else {
+              throw err
+            }
+          } catch (statusErr) {
+            // Si le statut n'est pas accessible non plus, afficher l'erreur
+            throw err
+          }
+        } else {
+          throw err
+        }
       }
-      
-      setVideo(response.data)
     } catch (err) {
       console.error('Erreur lors de la récupération de la vidéo:', err)
       const errorMessage = err.response?.data?.error || err.message || 'Vidéo non trouvée'
@@ -47,6 +90,49 @@ const VideoPlayerPage = () => {
     } finally {
       setLoading(false)
     }
+  }
+  
+  // Polling du statut pour les vidéos en traitement
+  const startStatusPolling = (videoId) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusResponse = await api.get(`/videos/${videoId}/status`)
+        if (statusResponse.data) {
+          // Mettre à jour le statut et la progression
+          setVideo(prev => ({
+            ...prev,
+            status: statusResponse.data.status,
+            progress: statusResponse.data.progress,
+            formats_count: statusResponse.data.formats_count,
+            thumbnail_path: statusResponse.data.thumbnail_path || prev?.thumbnail_path
+          }))
+          
+          // Si la vidéo est prête, arrêter le polling et recharger la vidéo complète
+          if (statusResponse.data.status === 'ready') {
+            clearInterval(pollInterval)
+            // Recharger la vidéo complète
+            try {
+              const fullResponse = await api.get(`/videos/${videoId}`)
+              if (fullResponse.data) {
+                setVideo(fullResponse.data)
+              }
+            } catch (err) {
+              console.error('Erreur lors du rechargement de la vidéo:', err)
+            }
+          } else if (statusResponse.data.status === 'error') {
+            clearInterval(pollInterval)
+            setError('Erreur lors du traitement de la vidéo. Veuillez réessayer l\'upload.')
+          }
+        }
+      } catch (err) {
+        console.error('Erreur lors du polling du statut:', err)
+        // Arrêter le polling en cas d'erreur
+        clearInterval(pollInterval)
+      }
+    }, 2000) // Polling toutes les 2 secondes
+    
+    // Nettoyer l'intervalle quand le composant est démonté
+    return () => clearInterval(pollInterval)
   }
 
   const fetchRelatedVideos = async () => {
