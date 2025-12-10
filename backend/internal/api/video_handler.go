@@ -698,7 +698,7 @@ func (h *VideoHandler) CancelVideoProcessing(c *gin.Context) {
 	isOwner := video.UserID == userUUID
 	var user models.User
 	isAdmin := false
-	if err := h.db.Where("id = ?", userUUID).First(&user).Error == nil {
+		if h.db.Where("id = ?", userUUID).First(&user).Error == nil {
 		isAdmin = user.Role == models.RoleAdmin
 	}
 
