@@ -295,9 +295,14 @@ const VideoPlayerPage = () => {
           limit: 12,
         },
       })
-      setRelatedVideos(filterValidVideos(response.data.videos || []))
+      // Filtrer les vidéos valides et exclure la vidéo actuelle
+      const validVideos = filterValidVideos(response.data.videos || [])
+      const filteredVideos = validVideos.filter(v => v.id !== id)
+      setRelatedVideos(filteredVideos)
     } catch (err) {
       console.error('Erreur lors de la récupération des vidéos similaires:', err)
+      // En cas d'erreur, ne pas bloquer l'affichage de la vidéo principale
+      setRelatedVideos([])
     }
   }
 
