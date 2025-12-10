@@ -133,23 +133,71 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Utilisateur supprimé"})
 }
 
+// ListInvalidVideos liste les vidéos invalides sans les supprimer
+func (h *AdminHandler) ListInvalidVideos(c *gin.Context) {
+	var invalidVideos []gin.H
+
+	// Trouver toutes les vidéos
+	var videos []models.Video
+	h.db.Preload("User").Find(&videos)
+
+	for _, video := range videos {
+		var reasons []string
+
+		// Vérifier si le titre est null ou vide
+		if video.Title == "" || video.Title == "null" || video.Title == "Null" || video.Title == "NULL" {
+			reasons = append(reasons, "titre null ou vide")
+		}
+
+		// Vérifier si la vidéo n'a aucun format
+		var formatCount int64
+		h.db.Model(&models.VideoFormat{}).Where("video_id = ?", video.ID).Count(&formatCount)
+		if formatCount == 0 {
+			reasons = append(reasons, "aucun format disponible")
+		}
+
+		// Vérifier si le statut est "error"
+		if video.Status == models.VideoStatusError {
+			reasons = append(reasons, "statut error")
+		}
+
+		if len(reasons) > 0 {
+			invalidVideos = append(invalidVideos, gin.H{
+				"id":          video.ID,
+				"title":       video.Title,
+				"status":      video.Status,
+				"user":        video.User.Username,
+				"created_at":  video.CreatedAt,
+				"reasons":     reasons,
+				"format_count": formatCount,
+			})
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"invalid_videos": invalidVideos,
+		"count":         len(invalidVideos),
+	})
+}
+
 // CleanInvalidVideos supprime les vidéos invalides (sans format, titre null, etc.)
 func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 	var deletedCount int
 	var errors []string
+	var deletedVideos []gin.H
 
 	// Trouver toutes les vidéos
 	var videos []models.Video
-	h.db.Find(&videos)
+	h.db.Preload("User").Find(&videos)
 
 	for _, video := range videos {
 		shouldDelete := false
-		reason := ""
+		var reasons []string
 
 		// Vérifier si le titre est null ou vide
 		if video.Title == "" || video.Title == "null" || video.Title == "Null" || video.Title == "NULL" {
 			shouldDelete = true
-			reason = "titre null ou vide"
+			reasons = append(reasons, "titre null ou vide")
 		}
 
 		// Vérifier si la vidéo n'a aucun format
@@ -157,22 +205,25 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 		h.db.Model(&models.VideoFormat{}).Where("video_id = ?", video.ID).Count(&formatCount)
 		if formatCount == 0 {
 			shouldDelete = true
-			if reason != "" {
-				reason += " et "
-			}
-			reason += "aucun format disponible"
+			reasons = append(reasons, "aucun format disponible")
 		}
 
-		// Vérifier si le statut est "error" depuis plus de 24h
+		// Vérifier si le statut est "error"
 		if video.Status == models.VideoStatusError {
 			shouldDelete = true
-			if reason != "" {
-				reason += " et "
-			}
-			reason += "statut error"
+			reasons = append(reasons, "statut error")
 		}
 
 		if shouldDelete {
+			// Enregistrer les infos de la vidéo avant suppression
+			deletedVideos = append(deletedVideos, gin.H{
+				"id":      video.ID.String(),
+				"title":   video.Title,
+				"status":  string(video.Status),
+				"user":    video.User.Username,
+				"reasons": reasons,
+			})
+
 			// Supprimer les formats associés
 			h.db.Where("video_id = ?", video.ID).Delete(&models.VideoFormat{})
 			
@@ -203,9 +254,10 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":      "Nettoyage terminé",
+		"message":       "Nettoyage terminé",
 		"deleted_count": deletedCount,
-		"errors":       errors,
+		"deleted_videos": deletedVideos,
+		"errors":        errors,
 	})
 }
 

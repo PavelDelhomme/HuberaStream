@@ -158,6 +158,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		admin.GET("/stats", adminHandler.GetStats)
 
 		// Nettoyage des vidéos invalides
+		admin.GET("/videos/invalid", adminHandler.ListInvalidVideos)
 		admin.POST("/videos/clean-invalid", adminHandler.CleanInvalidVideos)
 
 		// Catégories

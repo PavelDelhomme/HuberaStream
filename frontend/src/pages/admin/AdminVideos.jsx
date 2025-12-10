@@ -15,6 +15,8 @@ const AdminVideos = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [cleaning, setCleaning] = useState(false)
+  const [invalidVideos, setInvalidVideos] = useState([])
+  const [showInvalidList, setShowInvalidList] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -105,22 +107,88 @@ const AdminVideos = () => {
     }
   }
 
+  const fetchInvalidVideos = async () => {
+    try {
+      console.log('🔍 AdminVideos: Récupération de la liste des vidéos invalides...')
+      const response = await api.get('/admin/videos/invalid')
+      const invalid = response.data.invalid_videos || []
+      console.log(`📋 AdminVideos: ${invalid.length} vidéo(s) invalide(s) trouvée(s):`, invalid)
+      setInvalidVideos(invalid)
+      return invalid
+    } catch (err) {
+      console.error('❌ AdminVideos: Erreur lors de la récupération des vidéos invalides:', err)
+      setInvalidVideos([])
+      return []
+    }
+  }
+
   const handleCleanInvalidVideos = async () => {
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer toutes les vidéos invalides (titre null, sans format, etc.) ?')) {
+    // D'abord, récupérer la liste des vidéos invalides
+    console.log('🧹 AdminVideos: Début du processus de nettoyage...')
+    const invalid = await fetchInvalidVideos()
+    
+    if (invalid.length === 0) {
+      console.log('✅ AdminVideos: Aucune vidéo invalide à nettoyer')
+      alert('✅ Aucune vidéo invalide trouvée. Tout est propre !')
+      return
+    }
+
+    // Afficher la liste des vidéos à supprimer
+    const videoList = invalid.map(v => {
+      const reasons = Array.isArray(v.reasons) ? v.reasons.join(', ') : v.reasons
+      return `  • ${v.title || '(sans titre)'} (ID: ${v.id})\n    Raisons: ${reasons}`
+    }).join('\n')
+
+    const confirmMessage = `⚠️ ATTENTION: Vous êtes sur le point de supprimer ${invalid.length} vidéo(s) invalide(s):\n\n${videoList}\n\nÊtes-vous sûr de vouloir continuer ?`
+    
+    if (!window.confirm(confirmMessage)) {
+      console.log('❌ AdminVideos: Nettoyage annulé par l\'utilisateur')
       return
     }
 
     try {
+      console.log('🚀 AdminVideos: Démarrage du nettoyage des vidéos invalides...')
       setCleaning(true)
+      setError(null)
+      
       const response = await api.post('/admin/videos/clean-invalid')
-      alert(`Nettoyage terminé: ${response.data.deleted_count} vidéo(s) supprimée(s)`)
-      if (response.data.errors && response.data.errors.length > 0) {
-        console.error('Erreurs lors du nettoyage:', response.data.errors)
+      
+      const deletedCount = response.data.deleted_count || 0
+      const deletedVideos = response.data.deleted_videos || []
+      const errors = response.data.errors || []
+      
+      console.log(`✅ AdminVideos: Nettoyage terminé - ${deletedCount} vidéo(s) supprimée(s)`)
+      console.log('📋 AdminVideos: Liste des vidéos supprimées:', deletedVideos)
+      
+      if (errors.length > 0) {
+        console.error('⚠️ AdminVideos: Erreurs lors du nettoyage:', errors)
       }
+      
+      // Afficher un message détaillé
+      let message = `✅ Nettoyage terminé: ${deletedCount} vidéo(s) supprimée(s)\n\n`
+      
+      if (deletedVideos.length > 0) {
+        message += 'Vidéos supprimées:\n'
+        deletedVideos.forEach(v => {
+          const reasons = Array.isArray(v.reasons) ? v.reasons.join(', ') : v.reasons
+          message += `  • ${v.title || '(sans titre)'} (${v.id})\n    Raisons: ${reasons}\n`
+        })
+      }
+      
+      if (errors.length > 0) {
+        message += `\n⚠️ Erreurs: ${errors.length} erreur(s) lors de la suppression`
+        console.error('Erreurs détaillées:', errors)
+      }
+      
+      alert(message)
+      setInvalidVideos([])
       fetchVideos() // Recharger la liste
     } catch (err) {
-      console.error('Erreur lors du nettoyage:', err)
-      alert('Erreur lors du nettoyage des vidéos invalides: ' + (err.response?.data?.error || err.message))
+      console.error('❌ AdminVideos: Erreur lors du nettoyage:', err)
+      const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue'
+      console.error('Détails de l\'erreur:', err.response?.data)
+      alert('❌ Erreur lors du nettoyage des vidéos invalides: ' + errorMessage)
+      setError('Erreur lors du nettoyage: ' + errorMessage)
     } finally {
       setCleaning(false)
     }
@@ -144,6 +212,16 @@ const AdminVideos = () => {
         <h1>🎬 Gestion des Vidéos</h1>
         <div className="admin-videos-actions">
           <button 
+            onClick={async () => {
+              const invalid = await fetchInvalidVideos()
+              setShowInvalidList(!showInvalidList)
+            }}
+            className="admin-action-button info"
+            disabled={cleaning}
+          >
+            {showInvalidList ? '👁️ Masquer' : '👁️ Voir'} les vidéos invalides
+          </button>
+          <button 
             onClick={handleCleanInvalidVideos} 
             className="admin-action-button clean"
             disabled={cleaning}
@@ -155,6 +233,48 @@ const AdminVideos = () => {
           </Link>
         </div>
       </div>
+
+      {showInvalidList && (
+        <div className="invalid-videos-preview">
+          <h3>📋 Vidéos invalides ({invalidVideos.length})</h3>
+          {invalidVideos.length === 0 ? (
+            <p className="no-invalid">✅ Aucune vidéo invalide trouvée</p>
+          ) : (
+            <div className="invalid-videos-list">
+              {invalidVideos.map(video => (
+                <div key={video.id} className="invalid-video-item">
+                  <div className="invalid-video-info">
+                    <strong>{video.title || '(sans titre)'}</strong>
+                    <span className="invalid-video-id">ID: {video.id}</span>
+                    <span className={`invalid-video-status status-${video.status}`}>
+                      {video.status}
+                    </span>
+                  </div>
+                  <div className="invalid-video-reasons">
+                    <strong>Raisons:</strong>
+                    <ul>
+                      {Array.isArray(video.reasons) ? (
+                        video.reasons.map((reason, idx) => (
+                          <li key={idx}>{reason}</li>
+                        ))
+                      ) : (
+                        <li>{video.reasons}</li>
+                      )}
+                    </ul>
+                  </div>
+                  {video.format_count !== undefined && (
+                    <div className="invalid-video-meta">
+                      Formats: {video.format_count} | 
+                      Créée: {new Date(video.created_at).toLocaleDateString('fr-FR')} |
+                      Par: {video.user || 'N/A'}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="admin-videos-filters">
         <div className="search-box">
