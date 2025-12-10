@@ -14,6 +14,7 @@ const AdminTorrentClients = () => {
   const [testing, setTesting] = useState({})
   const [testResults, setTestResults] = useState({})
   const [expandedClient, setExpandedClient] = useState(null)
+  const [showPasswords, setShowPasswords] = useState({}) // État pour afficher/masquer les mots de passe
   const [clientConfigs, setClientConfigs] = useState({
     transmission: {
       url: 'http://transmission:9091/transmission/rpc',
@@ -182,6 +183,13 @@ const AdminTorrentClients = () => {
     setExpandedClient(expandedClient === clientType ? null : clientType)
   }
 
+  const togglePasswordVisibility = (clientType) => {
+    setShowPasswords(prev => ({
+      ...prev,
+      [clientType]: !prev[clientType]
+    }))
+  }
+
   if (loading) {
     return (
       <div className="admin-torrent-clients">
@@ -256,11 +264,25 @@ const AdminTorrentClients = () => {
                           </div>
                           <div className="config-form-group">
                             <label>Mot de passe</label>
-                            <input
-                              type="password"
-                              value={config.pass || ''}
-                              onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
-                            />
+                            <div className="password-input-wrapper">
+                              <input
+                                type={showPasswords[clientType] ? 'text' : 'password'}
+                                value={config.pass || ''}
+                                onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
+                                placeholder="transmission"
+                              />
+                              <button
+                                type="button"
+                                className="password-toggle-btn"
+                                onClick={() => togglePasswordVisibility(clientType)}
+                                title={showPasswords[clientType] ? 'Masquer' : 'Afficher'}
+                              >
+                                {showPasswords[clientType] ? '👁️' : '👁️‍🗨️'}
+                              </button>
+                            </div>
+                            <small style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                              Par défaut: transmission
+                            </small>
                           </div>
                         </div>
                       </>
@@ -289,12 +311,25 @@ const AdminTorrentClients = () => {
                           </div>
                           <div className="config-form-group">
                             <label>Mot de passe</label>
-                            <input
-                              type="password"
-                              value={config.pass || ''}
-                              onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
-                              placeholder="Laissez vide pour utiliser le mot de passe temporaire"
-                            />
+                            <div className="password-input-wrapper">
+                              <input
+                                type={showPasswords[clientType] ? 'text' : 'password'}
+                                value={config.pass || ''}
+                                onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
+                                placeholder="fSBT53tSk (temporaire)"
+                              />
+                              <button
+                                type="button"
+                                className="password-toggle-btn"
+                                onClick={() => togglePasswordVisibility(clientType)}
+                                title={showPasswords[clientType] ? 'Masquer' : 'Afficher'}
+                              >
+                                {showPasswords[clientType] ? '👁️' : '👁️‍🗨️'}
+                              </button>
+                            </div>
+                            <small style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                              Mot de passe temporaire: fSBT53tSk (voir logs Docker)
+                            </small>
                           </div>
                         </div>
                       </>
@@ -314,11 +349,25 @@ const AdminTorrentClients = () => {
                         </div>
                         <div className="config-form-group">
                           <label>Mot de passe</label>
-                          <input
-                            type="password"
-                            value={config.pass || ''}
-                            onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
-                          />
+                          <div className="password-input-wrapper">
+                            <input
+                              type={showPasswords[clientType] ? 'text' : 'password'}
+                              value={config.pass || ''}
+                              onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
+                              placeholder="deluge"
+                            />
+                            <button
+                              type="button"
+                              className="password-toggle-btn"
+                              onClick={() => togglePasswordVisibility(clientType)}
+                              title={showPasswords[clientType] ? 'Masquer' : 'Afficher'}
+                            >
+                              {showPasswords[clientType] ? '👁️' : '👁️‍🗨️'}
+                            </button>
+                          </div>
+                          <small style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+                            Par défaut: deluge
+                          </small>
                         </div>
                       </>
                     )}
