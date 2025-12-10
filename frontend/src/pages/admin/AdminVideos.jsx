@@ -104,17 +104,6 @@ const AdminVideos = () => {
           '• "ready" = Vidéo prête (transcodage terminé avec succès)\n' +
           '• "error" = Erreur lors du traitement\n\n' +
           'Vous ne pouvez pas modifier manuellement le statut.')
-    return
-    
-    /* CODE DÉSACTIVÉ - Statut automatique
-    try {
-      // Note: Vous devrez peut-être créer une route spécifique pour changer le statut
-      await api.put(`/videos/${videoId}`, { status: newStatus })
-      fetchVideos()
-    } catch (err) {
-      console.error('Erreur lors de la mise à jour:', err)
-      alert('Erreur lors de la mise à jour du statut')
-    }
   }
 
   const fetchInvalidVideos = async () => {
