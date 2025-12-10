@@ -137,7 +137,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
-      - TRANSMISSION_WEB_HOME=/transmission-web-control/
+      # TRANSMISSION_WEB_HOME retiré car l'image ne supporte plus les UI tiers
       - USER=transmission
       - PASS=transmission
     volumes:

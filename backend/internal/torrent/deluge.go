@@ -79,7 +79,17 @@ func (c *DelugeClient) makeRequest(ctx context.Context, req DelugeRequest) (*Del
 		return nil, fmt.Errorf("erreur lors de la sérialisation JSON: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL, bytes.NewBuffer(jsonData))
+	// S'assurer que l'URL se termine par /json
+	baseURL := c.baseURL
+	if !strings.HasSuffix(baseURL, "/json") {
+		if strings.HasSuffix(baseURL, "/") {
+			baseURL = baseURL + "json"
+		} else {
+			baseURL = baseURL + "/json"
+		}
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("erreur lors de la création de la requête: %w", err)
 	}
@@ -100,7 +110,7 @@ func (c *DelugeClient) makeRequest(ctx context.Context, req DelugeRequest) (*Del
 
 	// Vérifier si la réponse est du HTML (erreur de configuration)
 	if len(body) > 0 && body[0] == '<' {
-		return nil, fmt.Errorf("réponse HTML reçue au lieu de JSON. Vérifiez que l'URL Deluge est correcte (doit pointer vers /json). URL actuelle: %s", c.baseURL)
+		return nil, fmt.Errorf("réponse HTML reçue au lieu de JSON. L'URL doit se terminer par /json. URL utilisée: %s", baseURL)
 	}
 
 	var delugeResp DelugeResponse

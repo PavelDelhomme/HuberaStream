@@ -22,9 +22,9 @@ const AdminTorrentClients = () => {
       pass: 'transmission'
     },
     qbittorrent: {
-      url: 'http://qbittorrent:8080',
+      url: 'http://qbittorrent:8080', // URL interne Docker (pour le backend)
       user: 'admin',
-      pass: 'fSBT53tSk' // Mot de passe temporaire actuel (voir logs Docker)
+      pass: 'adminadmin' // Par défaut, ou mot de passe temporaire depuis logs Docker
     },
     deluge: {
       url: 'http://deluge:8112/json',
