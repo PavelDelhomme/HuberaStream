@@ -20,17 +20,15 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	// Middleware de debug TRÈS TÔT pour capturer toutes les requêtes
 	// IMPORTANT: Ce middleware doit être le PREMIER pour capturer toutes les requêtes
 	router.Use(func(c *gin.Context) {
-		// Logger TOUTES les requêtes pour debug
-		if c.Request.Method == "POST" || c.Request.Method == "OPTIONS" {
-			log.Printf("[EARLY-DEBUG] %s %s - RemoteAddr: %s, Origin: %s, ClientIP: %s", 
-				c.Request.Method,
-				c.Request.URL.Path,
-				c.Request.RemoteAddr,
-				c.Request.Header.Get("Origin"),
-				c.ClientIP())
-		}
+		// Logger TOUTES les requêtes pour debug (y compris GET)
+		log.Printf("[EARLY-DEBUG] %s %s - RemoteAddr: %s, Origin: %s, ClientIP: %s", 
+			c.Request.Method,
+			c.Request.URL.Path,
+			c.Request.RemoteAddr,
+			c.Request.Header.Get("Origin"),
+			c.ClientIP())
 		c.Next()
-		if (c.Request.Method == "POST" || c.Request.Method == "OPTIONS") && c.Request.URL.Path == "/api/auth/login" {
+		if c.Request.URL.Path == "/api/auth/login" || c.Request.URL.Path == "/api/videos/e2812d03-e660-4c66-8d7c-5b9868fde832" || c.Request.URL.Path == "/api/thumbnails/e2812d03-e660-4c66-8d7c-5b9868fde832.jpg" {
 			log.Printf("[EARLY-DEBUG] %s %s terminée - Status: %d", c.Request.Method, c.Request.URL.Path, c.Writer.Status())
 		}
 	})
