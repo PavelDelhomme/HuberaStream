@@ -254,18 +254,15 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 		}
 	}
 
-	// Si la vidéo n'est pas prête, seuls le propriétaire et les admins peuvent la voir
-	// Cela inclut les vidéos en traitement (processing) et en erreur (error)
-	// MAIS: Pour les vidéos en traitement, permettre l'accès même sans authentification
+	// Si la vidéo est en traitement, permettre l'accès même sans authentification
 	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
-	if video.Status != models.VideoStatusReady {
-		// Pour les vidéos en traitement, permettre l'accès même sans authentification
-		// (le statut sera accessible via /status, mais on permet aussi l'accès direct ici)
-		if video.Status == models.VideoStatusProcessing {
-			// Permettre l'accès pour les vidéos en traitement (même sans auth)
-			// Cela permet au frontend d'afficher l'écran de traitement
-		} else if !isOwner && !isAdmin {
-			// Pour les vidéos en erreur, seuls propriétaire et admin
+	if video.Status == models.VideoStatusProcessing {
+		// Permettre l'accès pour les vidéos en traitement (même sans auth, même si pas publique)
+		// Cela permet au frontend d'afficher l'écran de traitement
+		// Continuer pour retourner la vidéo
+	} else if video.Status != models.VideoStatusReady {
+		// Pour les vidéos en erreur, seuls propriétaire et admin peuvent les voir
+		if !isOwner && !isAdmin {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
@@ -274,13 +271,10 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	}
 
 	// Si la vidéo n'est pas publique, seuls le propriétaire et les admins peuvent la voir
-	// MAIS: Pour les vidéos en traitement, permettre l'accès même si elles ne sont pas publiques
-	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
+	// MAIS: Pour les vidéos en traitement, on a déjà permis l'accès ci-dessus
 	if !video.IsPublic && !isOwner && !isAdmin {
-		// Si la vidéo est en traitement, permettre l'accès même si elle n'est pas publique
-		if video.Status == models.VideoStatusProcessing {
-			// Permettre l'accès pour les vidéos en traitement (même si pas publique)
-		} else {
+		// Si la vidéo est en traitement, on a déjà permis l'accès ci-dessus
+		if video.Status != models.VideoStatusProcessing {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
