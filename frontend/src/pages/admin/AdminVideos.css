@@ -66,6 +66,119 @@
   cursor: not-allowed;
 }
 
+.admin-action-button.info {
+  background: linear-gradient(135deg, #4dabf7 0%, #339af0 100%);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+}
+
+.admin-action-button.info:hover:not(:disabled) {
+  background: linear-gradient(135deg, #339af0 0%, #228be6 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(77, 171, 247, 0.3);
+}
+
+.invalid-videos-preview {
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+  margin: 20px 0;
+}
+
+.invalid-videos-preview h3 {
+  color: #ffc107;
+  margin-bottom: 15px;
+  font-size: 1.2em;
+}
+
+.no-invalid {
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  padding: 20px;
+}
+
+.invalid-videos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.invalid-video-item {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 193, 7, 0.2);
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.invalid-video-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.invalid-video-info strong {
+  color: #ffffff;
+  font-size: 1.1em;
+}
+
+.invalid-video-id {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9em;
+  font-family: monospace;
+}
+
+.invalid-video-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.invalid-video-status.status-error {
+  background: rgba(255, 107, 107, 0.3);
+  color: #ff6b6b;
+}
+
+.invalid-video-status.status-processing {
+  background: rgba(255, 193, 7, 0.3);
+  color: #ffc107;
+}
+
+.invalid-video-reasons {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.invalid-video-reasons strong {
+  color: #ffc107;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.invalid-video-reasons ul {
+  margin: 5px 0 0 20px;
+  padding: 0;
+  list-style-type: disc;
+}
+
+.invalid-video-reasons li {
+  color: rgba(255, 255, 255, 0.8);
+  margin: 3px 0;
+}
+
+.invalid-video-meta {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9em;
+}
+
 .admin-videos-filters {
   display: flex;
   gap: 20px;
