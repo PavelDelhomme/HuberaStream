@@ -152,8 +152,10 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 			}
 		case "deluge":
 			testCfg.TorrentClientDelugeURL = url
-			if pass, ok := req.Config["pass"].(string); ok && pass != "" {
+			if pass, ok := req.Config["pass"].(string); ok {
 				testCfg.TorrentClientDelugePass = pass
+			} else {
+				testCfg.TorrentClientDelugePass = "deluge" // Par défaut
 			}
 		case "rtorrent":
 			testCfg.TorrentClientRTorrentURL = url
