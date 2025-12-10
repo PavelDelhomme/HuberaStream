@@ -363,16 +363,16 @@ const AdminVideos = () => {
                   </td>
                   <td>{video.user?.username || 'N/A'}</td>
                   <td>
-                    <select
-                      value={video.status || 'pending'}
-                      onChange={(e) => handleStatusChange(video.id, e.target.value)}
-                      className={`status-select status-${video.status || 'pending'}`}
+                    <span
+                      className={`status-badge status-${video.status || 'pending'}`}
+                      title="Statut automatique (non modifiable manuellement)"
                     >
-                      <option value="pending">En attente</option>
-                      <option value="processing">En traitement</option>
-                      <option value="ready">Prête</option>
-                      <option value="error">Erreur</option>
-                    </select>
+                      {video.status === 'processing' && '⏳ En traitement'}
+                      {video.status === 'ready' && '✅ Prête'}
+                      {video.status === 'pending' && '⏸️ En attente'}
+                      {video.status === 'error' && '❌ Erreur'}
+                      {!video.status && '❓ Inconnu'}
+                    </span>
                   </td>
                   <td>{video.views || 0}</td>
                   <td>{new Date(video.created_at).toLocaleDateString('fr-FR')}</td>
