@@ -40,16 +40,27 @@ type QBittorrentTorrent struct {
 }
 
 func NewQBittorrentClient(cfg *config.Config) (*QBittorrentClient, error) {
-	baseURL := cfg.TorrentClientPath
+	baseURL := cfg.TorrentClientQBittorrentURL
+	if baseURL == "" {
+		baseURL = cfg.TorrentClientPath
+	}
 	if baseURL == "" {
 		baseURL = "http://qbittorrent:8080"
 	}
 
+	username := cfg.TorrentClientQBittorrentUser
+	if username == "" {
+		username = "admin"
+	}
+
+	password := cfg.TorrentClientQBittorrentPass
+	// Si le mot de passe est vide, on essaiera avec une chaîne vide (pour utiliser le mot de passe temporaire)
+
 	client := &QBittorrentClient{
 		cfg:      cfg,
 		baseURL:  baseURL,
-		username: "admin",
-		password: "adminadmin",
+		username: username,
+		password: password,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -77,12 +88,25 @@ func (c *QBittorrentClient) login(ctx context.Context) error {
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("erreur réseau: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Lire le corps de la réponse pour voir le message d'erreur
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("échec de la connexion, code: %d", resp.StatusCode)
+		// qBittorrent retourne "Fails." en cas d'échec d'authentification
+		if bodyStr == "Fails." {
+			return fmt.Errorf("échec de la connexion: identifiants incorrects (code: %d). Vérifiez le mot de passe dans les logs Docker ou configurez-le via le WebUI", resp.StatusCode)
+		}
+		return fmt.Errorf("échec de la connexion, code: %d, réponse: %s", resp.StatusCode, bodyStr)
+	}
+
+	// Vérifier que la réponse est "Ok."
+	if bodyStr != "Ok." {
+		return fmt.Errorf("réponse inattendue: %s", bodyStr)
 	}
 
 	// Le cookie de session est dans les headers

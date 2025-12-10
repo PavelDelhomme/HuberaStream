@@ -32,15 +32,23 @@ type DelugeResponse struct {
 }
 
 func NewDelugeClient(cfg *config.Config) (*DelugeClient, error) {
-	baseURL := cfg.TorrentClientPath
+	baseURL := cfg.TorrentClientDelugeURL
+	if baseURL == "" {
+		baseURL = cfg.TorrentClientPath
+	}
 	if baseURL == "" {
 		baseURL = "http://deluge:8112/json"
+	}
+
+	password := cfg.TorrentClientDelugePass
+	if password == "" {
+		password = "deluge"
 	}
 
 	client := &DelugeClient{
 		cfg:      cfg,
 		baseURL:  baseURL,
-		password: "deluge",
+		password: password,
 		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
@@ -68,25 +76,36 @@ func (c *DelugeClient) connect(ctx context.Context) error {
 func (c *DelugeClient) makeRequest(ctx context.Context, req DelugeRequest) (*DelugeResponse, error) {
 	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("erreur lors de la sérialisation JSON: %w", err)
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST", c.baseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("erreur lors de la création de la requête: %w", err)
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("erreur réseau: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// Lire le corps pour vérifier si c'est du JSON ou du HTML
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la lecture de la réponse: %w", err)
+	}
+
+	// Vérifier si la réponse est du HTML (erreur de configuration)
+	if len(body) > 0 && body[0] == '<' {
+		return nil, fmt.Errorf("réponse HTML reçue au lieu de JSON. Vérifiez que l'URL Deluge est correcte (doit pointer vers /json). URL actuelle: %s", c.baseURL)
+	}
+
 	var delugeResp DelugeResponse
-	if err := json.NewDecoder(resp.Body).Decode(&delugeResp); err != nil {
-		return nil, err
+	if err := json.Unmarshal(body, &delugeResp); err != nil {
+		return nil, fmt.Errorf("erreur lors du parsing JSON: %w, réponse: %s", err, string(body))
 	}
 
 	if delugeResp.Error != nil {

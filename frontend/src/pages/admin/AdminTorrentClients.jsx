@@ -23,7 +23,7 @@ const AdminTorrentClients = () => {
     qbittorrent: {
       url: 'http://qbittorrent:8080',
       user: 'admin',
-      pass: ''
+      pass: 'adminadmin' // Par défaut, peut être laissé vide pour utiliser le mot de passe temporaire
     },
     deluge: {
       url: 'http://deluge:8112/json',

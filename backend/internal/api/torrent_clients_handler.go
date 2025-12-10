@@ -140,9 +140,15 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 			testCfg.TorrentClientQBittorrentURL = url
 			if user, ok := req.Config["user"].(string); ok && user != "" {
 				testCfg.TorrentClientQBittorrentUser = user
+			} else {
+				testCfg.TorrentClientQBittorrentUser = "admin" // Par défaut
 			}
-			if pass, ok := req.Config["pass"].(string); ok && pass != "" {
+			if pass, ok := req.Config["pass"].(string); ok {
+				// Permettre un mot de passe vide pour utiliser le mot de passe temporaire
 				testCfg.TorrentClientQBittorrentPass = pass
+			} else {
+				// Si pas de mot de passe fourni, essayer avec une chaîne vide
+				testCfg.TorrentClientQBittorrentPass = ""
 			}
 		case "deluge":
 			testCfg.TorrentClientDelugeURL = url
