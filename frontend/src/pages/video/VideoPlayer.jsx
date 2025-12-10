@@ -169,6 +169,12 @@ const VideoPlayerPage = () => {
       return `/api/thumbnails/${filename}`
     }
     
+    // Si c'est déjà un chemin relatif qui contient "thumbnails", extraire le nom du fichier
+    if (thumbnailPath.includes('thumbnails')) {
+      const filename = thumbnailPath.split('/').pop()
+      return `/api/thumbnails/${filename}`
+    }
+    
     // Si c'est déjà un chemin relatif, l'utiliser tel quel
     if (thumbnailPath.startsWith('/')) {
       return `/api${thumbnailPath}`
@@ -344,28 +350,45 @@ const VideoPlayerPage = () => {
           
           {/* Barre de progression */}
           <div className="progress-bar-container" style={{ marginTop: '30px', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
-            <div className="progress-bar" style={{ width: '100%', height: '25px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+            <div className="progress-bar" style={{ width: '100%', height: '30px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '15px', overflow: 'hidden', position: 'relative', border: '1px solid rgba(255,255,255,0.2)' }}>
               <div 
                 className="progress-bar-fill" 
                 style={{ 
-                  width: `${progress}%`, 
+                  width: `${Math.max(0, Math.min(100, progress))}%`, 
                   height: '100%', 
-                  background: 'linear-gradient(90deg, #6c5ce7 0%, #5a4fcf 100%)',
-                  transition: 'width 0.5s ease',
+                  background: progress > 0 ? 'linear-gradient(90deg, #6c5ce7 0%, #5a4fcf 100%)' : 'rgba(108, 92, 231, 0.3)',
+                  transition: 'width 0.5s ease, background 0.3s ease',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  justifyContent: progress > 10 ? 'center' : 'flex-start',
+                  paddingLeft: progress > 10 ? '0' : '10px',
                   color: 'white',
                   fontSize: '12px',
                   fontWeight: 'bold',
-                  boxShadow: '0 2px 10px rgba(108, 92, 231, 0.3)'
+                  boxShadow: progress > 0 ? '0 2px 10px rgba(108, 92, 231, 0.3)' : 'none',
+                  minWidth: progress > 0 ? '30px' : '0'
                 }}
               >
-                {progress > 15 && `${progress}%`}
+                {progress > 10 ? `${progress}%` : progress > 0 ? `${progress}%` : ''}
               </div>
+              {/* Texte au-dessus de la barre si progress est faible */}
+              {progress <= 10 && (
+                <div style={{ 
+                  position: 'absolute', 
+                  top: '50%', 
+                  left: '50%', 
+                  transform: 'translate(-50%, -50%)',
+                  color: 'rgba(255,255,255,0.9)',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  pointerEvents: 'none'
+                }}>
+                  {progress > 0 ? `${progress}%` : '0%'}
+                </div>
+              )}
             </div>
             <p className="progress-text" style={{ marginTop: '15px', textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>
-              {formatsCount > 0 ? `${formatsCount} format(s) créé(s)` : 'Initialisation...'} • {progress}% complété
+              {formatsCount > 0 ? `${formatsCount} format(s) créé(s)` : 'Initialisation...'} • {Math.max(0, Math.min(100, progress))}% complété
             </p>
           </div>
           

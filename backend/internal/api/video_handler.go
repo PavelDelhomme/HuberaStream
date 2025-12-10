@@ -251,8 +251,16 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 
 	// Si la vidéo n'est pas prête, seuls le propriétaire et les admins peuvent la voir
 	// Cela inclut les vidéos en traitement (processing) et en erreur (error)
+	// MAIS: Pour les vidéos en traitement, permettre l'accès même sans authentification
+	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
 	if video.Status != models.VideoStatusReady {
-		if !isOwner && !isAdmin {
+		// Pour les vidéos en traitement, permettre l'accès même sans authentification
+		// (le statut sera accessible via /status, mais on permet aussi l'accès direct ici)
+		if video.Status == models.VideoStatusProcessing {
+			// Permettre l'accès pour les vidéos en traitement (même sans auth)
+			// Cela permet au frontend d'afficher l'écran de traitement
+		} else if !isOwner && !isAdmin {
+			// Pour les vidéos en erreur, seuls propriétaire et admin
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
