@@ -278,22 +278,66 @@ const VideoPlayerPage = () => {
   
   // Afficher un message si la vidéo est en cours de traitement
   if (video && video.status === 'processing') {
+    const progress = video.progress || 0
+    const formatsCount = video.formats_count || 0
+    
     return (
       <div className="video-player-page">
         <div className="processing-container">
           <div className="processing-icon">⏳</div>
           <h2>Vidéo en cours de traitement</h2>
           <p>Votre vidéo est en cours de traitement. Elle sera disponible dans quelques instants.</p>
+          
+          {/* Afficher la miniature si disponible */}
+          {video.thumbnail_path && (
+            <div className="processing-thumbnail" style={{ marginTop: '20px', maxWidth: '400px', margin: '20px auto' }}>
+              <img 
+                src={video.thumbnail_path.startsWith('http') ? video.thumbnail_path : `/api${video.thumbnail_path}`} 
+                alt={video.title || 'Vidéo en traitement'}
+                style={{ width: '100%', borderRadius: '8px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}
+              />
+            </div>
+          )}
+          
           <div className="video-info">
-            <h3>{video.title}</h3>
+            <h3>{video.title || 'Vidéo en traitement'}</h3>
             {video.description && <p>{video.description}</p>}
           </div>
+          
+          {/* Barre de progression */}
+          <div className="progress-bar-container" style={{ marginTop: '30px', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+            <div className="progress-bar" style={{ width: '100%', height: '25px', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+              <div 
+                className="progress-bar-fill" 
+                style={{ 
+                  width: `${progress}%`, 
+                  height: '100%', 
+                  background: 'linear-gradient(90deg, #6c5ce7 0%, #5a4fcf 100%)',
+                  transition: 'width 0.5s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 10px rgba(108, 92, 231, 0.3)'
+                }}
+              >
+                {progress > 15 && `${progress}%`}
+              </div>
+            </div>
+            <p className="progress-text" style={{ marginTop: '15px', textAlign: 'center', color: 'rgba(255,255,255,0.8)', fontSize: '14px' }}>
+              {formatsCount > 0 ? `${formatsCount} format(s) créé(s)` : 'Initialisation...'} • {progress}% complété
+            </p>
+          </div>
+          
           <button 
             onClick={() => {
               setLoading(true)
               fetchVideo()
             }} 
             className="refresh-button"
+            style={{ marginTop: '25px' }}
           >
             🔄 Actualiser
           </button>
