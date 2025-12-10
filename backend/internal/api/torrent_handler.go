@@ -1,13 +1,14 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"streammake/internal/config"
 	"streammake/internal/models"
-	"streammake/internal/torrent"
 	"streammake/internal/scraper"
+	"streammake/internal/torrent"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
