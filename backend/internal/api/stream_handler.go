@@ -105,9 +105,20 @@ func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
 	// Construire le chemin complet vers le fichier thumbnail
 	thumbnailPath := filepath.Join(h.cfg.ThumbnailStoragePath, filename)
 
+	// Log pour debug
+	fmt.Printf("[DEBUG ServeThumbnail] Recherche thumbnail: %s (chemin complet: %s)\n", filename, thumbnailPath)
+
 	// Vérifier si le fichier existe
 	if _, err := os.Stat(thumbnailPath); os.IsNotExist(err) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Miniature non trouvée"})
+		fmt.Printf("[DEBUG ServeThumbnail] Fichier non trouvé: %s (erreur: %v)\n", thumbnailPath, err)
+		// Lister les fichiers dans le dossier pour debug
+		if files, err := os.ReadDir(h.cfg.ThumbnailStoragePath); err == nil {
+			fmt.Printf("[DEBUG ServeThumbnail] Fichiers disponibles dans %s:\n", h.cfg.ThumbnailStoragePath)
+			for _, file := range files {
+				fmt.Printf("  - %s\n", file.Name())
+			}
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "Miniature non trouvée", "path": thumbnailPath})
 		return
 	}
 
