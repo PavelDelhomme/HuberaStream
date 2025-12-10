@@ -211,6 +211,7 @@ func (h *VideoHandler) GetContinueWatching(c *gin.Context) {
 
 func (h *VideoHandler) GetVideo(c *gin.Context) {
 	id := c.Param("id")
+	fmt.Printf("[DEBUG GetVideo] Handler appelé avec id=%s\n", id)
 	
 	// Si c'est "continue-watching", rediriger vers le bon handler
 	if id == "continue-watching" {
