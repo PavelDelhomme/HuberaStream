@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -224,9 +225,16 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	}
 
 	var video models.Video
+	// Récupérer la vidéo avec Preload (en cas d'erreur sur Preload, essayer sans)
 	if err := h.db.Preload("User").Preload("Formats").Preload("Subtitles").Preload("Tags").Where("id = ?", videoID).First(&video).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
-		return
+		// Si Preload échoue, essayer sans Preload
+		if err2 := h.db.Where("id = ?", videoID).First(&video).Error; err2 != nil {
+			fmt.Printf("Erreur lors de la récupération de la vidéo %s: %v (preload: %v)\n", videoID, err2, err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+			return
+		}
+		// Charger les relations manuellement si nécessaire
+		h.db.Model(&video).Association("Formats").Find(&video.Formats)
 	}
 
 	// Vérifier les permissions d'accès
