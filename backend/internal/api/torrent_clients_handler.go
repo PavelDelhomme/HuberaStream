@@ -130,10 +130,25 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 		switch req.ClientType {
 		case "transmission":
 			testCfg.TorrentClientTransmissionURL = url
+			if user, ok := req.Config["user"].(string); ok && user != "" {
+				testCfg.TorrentClientTransmissionUser = user
+			}
+			if pass, ok := req.Config["pass"].(string); ok && pass != "" {
+				testCfg.TorrentClientTransmissionPass = pass
+			}
 		case "qbittorrent":
 			testCfg.TorrentClientQBittorrentURL = url
+			if user, ok := req.Config["user"].(string); ok && user != "" {
+				testCfg.TorrentClientQBittorrentUser = user
+			}
+			if pass, ok := req.Config["pass"].(string); ok && pass != "" {
+				testCfg.TorrentClientQBittorrentPass = pass
+			}
 		case "deluge":
 			testCfg.TorrentClientDelugeURL = url
+			if pass, ok := req.Config["pass"].(string); ok && pass != "" {
+				testCfg.TorrentClientDelugePass = pass
+			}
 		case "rtorrent":
 			testCfg.TorrentClientRTorrentURL = url
 		}

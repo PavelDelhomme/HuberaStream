@@ -20,7 +20,7 @@ const AdminTorrentClients = () => {
     transmission_pass: 'transmission',
     qbittorrent_url: 'http://qbittorrent:8080',
     qbittorrent_user: 'admin',
-    qbittorrent_pass: 'adminadmin',
+    qbittorrent_pass: '', // Sera défini lors de la première connexion
     deluge_url: 'http://deluge:8112/json',
     deluge_pass: 'deluge',
     rtorrent_url: 'http://rtorrent:5000/RPC2'
