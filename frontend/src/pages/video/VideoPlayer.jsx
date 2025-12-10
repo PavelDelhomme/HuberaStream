@@ -207,6 +207,40 @@ const VideoPlayerPage = () => {
     )
   }
   
+  // Afficher un écran d'erreur si la vidéo est en erreur
+  if (video && video.status === 'error') {
+    return (
+      <div className="video-player-page">
+        <div className="error-container">
+          <div className="error-icon">❌</div>
+          <h2>Vidéo invalide</h2>
+          <div className="error-message">
+            Cette vidéo est invalide ou a rencontré une erreur lors du traitement. Elle ne peut pas être visionnée.
+          </div>
+          <div className="video-error-details" style={{ marginTop: '20px', textAlign: 'left', maxWidth: '600px' }}>
+            <p><strong>Titre:</strong> {video.title || 'Sans titre'}</p>
+            <p><strong>Statut:</strong> {video.status}</p>
+            {video.description && <p><strong>Description:</strong> {video.description}</p>}
+          </div>
+          <div style={{ marginTop: '20px' }}>
+            <button onClick={() => window.history.back()} className="retry-button">
+              ← Retour
+            </button>
+            {user && user.role === 'admin' && (
+              <button 
+                onClick={() => window.location.href = '/admin/videos'} 
+                className="retry-button"
+                style={{ marginLeft: '10px' }}
+              >
+                Gérer les vidéos
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   // Afficher un message si la vidéo est en cours de traitement
   if (video && video.status === 'processing') {
     return (
