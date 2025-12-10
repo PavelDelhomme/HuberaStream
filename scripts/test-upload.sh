@@ -43,12 +43,29 @@ echo ""
 # Test 3: Créer un fichier vidéo de test (si pas de fichier fourni)
 echo -e "${BLUE}[3/5] Préparation du fichier de test...${NC}"
 TEST_VIDEO="/tmp/test_video.mp4"
-if [ ! -f "$TEST_VIDEO" ]; then
-  echo -e "${YELLOW}⚠ Fichier de test non trouvé. Création d'un fichier vide pour test...${NC}"
-  # Créer un fichier minimal (juste pour tester l'endpoint)
-  echo "test" > "$TEST_VIDEO"
+
+# Essayer d'utiliser une vraie vidéo de test si disponible
+if [ -f "/tmp/test_video_sample.mp4" ] && [ -s "/tmp/test_video_sample.mp4" ]; then
+  echo -e "${GREEN}✓ Utilisation de la vidéo de test existante: /tmp/test_video_sample.mp4${NC}"
+  TEST_VIDEO="/tmp/test_video_sample.mp4"
+elif [ ! -f "$TEST_VIDEO" ] || [ ! -s "$TEST_VIDEO" ]; then
+  echo -e "${YELLOW}⚠ Fichier de test non trouvé. Tentative de génération d'une vidéo de test...${NC}"
+  # Essayer de générer une petite vidéo de test avec ffmpeg si disponible
+  if command -v ffmpeg >/dev/null 2>&1; then
+    echo -e "${YELLOW}  Génération d'une vidéo de test avec ffmpeg...${NC}"
+    ffmpeg -f lavfi -i testsrc=duration=5:size=320x240:rate=1 -f lavfi -i sine=frequency=1000:duration=5 -c:v libx264 -preset ultrafast -crf 28 -c:a aac -shortest "$TEST_VIDEO" -y 2>/dev/null
+    if [ -f "$TEST_VIDEO" ] && [ -s "$TEST_VIDEO" ]; then
+      echo -e "${GREEN}✓ Vidéo de test générée avec succès${NC}"
+    else
+      echo -e "${YELLOW}⚠ Échec génération vidéo, création d'un fichier minimal...${NC}"
+      echo "test" > "$TEST_VIDEO"
+    fi
+  else
+    echo -e "${YELLOW}⚠ ffmpeg non disponible, création d'un fichier minimal...${NC}"
+    echo "test" > "$TEST_VIDEO"
+  fi
 fi
-echo -e "${GREEN}✓ Fichier de test prêt: $TEST_VIDEO${NC}"
+echo -e "${GREEN}✓ Fichier de test prêt: $TEST_VIDEO ($(du -h "$TEST_VIDEO" | cut -f1))${NC}"
 echo ""
 
 # Test 4: Test d'upload (sans fichier réel, juste pour tester l'endpoint)

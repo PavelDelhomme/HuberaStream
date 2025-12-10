@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api test-all test-upload test-comprehensive install-torrents
+.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api test-all test-upload test-comprehensive install-torrents clean-test-videos
 
 # Variables
 PROJECT_NAME := streammake
