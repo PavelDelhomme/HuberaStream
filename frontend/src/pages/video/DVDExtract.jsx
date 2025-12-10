@@ -80,11 +80,22 @@ const DVDExtract = () => {
     setError('')
     try {
       const response = await api.get(`/dvd/info?device=${encodeURIComponent(device)}`)
-      if (response.data && (response.data.video_tracks || response.data.audio_tracks)) {
-        setDvdInfo(response.data)
-        setTitle(response.data.title || 'DVD Extraite')
+      if (response.data) {
+        // S'assurer que les tableaux existent et sont initialisés
+        const dvdData = {
+          ...response.data,
+          video_tracks: response.data.video_tracks || [],
+          audio_tracks: response.data.audio_tracks || [],
+          subtitle_tracks: response.data.subtitle_tracks || [],
+          title: response.data.title || 'DVD Extraite',
+          duration: response.data.duration || 0,
+          chapters: response.data.chapters || []
+        }
+        
+        setDvdInfo(dvdData)
+        setTitle(dvdData.title)
         setSelectedVideoTrack(0)
-        setSelectedAudioTracks(response.data.audio_tracks && response.data.audio_tracks.length > 0 ? [0] : [])
+        setSelectedAudioTracks(dvdData.audio_tracks.length > 0 ? [0] : [])
         setSelectedSubtitleTracks([])
         setStep(3)
       } else {
@@ -303,17 +314,21 @@ const DVDExtract = () => {
             <div className="config-section">
               <h3>🎬 Piste vidéo</h3>
               <div className="tracks-list">
-                {dvdInfo.video_tracks.map((track, idx) => (
-                  <label key={idx} className="track-item">
-                    <input
-                      type="radio"
-                      name="videoTrack"
-                      checked={selectedVideoTrack === idx}
-                      onChange={() => setSelectedVideoTrack(idx)}
-                    />
-                    <span>Piste {idx + 1} - {track.codec}</span>
-                  </label>
-                ))}
+                {dvdInfo.video_tracks && Array.isArray(dvdInfo.video_tracks) && dvdInfo.video_tracks.length > 0 ? (
+                  dvdInfo.video_tracks.map((track, idx) => (
+                    <label key={idx} className="track-item">
+                      <input
+                        type="radio"
+                        name="videoTrack"
+                        checked={selectedVideoTrack === idx}
+                        onChange={() => setSelectedVideoTrack(idx)}
+                      />
+                      <span>Piste {idx + 1} - {track.codec || 'Inconnu'}</span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="no-tracks">Aucune piste vidéo disponible</p>
+                )}
               </div>
             </div>
 
@@ -321,18 +336,22 @@ const DVDExtract = () => {
               <h3>🔊 Pistes audio</h3>
               <p className="section-description">Sélectionnez les pistes audio à inclure</p>
               <div className="tracks-list">
-                {dvdInfo.audio_tracks.map((track, idx) => (
-                  <label key={idx} className="track-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedAudioTracks.includes(idx)}
-                      onChange={() => toggleAudioTrack(idx)}
-                    />
-                    <span>
-                      Piste {idx + 1} - {track.language || 'Inconnu'} ({track.codec})
-                    </span>
-                  </label>
-                ))}
+                {dvdInfo.audio_tracks && Array.isArray(dvdInfo.audio_tracks) && dvdInfo.audio_tracks.length > 0 ? (
+                  dvdInfo.audio_tracks.map((track, idx) => (
+                    <label key={idx} className="track-item">
+                      <input
+                        type="checkbox"
+                        checked={selectedAudioTracks.includes(idx)}
+                        onChange={() => toggleAudioTrack(idx)}
+                      />
+                      <span>
+                        Piste {idx + 1} - {track.language || 'Inconnu'} ({track.codec || 'Inconnu'})
+                      </span>
+                    </label>
+                  ))
+                ) : (
+                  <p className="no-tracks">Aucune piste audio disponible</p>
+                )}
               </div>
             </div>
 
@@ -340,7 +359,7 @@ const DVDExtract = () => {
               <h3>📝 Sous-titres</h3>
               <p className="section-description">Sélectionnez les pistes de sous-titres à inclure</p>
               <div className="tracks-list">
-                {dvdInfo.subtitle_tracks.length > 0 ? (
+                {dvdInfo.subtitle_tracks && Array.isArray(dvdInfo.subtitle_tracks) && dvdInfo.subtitle_tracks.length > 0 ? (
                   dvdInfo.subtitle_tracks.map((track, idx) => (
                     <label key={idx} className="track-item">
                       <input
