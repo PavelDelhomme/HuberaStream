@@ -125,6 +125,17 @@ func (p *PostProcessor) findVideoFiles(rootPath string) ([]string, error) {
 
 // createVideoFromFile crée une vidéo depuis un fichier téléchargé
 func (p *PostProcessor) createVideoFromFile(ctx context.Context, torrent *models.Torrent, videoFilePath string) error {
+	// Récupérer l'utilisateur admin par défaut
+	var adminUser models.User
+	if err := p.db.Where("role = ?", models.RoleAdmin).First(&adminUser).Error; err != nil {
+		log.Printf("Erreur: aucun utilisateur admin trouvé, utilisation d'un UUID par défaut")
+		// Si aucun admin n'est trouvé, utiliser un UUID par défaut (sera corrigé plus tard)
+		adminUser.ID = uuid.MustParse("00000000-0000-0000-0000-000000000000")
+	}
+	
+	// Si le torrent est marqué pour la bibliothèque, la vidéo doit être publique
+	isPublic := torrent.AddToLibrary
+
 	// Générer un titre depuis le nom du fichier
 	title := strings.TrimSuffix(filepath.Base(videoFilePath), filepath.Ext(videoFilePath))
 	title = strings.ReplaceAll(title, "_", " ")
