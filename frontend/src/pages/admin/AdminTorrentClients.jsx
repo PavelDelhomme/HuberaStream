@@ -23,7 +23,7 @@ const AdminTorrentClients = () => {
     qbittorrent: {
       url: 'http://qbittorrent:8080',
       user: 'admin',
-      pass: 'adminadmin' // Par défaut, peut être laissé vide pour utiliser le mot de passe temporaire
+      pass: 'fSBT53tSk' // Mot de passe temporaire actuel (voir logs Docker)
     },
     deluge: {
       url: 'http://deluge:8112/json',
@@ -325,15 +325,21 @@ const AdminTorrentClients = () => {
 
                     {/* rTorrent */}
                     {clientType === 'rtorrent' && (
-                      <div className="config-form-group">
-                        <label>URL rTorrent XMLRPC</label>
-                        <input
-                          type="text"
-                          value={config.url || ''}
-                          onChange={(e) => updateClientConfig(clientType, 'url', e.target.value)}
-                          placeholder="http://rtorrent:5000/RPC2"
-                        />
-                      </div>
+                      <>
+                        <div className="config-form-group">
+                          <label>URL rTorrent XMLRPC</label>
+                          <input
+                            type="text"
+                            value={config.url || ''}
+                            onChange={(e) => updateClientConfig(clientType, 'url', e.target.value)}
+                            placeholder="http://rtorrent:5000/RPC2"
+                          />
+                        </div>
+                        <div className="test-result-mini error" style={{ marginTop: '10px' }}>
+                          <p><strong>⚠️</strong> rTorrent n'est pas encore implémenté</p>
+                          <p className="test-details">Utilisez Transmission, qBittorrent ou Deluge pour l'instant.</p>
+                        </div>
+                      </>
                     )}
 
                     {/* Résultat du test */}
