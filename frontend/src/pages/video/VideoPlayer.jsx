@@ -220,16 +220,42 @@ const VideoPlayerPage = () => {
           if (statusResponse.data.status === 'ready') {
             console.log(`✅ Vidéo ${videoId} prête! Arrêt du polling.`)
             clearInterval(pollInterval)
-            // Recharger la vidéo complète
-            try {
-              const fullResponse = await api.get(`/videos/${videoId}`)
-              if (fullResponse.data) {
-                setVideo(fullResponse.data)
-                setLoading(false)
+            // Mettre à jour le statut localement d'abord
+            setVideo(prev => ({
+              ...prev,
+              status: 'ready',
+              progress: 100
+            }))
+            setLoading(false)
+            // Essayer de recharger la vidéo complète avec retry
+            let retryCount = 0
+            const maxRetries = 3
+            while (retryCount < maxRetries) {
+              try {
+                const fullResponse = await api.get(`/videos/${videoId}`)
+                if (fullResponse.data) {
+                  setVideo(fullResponse.data)
+                  break // Succès, sortir de la boucle
+                }
+              } catch (err) {
+                retryCount++
+                if (retryCount >= maxRetries) {
+                  console.warn(`Impossible de recharger la vidéo complète après ${maxRetries} tentatives, utilisation des données du statut:`, err)
+                  // Utiliser les données du statut pour construire un objet vidéo minimal
+                  // Ne pas afficher d'erreur, juste utiliser les données disponibles
+                  break
+                } else {
+                  console.log(`Tentative ${retryCount}/${maxRetries} de rechargement de la vidéo...`)
+                  await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)) // Attendre avant de réessayer
+                }
               }
-            } catch (err) {
-              console.error('Erreur lors du rechargement de la vidéo:', err)
-              // Même en cas d'erreur, on a le statut "ready", donc on peut arrêter le polling
+            }
+              setVideo(prev => ({
+                ...prev,
+                status: 'ready',
+                progress: 100,
+                formats: prev?.formats || []
+              }))
             }
           } else if (statusResponse.data.status === 'error') {
             console.error(`❌ Erreur lors du traitement de la vidéo ${videoId}`)
@@ -246,10 +272,17 @@ const VideoPlayerPage = () => {
         console.error(`Erreur lors du polling du statut (tentative ${pollCount}):`, err)
         // Ne pas arrêter le polling immédiatement en cas d'erreur
         // Attendre quelques tentatives avant d'abandonner
-        if (pollCount > 10 && err.response?.status === 404) {
-          console.error('Vidéo non trouvée après plusieurs tentatives, arrêt du polling')
-          clearInterval(pollInterval)
-          setError('Impossible de récupérer le statut de la vidéo.')
+        if (pollCount > 10) {
+          if (err.response?.status === 404 || err.response?.status === 502) {
+            console.error('Vidéo non trouvée ou erreur serveur après plusieurs tentatives, arrêt du polling')
+            clearInterval(pollInterval)
+            setError('Impossible de récupérer le statut de la vidéo. Veuillez actualiser la page.')
+          } else if (pollCount > 20) {
+            // Après 20 tentatives (40 secondes), arrêter le polling même pour d'autres erreurs
+            console.warn('Arrêt du polling après trop d\'erreurs')
+            clearInterval(pollInterval)
+            setError('Erreur lors du suivi du traitement. Veuillez actualiser la page.')
+          }
         }
       }
     }, 2000) // Polling toutes les 2 secondes

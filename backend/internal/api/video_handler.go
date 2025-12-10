@@ -233,15 +233,27 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	var video models.Video
 	fmt.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
 	
-	// Essayer d'abord sans Preload pour éviter les erreurs silencieuses
-	// Utiliser Unscoped pour éviter les problèmes avec deleted_at
-	if err := h.db.Unscoped().Where("id = ?", videoID).First(&video).Error; err != nil {
-		fmt.Printf("[DEBUG GetVideo] Erreur lors de la récupération de la vidéo %s: %v\n", videoID, err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
-		return
+	// Essayer d'abord de récupérer la vidéo (sans soft-deleted)
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		// Si la vidéo n'est pas trouvée, essayer avec Unscoped pour voir si elle est soft-deleted
+		if err := h.db.Unscoped().Where("id = ?", videoID).First(&video).Error; err != nil {
+			fmt.Printf("[DEBUG GetVideo] Erreur lors de la récupération de la vidéo %s: %v\n", videoID, err)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+			return
+		}
+		// Si la vidéo est soft-deleted, vérifier si elle est en traitement
+		// Si elle est en traitement, permettre quand même l'accès
+		if video.DeletedAt.Valid && video.Status != models.VideoStatusProcessing {
+			fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted et n'est pas en traitement\n", videoID)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+			return
+		}
+		// Si elle est en traitement même si soft-deleted, continuer
+		fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted mais en traitement, accès autorisé\n", videoID)
 	}
 	
-	fmt.Printf("[DEBUG GetVideo] Vidéo trouvée en base: ID=%s, Title=%s, Status=%s, IsPublic=%v\n", video.ID, video.Title, video.Status, video.IsPublic)
+	fmt.Printf("[DEBUG GetVideo] Vidéo trouvée en base: ID=%s, Title=%s, Status=%s, IsPublic=%v, DeletedAt=%v\n", 
+		video.ID, video.Title, video.Status, video.IsPublic, video.DeletedAt.Valid)
 	
 	// Charger les relations manuellement après avoir récupéré la vidéo
 	h.db.Model(&video).Association("Formats").Find(&video.Formats)
@@ -294,9 +306,12 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 
 	// Si la vidéo n'est pas publique, seuls le propriétaire et les admins peuvent la voir
 	// MAIS: Pour les vidéos en traitement, on a déjà permis l'accès ci-dessus
+	// ET: Pour les vidéos prêtes mais non publiques, permettre l'accès au propriétaire et aux admins
 	if !video.IsPublic && !isOwner && !isAdmin {
 		// Si la vidéo est en traitement, on a déjà permis l'accès ci-dessus
 		if video.Status != models.VideoStatusProcessing {
+			fmt.Printf("[DEBUG GetVideo] Accès refusé: vidéo non publique, pas propriétaire/admin (Status: %s, IsPublic: %v, isOwner: %v, isAdmin: %v)\n", 
+				video.Status, video.IsPublic, isOwner, isAdmin)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
@@ -351,11 +366,17 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	// Permettre l'accès au statut pour les vidéos en traitement même sans authentification
 	// Cela permet au frontend d'afficher l'écran de traitement
 	// Pour les vidéos en traitement, permettre l'accès même si pas propriétaire/admin
+	fmt.Printf("[DEBUG GetVideoStatus] Vidéo %s: Status=%s, VideoStatusProcessing=%s, isOwner=%v, isAdmin=%v\n", 
+		videoID, video.Status, models.VideoStatusProcessing, isOwner, isAdmin)
+	
 	if video.Status == models.VideoStatusProcessing {
 		// Permettre l'accès au statut pour les vidéos en traitement (même sans auth)
 		// Cela permet au frontend d'afficher l'écran de traitement
+		fmt.Printf("[DEBUG GetVideoStatus] Accès autorisé pour vidéo en traitement %s\n", videoID)
 	} else if !isOwner && !isAdmin {
 		// Pour les autres statuts, vérifier les permissions
+		fmt.Printf("[DEBUG GetVideoStatus] Accès refusé pour vidéo %s (statut: %s, isOwner: %v, isAdmin: %v)\n", 
+			videoID, video.Status, isOwner, isAdmin)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Permission refusée"})
 		return
 	}
