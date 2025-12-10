@@ -285,8 +285,8 @@ const VideoPlayerPage = () => {
     )
   }
   
-  // Afficher un écran d'erreur si la vidéo est en erreur
-  if (video && video.status === 'error') {
+  // Afficher un écran d'erreur si la vidéo est en erreur ou annulée
+  if (video && (video.status === 'error' || video.status === 'cancelled')) {
     return (
       <div className="video-player-page">
         <div className="error-container">
