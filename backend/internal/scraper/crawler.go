@@ -6,8 +6,6 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"streammake/internal/models"
 )
 
 // CrawlerService gère le crawling automatique de 1337x
