@@ -186,48 +186,79 @@ const VideoPlayerPage = () => {
   
   // Polling du statut pour les vidéos en traitement
   const startStatusPolling = (videoId) => {
+    let pollCount = 0
+    const maxPollAttempts = 300 // Maximum 10 minutes (300 * 2s = 600s)
+    
     const pollInterval = setInterval(async () => {
+      pollCount++
+      
+      // Arrêter le polling après un certain nombre de tentatives pour éviter les boucles infinies
+      if (pollCount > maxPollAttempts) {
+        console.warn(`Polling arrêté après ${maxPollAttempts} tentatives pour la vidéo ${videoId}`)
+        clearInterval(pollInterval)
+        setError('Le traitement prend plus de temps que prévu. Veuillez actualiser la page.')
+        return
+      }
+      
       try {
         const statusResponse = await api.get(`/videos/${videoId}/status`)
         if (statusResponse.data) {
+          console.log(`[Polling ${pollCount}] Statut: ${statusResponse.data.status}, Progression: ${statusResponse.data.progress}%, Formats: ${statusResponse.data.formats_count}`)
+          
           // Mettre à jour le statut et la progression
           setVideo(prev => ({
             ...prev,
             status: statusResponse.data.status,
             progress: statusResponse.data.progress,
             formats_count: statusResponse.data.formats_count,
-            thumbnail_path: statusResponse.data.thumbnail_path || prev?.thumbnail_path
+            thumbnail_path: statusResponse.data.thumbnail_path || prev?.thumbnail_path,
+            title: statusResponse.data.title || prev?.title,
+            description: statusResponse.data.description || prev?.description
           }))
           
           // Si la vidéo est prête, arrêter le polling et recharger la vidéo complète
           if (statusResponse.data.status === 'ready') {
+            console.log(`✅ Vidéo ${videoId} prête! Arrêt du polling.`)
             clearInterval(pollInterval)
             // Recharger la vidéo complète
             try {
               const fullResponse = await api.get(`/videos/${videoId}`)
               if (fullResponse.data) {
                 setVideo(fullResponse.data)
+                setLoading(false)
               }
             } catch (err) {
               console.error('Erreur lors du rechargement de la vidéo:', err)
+              // Même en cas d'erreur, on a le statut "ready", donc on peut arrêter le polling
             }
           } else if (statusResponse.data.status === 'error') {
+            console.error(`❌ Erreur lors du traitement de la vidéo ${videoId}`)
             clearInterval(pollInterval)
             setError('Erreur lors du traitement de la vidéo. Veuillez réessayer l\'upload.')
           } else if (statusResponse.data.status === 'cancelled') {
+            console.log(`⚠️ Traitement de la vidéo ${videoId} annulé`)
             clearInterval(pollInterval)
             setError('Le traitement de la vidéo a été annulé.')
           }
+          // Si toujours en "processing", continuer le polling
         }
       } catch (err) {
-        console.error('Erreur lors du polling du statut:', err)
-        // Arrêter le polling en cas d'erreur
-        clearInterval(pollInterval)
+        console.error(`Erreur lors du polling du statut (tentative ${pollCount}):`, err)
+        // Ne pas arrêter le polling immédiatement en cas d'erreur
+        // Attendre quelques tentatives avant d'abandonner
+        if (pollCount > 10 && err.response?.status === 404) {
+          console.error('Vidéo non trouvée après plusieurs tentatives, arrêt du polling')
+          clearInterval(pollInterval)
+          setError('Impossible de récupérer le statut de la vidéo.')
+        }
       }
     }, 2000) // Polling toutes les 2 secondes
     
     // Nettoyer l'intervalle quand le composant est démonté
-    return () => clearInterval(pollInterval)
+    return () => {
+      console.log(`Nettoyage du polling pour la vidéo ${videoId}`)
+      clearInterval(pollInterval)
+    }
   }
 
   const fetchRelatedVideos = async () => {

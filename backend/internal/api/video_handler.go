@@ -370,20 +370,60 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 		progress = 100
 	} else if video.Status == models.VideoStatusProcessing {
 		// Estimation basée sur le nombre de formats (5 formats max: 4 progressifs + 1 HLS)
-		// Si aucun format n'a été créé, on est au début du traitement (5-10%)
+		// Étapes du traitement :
+		// - 0-10% : Génération miniature et récupération durée
+		// - 10-80% : Génération des 4 formats progressifs (360p, 480p, 720p, 1080p) = 4/5 = 80%
+		// - 80-95% : Génération du format HLS = 1/5 = 20%
+		// - 95-100% : Finalisation
+		
+		// Si aucun format n'a été créé, on est au début du traitement
 		if formatCount == 0 {
-			progress = 5 // Début du traitement (génération miniature, analyse, etc.)
-		} else {
-			progress = int((float64(formatCount) / 5.0) * 100)
-			if progress > 90 {
-				progress = 90 // Ne pas dépasser 90% tant que le statut n'est pas "ready"
+			// Vérifier si la miniature existe (indique qu'on a passé l'étape initiale)
+			if video.ThumbnailPath != "" {
+				progress = 10 // Miniature créée, début du transcodage
+			} else {
+				progress = 5 // Début du traitement (génération miniature, analyse, etc.)
 			}
+		} else {
+			// Calculer la progression basée sur les formats créés
+			// 5 formats max : 4 progressifs + 1 HLS
+			// Chaque format progressif = 15% (4 * 15% = 60%)
+			// Le format HLS = 25% (car plus long)
+			// Total = 85% pour tous les formats, puis 15% pour la finalisation
+			
+			// Compter les formats progressifs et HLS séparément
+			var progressiveCount int64
+			var hlsCount int64
+			h.db.Model(&models.VideoFormat{}).
+				Where("video_id = ? AND format = ?", videoID, "progressive").
+				Count(&progressiveCount)
+			h.db.Model(&models.VideoFormat{}).
+				Where("video_id = ? AND format = ?", videoID, "hls").
+				Count(&hlsCount)
+			
+			// Calculer la progression
+			// 0-10% : Initialisation (miniature, durée)
+			// 10-70% : Formats progressifs (4 formats * 15% = 60%)
+			// 70-95% : Format HLS (25%)
+			// 95-100% : Finalisation
+			
+			baseProgress := 10 // Étape initiale terminée
+			progressiveProgress := int((float64(progressiveCount) / 4.0) * 60.0) // Max 60%
+			hlsProgress := int((float64(hlsCount) / 1.0) * 25.0) // Max 25%
+			
+			progress = baseProgress + progressiveProgress + hlsProgress
+			
+			// Ne pas dépasser 95% tant que le statut n'est pas "ready"
+			if progress > 95 {
+				progress = 95
+			}
+			
 			// S'assurer qu'on a au moins 10% si un format a été créé
-			if progress < 10 {
+			if progress < 10 && formatCount > 0 {
 				progress = 10
 			}
 		}
-	} else if video.Status == models.VideoStatusError {
+	} else if video.Status == models.VideoStatusError || video.Status == models.VideoStatusCancelled {
 		progress = 0
 	}
 

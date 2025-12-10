@@ -286,13 +286,35 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	var formatCount int64
 	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
 	
+	// Compter les formats par type pour le log
+	var progressiveCount int64
+	var hlsCount int64
+	h.db.Model(&models.VideoFormat{}).
+		Where("video_id = ? AND format = ?", videoID, "progressive").
+		Count(&progressiveCount)
+	h.db.Model(&models.VideoFormat{}).
+		Where("video_id = ? AND format = ?", videoID, "hls").
+		Count(&hlsCount)
+	
+	fmt.Printf("Traitement terminé pour la vidéo %s: %d format(s) total (%d progressifs, %d HLS)\n", 
+		videoID, formatCount, progressiveCount, hlsCount)
+	
 	if formatCount == 0 {
-		fmt.Printf("AUCUN FORMAT CRÉÉ POUR LA VIDÉO %s - La vidéo ne sera pas lisible\n", videoID)
+		fmt.Printf("❌ AUCUN FORMAT CRÉÉ POUR LA VIDÉO %s - La vidéo ne sera pas lisible\n", videoID)
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 	} else {
-		fmt.Printf("Traitement terminé: %d format(s) créé(s) pour la vidéo %s\n", formatCount, videoID)
-		// Mettre à jour le statut seulement si au moins un format a été créé
-		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
+		fmt.Printf("✅ Traitement terminé avec succès: %d format(s) créé(s) pour la vidéo %s\n", formatCount, videoID)
+		// Mettre à jour le statut à "ready" seulement si au moins un format a été créé
+		// Utiliser UpdateColumns pour forcer la mise à jour même si d'autres champs n'ont pas changé
+		if err := h.db.Model(&models.Video{}).
+			Where("id = ?", videoID).
+			UpdateColumns(map[string]interface{}{
+				"status": models.VideoStatusReady,
+			}).Error; err != nil {
+			fmt.Printf("❌ Erreur lors de la mise à jour du statut à 'ready' pour la vidéo %s: %v\n", videoID, err)
+		} else {
+			fmt.Printf("✅ Statut mis à jour à 'ready' pour la vidéo %s\n", videoID)
+		}
 	}
 }
 
