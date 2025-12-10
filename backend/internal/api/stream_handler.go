@@ -97,6 +97,8 @@ func (h *StreamHandler) StreamVideo(c *gin.Context) {
 // ServeThumbnail sert un fichier de miniature
 func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
 	filename := c.Param("filename")
+	fmt.Printf("[DEBUG ServeThumbnail] Handler appelé avec filename=%s\n", filename)
+	
 	if filename == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nom de fichier requis"})
 		return
@@ -104,9 +106,7 @@ func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
 
 	// Construire le chemin complet vers le fichier thumbnail
 	thumbnailPath := filepath.Join(h.cfg.ThumbnailStoragePath, filename)
-
-	// Log pour debug
-	fmt.Printf("[DEBUG ServeThumbnail] Recherche thumbnail: %s (chemin complet: %s)\n", filename, thumbnailPath)
+	fmt.Printf("[DEBUG ServeThumbnail] Recherche thumbnail: %s (chemin complet: %s, ThumbnailStoragePath: %s)\n", filename, thumbnailPath, h.cfg.ThumbnailStoragePath)
 
 	// Vérifier si le fichier existe
 	if _, err := os.Stat(thumbnailPath); os.IsNotExist(err) {
@@ -117,11 +117,14 @@ func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
 			for _, file := range files {
 				fmt.Printf("  - %s\n", file.Name())
 			}
+		} else {
+			fmt.Printf("[DEBUG ServeThumbnail] Erreur lors de la lecture du dossier: %v\n", err)
 		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "Miniature non trouvée", "path": thumbnailPath})
 		return
 	}
 
+	fmt.Printf("[DEBUG ServeThumbnail] Fichier trouvé, envoi: %s\n", thumbnailPath)
 	// Servir le fichier avec les bons headers
 	c.Header("Content-Type", "image/jpeg")
 	c.Header("Cache-Control", "public, max-age=604800") // Cache 7 jours

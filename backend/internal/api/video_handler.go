@@ -229,11 +229,14 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	fmt.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
 	
 	// Essayer d'abord sans Preload pour éviter les erreurs silencieuses
-	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+	// Utiliser Unscoped pour éviter les problèmes avec deleted_at
+	if err := h.db.Unscoped().Where("id = ?", videoID).First(&video).Error; err != nil {
 		fmt.Printf("[DEBUG GetVideo] Erreur lors de la récupération de la vidéo %s: %v\n", videoID, err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 		return
 	}
+	
+	fmt.Printf("[DEBUG GetVideo] Vidéo trouvée en base: ID=%s, Title=%s, Status=%s, IsPublic=%v\n", video.ID, video.Title, video.Status, video.IsPublic)
 	
 	// Charger les relations manuellement après avoir récupéré la vidéo
 	h.db.Model(&video).Association("Formats").Find(&video.Formats)
@@ -241,7 +244,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	h.db.Model(&video).Association("Subtitles").Find(&video.Subtitles)
 	h.db.Model(&video).Association("Tags").Find(&video.Tags)
 	
-	fmt.Printf("[DEBUG GetVideo] Vidéo récupérée: ID=%s, Title=%s, Status=%s, IsPublic=%v\n", video.ID, video.Title, video.Status, video.IsPublic)
+	fmt.Printf("[DEBUG GetVideo] Relations chargées: Formats=%d\n", len(video.Formats))
 
 	// Vérifier les permissions d'accès
 	// Récupérer user_id depuis le contexte (peut être vide si route publique sans token)
