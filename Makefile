@@ -25,6 +25,7 @@ help:
 	@echo "${YELLOW}  test-all${NC}      Exécuter tous les tests complets de l'application"
 	@echo "${YELLOW}  test-upload${NC}   Tester l'upload de vidéos"
 	@echo "${YELLOW}  test-comprehensive${NC} Tests complets backend + frontend (toutes fonctionnalités)"
+	@echo "${YELLOW}  clean-test-videos${NC} Nettoyer les vidéos de test (titre 'Test Video')"
 	@echo "${YELLOW}  install-deps${NC}  Installer les dépendances backend Go"
 	@echo "${YELLOW}  status${NC}        Afficher le statut des services Docker"
 	@echo "${YELLOW}  shell-backend${NC}  Accéder au shell du conteneur backend"
