@@ -55,22 +55,26 @@ const VideoPlayerPage = () => {
         }
       } catch (err) {
         // Si 404, essayer de récupérer le statut (pour les vidéos en traitement ou en erreur)
-        if (err.response?.status === 404 && user) {
+        // Essayer même sans user car le statut peut être accessible publiquement
+        if (err.response?.status === 404) {
           try {
+            console.log('Vidéo non trouvée (404), tentative de récupération du statut...')
             const statusResponse = await api.get(`/videos/${id}/status`)
             if (statusResponse.data) {
+              console.log('Statut récupéré:', statusResponse.data)
               // Créer un objet vidéo minimal avec les infos du statut
               const videoData = {
-                id: statusResponse.data.video_id,
+                id: statusResponse.data.video_id || id,
                 title: statusResponse.data.title || 'Vidéo en traitement',
                 description: statusResponse.data.description || '',
                 status: statusResponse.data.status,
                 thumbnail_path: statusResponse.data.thumbnail_path,
                 formats: [],
-                progress: statusResponse.data.progress,
-                formats_count: statusResponse.data.formats_count,
+                progress: statusResponse.data.progress || 0,
+                formats_count: statusResponse.data.formats_count || 0,
                 views: 0, // Valeur par défaut pour éviter les erreurs
-                user: null
+                user: null,
+                created_at: new Date().toISOString() // Valeur par défaut
               }
               
               // Si la vidéo est en erreur, afficher un message approprié
@@ -79,15 +83,19 @@ const VideoPlayerPage = () => {
               }
               
               setVideo(videoData)
+              setLoading(false) // Arrêter le chargement car on a les infos
               
               // Démarrer le polling seulement si en traitement
               if (statusResponse.data.status === 'processing') {
+                console.log('Démarrage du polling pour la vidéo en traitement...')
                 startStatusPolling(id)
               }
+              return // Sortir de la fonction car on a géré le cas
             } else {
               throw err
             }
           } catch (statusErr) {
+            console.error('Erreur lors de la récupération du statut:', statusErr)
             // Si le statut n'est pas accessible non plus, afficher l'erreur
             throw err
           }
@@ -97,13 +105,40 @@ const VideoPlayerPage = () => {
       }
     } catch (err) {
       console.error('Erreur lors de la récupération de la vidéo:', err)
+      
+      // Si 404, essayer une dernière fois de récupérer le statut
+      // (au cas où la première tentative aurait échoué)
+      if (err.response?.status === 404) {
+        try {
+          console.log('Dernière tentative de récupération du statut...')
+          const statusResponse = await api.get(`/videos/${id}/status`)
+          if (statusResponse.data && statusResponse.data.status === 'processing') {
+            // Créer un objet vidéo minimal pour afficher l'écran de traitement
+            const videoData = {
+              id: statusResponse.data.video_id || id,
+              title: statusResponse.data.title || 'Vidéo en traitement',
+              description: statusResponse.data.description || '',
+              status: 'processing',
+              thumbnail_path: statusResponse.data.thumbnail_path,
+              formats: [],
+              progress: statusResponse.data.progress || 0,
+              formats_count: statusResponse.data.formats_count || 0,
+              views: 0,
+              user: null,
+              created_at: new Date().toISOString()
+            }
+            setVideo(videoData)
+            setLoading(false)
+            startStatusPolling(id)
+            return
+          }
+        } catch (statusErr) {
+          console.error('Impossible de récupérer le statut:', statusErr)
+        }
+      }
+      
       const errorMessage = err.response?.data?.error || err.message || 'Vidéo non trouvée'
       setError(errorMessage)
-      
-      // Si la vidéo est en cours de traitement, afficher un message spécifique
-      if (err.response?.status === 404) {
-        setError('Cette vidéo est en cours de traitement ou n\'existe pas encore. Veuillez réessayer dans quelques instants.')
-      }
     } finally {
       setLoading(false)
     }
