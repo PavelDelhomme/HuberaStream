@@ -27,6 +27,7 @@ type Video struct {
 	Views       int         `gorm:"default:0" json:"views"`
 	ThumbnailPath string    `json:"thumbnail_path"`
 	OriginalURL   string    `json:"original_url"` // URL source si téléchargé depuis streaming
+	Checksum      string    `gorm:"type:varchar(64)" json:"checksum"` // SHA256 checksum pour vérifier l'intégrité
 	CategoryID    *uuid.UUID `gorm:"type:uuid" json:"category_id"`
 	Category      *Category  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	SubCategoryID *uuid.UUID `gorm:"type:uuid" json:"sub_category_id"`

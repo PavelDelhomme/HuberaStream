@@ -225,7 +225,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	
 	if exists {
 		userIDStr, ok := userID.(string)
-		if ok {
+		if ok && userIDStr != "" { // Vérifier que userIDStr n'est pas vide
 			userUUID, err := uuid.Parse(userIDStr)
 			if err == nil {
 				// Vérifier si c'est le propriétaire
@@ -286,7 +286,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	
 	if exists {
 		userIDStr, ok := userID.(string)
-		if ok {
+		if ok && userIDStr != "" { // Vérifier que userIDStr n'est pas vide
 			userUUID, err := uuid.Parse(userIDStr)
 			if err == nil {
 				if video.UserID == userUUID {

@@ -1,10 +1,12 @@
 package api
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -78,11 +80,28 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	videoFileName := fmt.Sprintf("%s_%d%s", videoID.String(), time.Now().Unix(), filepath.Ext(file.Filename))
 	videoPath := filepath.Join(h.cfg.VideoStoragePath, videoFileName)
 
-	// Sauvegarder le fichier
+	// Sauvegarder le fichier d'abord
 	if err := c.SaveUploadedFile(file, videoPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'enregistrement du fichier"})
 		return
 	}
+
+	// Calculer le checksum SHA256 du fichier sauvegardé
+	savedFile, err := os.Open(videoPath)
+	if err != nil {
+		os.Remove(videoPath)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'ouverture du fichier sauvegardé"})
+		return
+	}
+	defer savedFile.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, savedFile); err != nil {
+		os.Remove(videoPath)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors du calcul du checksum"})
+		return
+	}
+	checksum := fmt.Sprintf("%x", hash.Sum(nil))
 
 	// Créer l'entrée en base
 	videoModel := models.Video{
@@ -94,6 +113,7 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 		CategoryID:    categoryID,
 		SubCategoryID: subCategoryID,
 		IsPublic:      isPublic,
+		Checksum:      checksum,
 	}
 
 	if err := h.db.Create(&videoModel).Error; err != nil {

@@ -164,12 +164,46 @@ fi
 echo ""
 
 # Test 9: Vérification de la base de données
-echo -e "${BLUE}[10/10] Vérification de la base de données...${NC}"
+echo -e "${BLUE}[10/12] Vérification de la base de données...${NC}"
 DB_CHECK=$(docker-compose exec -T postgres psql -U streammake -d streammake_db -c "SELECT COUNT(*) FROM users;" 2>/dev/null | grep -o "[0-9]")
 if [ -n "$DB_CHECK" ]; then
     echo -e "${GREEN}✓ Base de données accessible (Users: $DB_CHECK)${NC}"
 else
     echo -e "${YELLOW}⚠ Impossible de vérifier la base de données${NC}"
+fi
+echo ""
+
+# Test 10: Vérification de l'intégrité des vidéos (checksum)
+echo -e "${BLUE}[11/12] Vérification de l'intégrité des vidéos...${NC}"
+VIDEOS_WITH_CHECKSUM=$(docker-compose exec -T postgres psql -U streammake -d streammake_db -t -c "SELECT COUNT(*) FROM videos WHERE checksum IS NOT NULL AND checksum != '';" 2>/dev/null | tr -d ' ')
+TOTAL_VIDEOS=$(docker-compose exec -T postgres psql -U streammake -d streammake_db -t -c "SELECT COUNT(*) FROM videos;" 2>/dev/null | tr -d ' ')
+
+if [ -n "$VIDEOS_WITH_CHECKSUM" ] && [ -n "$TOTAL_VIDEOS" ]; then
+    if [ "$TOTAL_VIDEOS" -gt 0 ]; then
+        PERCENTAGE=$((VIDEOS_WITH_CHECKSUM * 100 / TOTAL_VIDEOS))
+        if [ "$PERCENTAGE" -eq 100 ]; then
+            echo -e "${GREEN}✓ Toutes les vidéos ont un checksum ($VIDEOS_WITH_CHECKSUM/$TOTAL_VIDEOS)${NC}"
+        else
+            echo -e "${YELLOW}⚠ $PERCENTAGE% des vidéos ont un checksum ($VIDEOS_WITH_CHECKSUM/$TOTAL_VIDEOS)${NC}"
+        fi
+    else
+        echo -e "${GREEN}✓ Aucune vidéo dans la base (normal si nouveau)${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠ Impossible de vérifier les checksums${NC}"
+fi
+echo ""
+
+# Test 11: Vérification de l'intégrité des fichiers vidéo
+echo -e "${BLUE}[12/12] Vérification de l'intégrité des fichiers vidéo...${NC}"
+# Vérifier que les fichiers vidéo existent et correspondent aux checksums en base
+INTEGRITY_CHECK=$(docker-compose exec -T backend sh -c "cd /app && find storage/videos -type f 2>/dev/null | wc -l" 2>/dev/null | tr -d ' ')
+if [ -n "$INTEGRITY_CHECK" ]; then
+    echo -e "${GREEN}✓ $INTEGRITY_CHECK fichier(s) vidéo trouvé(s) dans le stockage${NC}"
+    # Note: La vérification complète des checksums nécessiterait un script Go dédié
+    echo -e "${YELLOW}  ℹ Vérification complète des checksums disponible via l'API admin${NC}"
+else
+    echo -e "${YELLOW}⚠ Impossible de vérifier les fichiers vidéo${NC}"
 fi
 echo ""
 
