@@ -182,7 +182,12 @@ const AdminVideos = () => {
       
       alert(message)
       setInvalidVideos([])
-      fetchVideos() // Recharger la liste
+      
+      // Recharger la liste des vidéos
+      fetchVideos()
+      
+      // Émettre un événement pour notifier le dashboard de rafraîchir les stats
+      window.dispatchEvent(new CustomEvent('videosCleaned', { detail: { deletedCount } }))
     } catch (err) {
       console.error('❌ AdminVideos: Erreur lors du nettoyage:', err)
       const errorMessage = err.response?.data?.error || err.message || 'Erreur inconnue'

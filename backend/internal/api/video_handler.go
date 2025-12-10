@@ -136,11 +136,18 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 		return
 	}
 
-	// Filtrer les vidéos avec titre "null" ou vide
+	// Filtrer les vidéos avec titre "null" ou vide SEULEMENT pour les non-admins
+	// Les admins doivent voir toutes les vidéos pour pouvoir les gérer
 	var validVideos []models.Video
-	for _, video := range videos {
-		if video.Title != "" && video.Title != "null" && video.Title != "Null" && video.Title != "NULL" {
-			validVideos = append(validVideos, video)
+	if isAdmin && statusFilter == "all" {
+		// Pour les admins avec status=all, afficher toutes les vidéos
+		validVideos = videos
+	} else {
+		// Pour les non-admins ou sans status=all, filtrer les vidéos avec titre "null" ou vide
+		for _, video := range videos {
+			if video.Title != "" && video.Title != "null" && video.Title != "Null" && video.Title != "NULL" {
+				validVideos = append(validVideos, video)
+			}
 		}
 	}
 

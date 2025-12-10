@@ -37,6 +37,19 @@ const AdminDashboard = () => {
     
     console.log('AdminDashboard: Utilisateur est admin, chargement des stats...')
     fetchStats()
+    
+    // Écouter les événements de nettoyage de vidéos pour rafraîchir les stats
+    const handleVideosCleaned = () => {
+      console.log('AdminDashboard: Événement videosCleaned reçu, rafraîchissement des stats...')
+      fetchStats()
+    }
+    
+    window.addEventListener('videosCleaned', handleVideosCleaned)
+    
+    // Nettoyer l'écouteur au démontage
+    return () => {
+      window.removeEventListener('videosCleaned', handleVideosCleaned)
+    }
   }, [user, authLoading, isAdmin, navigate])
 
   const fetchStats = async () => {
