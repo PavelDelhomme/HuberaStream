@@ -69,8 +69,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// Catégories (publiques - accessibles sans authentification)
 		api.GET("/categories", categoryHandler.ListCategories)
 		
-		// Servir les thumbnails (publiques)
-		api.Static("/thumbnails", cfg.ThumbnailStoragePath)
+		// Servir les thumbnails (publiques) - utiliser un handler dédié
+		api.GET("/thumbnails/:filename", streamHandler.ServeThumbnail)
 		
 		// Vidéos publiques (avec authentification optionnelle)
 		videos := api.Group("/videos")

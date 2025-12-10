@@ -93,6 +93,29 @@ func (h *StreamHandler) StreamVideo(c *gin.Context) {
 	}
 }
 
+// ServeThumbnail sert un fichier de miniature
+func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
+	filename := c.Param("filename")
+	if filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nom de fichier requis"})
+		return
+	}
+
+	// Construire le chemin complet vers le fichier thumbnail
+	thumbnailPath := filepath.Join(h.cfg.ThumbnailStoragePath, filename)
+
+	// Vérifier si le fichier existe
+	if _, err := os.Stat(thumbnailPath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Miniature non trouvée"})
+		return
+	}
+
+	// Servir le fichier avec les bons headers
+	c.Header("Content-Type", "image/jpeg")
+	c.Header("Cache-Control", "public, max-age=604800") // Cache 7 jours
+	c.File(thumbnailPath)
+}
+
 // StreamSubtitle sert un fichier de sous-titre
 func (h *StreamHandler) StreamSubtitle(c *gin.Context) {
 	videoIDParam := c.Param("id")
