@@ -11,19 +11,27 @@ const AdminTorrentClients = () => {
   const [clients, setClients] = useState([])
   const [currentClient, setCurrentClient] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [testing, setTesting] = useState(false)
-  const [testResult, setTestResult] = useState(null)
-  const [formData, setFormData] = useState({
-    client_type: 'transmission',
-    transmission_url: 'http://transmission:9091/transmission/rpc',
-    transmission_user: 'transmission',
-    transmission_pass: 'transmission',
-    qbittorrent_url: 'http://qbittorrent:8080',
-    qbittorrent_user: 'admin',
-    qbittorrent_pass: '', // Sera défini lors de la première connexion
-    deluge_url: 'http://deluge:8112/json',
-    deluge_pass: 'deluge',
-    rtorrent_url: 'http://rtorrent:5000/RPC2'
+  const [testing, setTesting] = useState({})
+  const [testResults, setTestResults] = useState({})
+  const [expandedClient, setExpandedClient] = useState(null)
+  const [clientConfigs, setClientConfigs] = useState({
+    transmission: {
+      url: 'http://transmission:9091/transmission/rpc',
+      user: 'transmission',
+      pass: 'transmission'
+    },
+    qbittorrent: {
+      url: 'http://qbittorrent:8080',
+      user: 'admin',
+      pass: ''
+    },
+    deluge: {
+      url: 'http://deluge:8112/json',
+      pass: 'deluge'
+    },
+    rtorrent: {
+      url: 'http://rtorrent:5000/RPC2'
+    }
   })
 
   useEffect(() => {
@@ -44,11 +52,26 @@ const AdminTorrentClients = () => {
     try {
       const response = await api.get('/admin/torrent-clients/current')
       setCurrentClient(response.data)
-      if (response.data) {
-        setFormData(prev => ({
-          ...prev,
-          client_type: response.data.type || 'transmission',
-          ...response.data.config
+      if (response.data && response.data.config) {
+        // Mettre à jour les configurations depuis le backend
+        setClientConfigs(prev => ({
+          transmission: {
+            url: response.data.config.transmission_url || prev.transmission.url,
+            user: response.data.config.transmission_user || prev.transmission.user,
+            pass: response.data.config.transmission_pass || prev.transmission.pass
+          },
+          qbittorrent: {
+            url: response.data.config.qbittorrent_url || prev.qbittorrent.url,
+            user: response.data.config.qbittorrent_user || prev.qbittorrent.user,
+            pass: response.data.config.qbittorrent_pass || prev.qbittorrent.pass
+          },
+          deluge: {
+            url: response.data.config.deluge_url || prev.deluge.url,
+            pass: response.data.config.deluge_pass || prev.deluge.pass
+          },
+          rtorrent: {
+            url: response.data.config.rtorrent_url || prev.rtorrent.url
+          }
         }))
       }
     } catch (error) {
@@ -68,69 +91,95 @@ const AdminTorrentClients = () => {
   }
 
   const handleTestClient = async (clientType) => {
-    setTesting(true)
-    setTestResult(null)
+    setTesting(prev => ({ ...prev, [clientType]: true }))
+    setTestResults(prev => ({ ...prev, [clientType]: null }))
+    
     try {
+      const config = getConfigForClient(clientType)
       const response = await api.post('/admin/torrent-clients/test', {
         client_type: clientType,
-        config: getConfigForClient(clientType)
+        config: config
       })
-      setTestResult({
-        success: true,
-        message: `Connexion réussie à ${clientType}`,
-        data: response.data
-      })
+      setTestResults(prev => ({
+        ...prev,
+        [clientType]: {
+          success: true,
+          message: `Connexion réussie à ${clientType}`,
+          data: response.data
+        }
+      }))
     } catch (error) {
-      setTestResult({
-        success: false,
-        message: error.response?.data?.error || `Erreur de connexion à ${clientType}`,
-        error: error.response?.data
-      })
+      setTestResults(prev => ({
+        ...prev,
+        [clientType]: {
+          success: false,
+          message: error.response?.data?.error || `Erreur de connexion à ${clientType}`,
+          error: error.response?.data,
+          details: error.response?.data?.details || error.response?.data?.message
+        }
+      }))
     } finally {
-      setTesting(false)
+      setTesting(prev => ({ ...prev, [clientType]: false }))
     }
   }
 
   const getConfigForClient = (clientType) => {
+    const config = clientConfigs[clientType]
+    if (!config) return {}
+    
     switch (clientType) {
       case 'transmission':
         return {
-          url: formData.transmission_url,
-          user: formData.transmission_user,
-          pass: formData.transmission_pass
+          url: config.url,
+          user: config.user,
+          pass: config.pass
         }
       case 'qbittorrent':
         return {
-          url: formData.qbittorrent_url,
-          user: formData.qbittorrent_user,
-          pass: formData.qbittorrent_pass
+          url: config.url,
+          user: config.user,
+          pass: config.pass
         }
       case 'deluge':
         return {
-          url: formData.deluge_url,
-          pass: formData.deluge_pass
+          url: config.url,
+          pass: config.pass
         }
       case 'rtorrent':
         return {
-          url: formData.rtorrent_url
+          url: config.url
         }
       default:
         return {}
     }
   }
 
-  const handleSave = async () => {
+  const handleSaveClient = async (clientType) => {
     try {
       await api.put('/admin/torrent-clients/current', {
-        client_type: formData.client_type,
-        config: getConfigForClient(formData.client_type)
+        client_type: clientType,
+        config: getConfigForClient(clientType)
       })
-      alert('Configuration sauvegardée avec succès !')
+      alert(`Configuration de ${clientType} sauvegardée avec succès !`)
       fetchCurrentClient()
     } catch (error) {
       console.error('Erreur:', error)
-      alert('Erreur lors de la sauvegarde')
+      alert(`Erreur lors de la sauvegarde de ${clientType}`)
     }
+  }
+
+  const updateClientConfig = (clientType, field, value) => {
+    setClientConfigs(prev => ({
+      ...prev,
+      [clientType]: {
+        ...prev[clientType],
+        [field]: value
+      }
+    }))
+  }
+
+  const toggleClientConfig = (clientType) => {
+    setExpandedClient(expandedClient === clientType ? null : clientType)
   }
 
   if (loading) {
@@ -148,171 +197,188 @@ const AdminTorrentClients = () => {
         <p className="subtitle">Configurez et testez vos clients torrent</p>
       </div>
 
-      {/* Statut des clients */}
+      {/* Statut et configuration des clients */}
       <div className="clients-status-section">
-        <h2>📊 Statut des Clients</h2>
+        <h2>📊 Clients Torrent</h2>
         <div className="clients-grid">
-          {clients.map((client) => (
-            <div key={client.type} className="client-status-card">
-              <div className="client-header">
-                <h3>{client.name}</h3>
-                <span className={`status-badge ${client.available ? 'online' : 'offline'}`}>
-                  {client.available ? '🟢 En ligne' : '🔴 Hors ligne'}
-                </span>
+          {clients.map((client) => {
+            const clientType = client.type
+            const config = clientConfigs[clientType] || {}
+            const isExpanded = expandedClient === clientType
+            const isTesting = testing[clientType]
+            const testResult = testResults[clientType]
+
+            return (
+              <div key={clientType} className="client-status-card">
+                <div className="client-header">
+                  <h3>{client.name}</h3>
+                  <span className={`status-badge ${client.available ? 'online' : 'offline'}`}>
+                    {client.available ? '🟢 En ligne' : '🔴 Hors ligne'}
+                  </span>
+                </div>
+                
+                <div className="client-info">
+                  <p><strong>Port Web UI:</strong> {client.web_port}</p>
+                  <p><strong>URL:</strong> <a href={client.web_url} target="_blank" rel="noopener noreferrer">{client.web_url}</a></p>
+                </div>
+
+                {/* Bouton pour afficher/masquer la configuration */}
+                <button
+                  onClick={() => toggleClientConfig(clientType)}
+                  className="config-toggle-button"
+                >
+                  {isExpanded ? '▼ Masquer la configuration' : '▶ Configurer'}
+                </button>
+
+                {/* Formulaire de configuration */}
+                {isExpanded && (
+                  <div className="client-config-form">
+                    {/* Transmission */}
+                    {clientType === 'transmission' && (
+                      <>
+                        <div className="config-form-group">
+                          <label>URL Transmission</label>
+                          <input
+                            type="text"
+                            value={config.url || ''}
+                            onChange={(e) => updateClientConfig(clientType, 'url', e.target.value)}
+                            placeholder="http://transmission:9091/transmission/rpc"
+                          />
+                        </div>
+                        <div className="config-form-row">
+                          <div className="config-form-group">
+                            <label>Utilisateur</label>
+                            <input
+                              type="text"
+                              value={config.user || ''}
+                              onChange={(e) => updateClientConfig(clientType, 'user', e.target.value)}
+                            />
+                          </div>
+                          <div className="config-form-group">
+                            <label>Mot de passe</label>
+                            <input
+                              type="password"
+                              value={config.pass || ''}
+                              onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* qBittorrent */}
+                    {clientType === 'qbittorrent' && (
+                      <>
+                        <div className="config-form-group">
+                          <label>URL qBittorrent</label>
+                          <input
+                            type="text"
+                            value={config.url || ''}
+                            onChange={(e) => updateClientConfig(clientType, 'url', e.target.value)}
+                            placeholder="http://qbittorrent:8080"
+                          />
+                        </div>
+                        <div className="config-form-row">
+                          <div className="config-form-group">
+                            <label>Utilisateur</label>
+                            <input
+                              type="text"
+                              value={config.user || ''}
+                              onChange={(e) => updateClientConfig(clientType, 'user', e.target.value)}
+                            />
+                          </div>
+                          <div className="config-form-group">
+                            <label>Mot de passe</label>
+                            <input
+                              type="password"
+                              value={config.pass || ''}
+                              onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
+                              placeholder="Laissez vide pour utiliser le mot de passe temporaire"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Deluge */}
+                    {clientType === 'deluge' && (
+                      <>
+                        <div className="config-form-group">
+                          <label>URL Deluge</label>
+                          <input
+                            type="text"
+                            value={config.url || ''}
+                            onChange={(e) => updateClientConfig(clientType, 'url', e.target.value)}
+                            placeholder="http://deluge:8112/json"
+                          />
+                        </div>
+                        <div className="config-form-group">
+                          <label>Mot de passe</label>
+                          <input
+                            type="password"
+                            value={config.pass || ''}
+                            onChange={(e) => updateClientConfig(clientType, 'pass', e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {/* rTorrent */}
+                    {clientType === 'rtorrent' && (
+                      <div className="config-form-group">
+                        <label>URL rTorrent XMLRPC</label>
+                        <input
+                          type="text"
+                          value={config.url || ''}
+                          onChange={(e) => updateClientConfig(clientType, 'url', e.target.value)}
+                          placeholder="http://rtorrent:5000/RPC2"
+                        />
+                      </div>
+                    )}
+
+                    {/* Résultat du test */}
+                    {testResult && (
+                      <div className={`test-result-mini ${testResult.success ? 'success' : 'error'}`}>
+                        <p><strong>{testResult.success ? '✅' : '❌'}</strong> {testResult.message}</p>
+                        {testResult.details && (
+                          <p className="test-details">{testResult.details}</p>
+                        )}
+                        {testResult.data && testResult.data.torrents_count !== undefined && (
+                          <p className="test-details">Torrents trouvés: {testResult.data.torrents_count}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="client-config-actions">
+                      <button
+                        onClick={() => handleTestClient(clientType)}
+                        disabled={isTesting}
+                        className="test-button-small"
+                      >
+                        {isTesting ? '⏳ Test...' : '🔍 Tester'}
+                      </button>
+                      <button
+                        onClick={() => handleSaveClient(clientType)}
+                        className="save-button-small"
+                      >
+                        💾 Sauvegarder
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="client-info">
-                <p><strong>Port Web UI:</strong> {client.web_port}</p>
-                <p><strong>URL:</strong> <a href={client.web_url} target="_blank" rel="noopener noreferrer">{client.web_url}</a></p>
-              </div>
-              <button
-                onClick={() => handleTestClient(client.type)}
-                disabled={testing}
-                className="test-button"
-              >
-                {testing ? '⏳ Test...' : '🔍 Tester'}
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
-      {/* Résultat du test */}
-      {testResult && (
-        <div className={`test-result ${testResult.success ? 'success' : 'error'}`}>
-          <p><strong>{testResult.success ? '✅' : '❌'}</strong> {testResult.message}</p>
-          {testResult.data && (
-            <pre>{JSON.stringify(testResult.data, null, 2)}</pre>
-          )}
-        </div>
-      )}
-
-      {/* Configuration du client actif */}
+      {/* Configuration du client actif (pour compatibilité) */}
       <div className="config-section">
-        <h2>🔧 Configuration du Client Actif</h2>
-        <div className="config-form">
-          <div className="form-group">
-            <label>Client Torrent</label>
-            <select
-              value={formData.client_type}
-              onChange={(e) => setFormData({ ...formData, client_type: e.target.value })}
-            >
-              <option value="transmission">Transmission (Port 3305)</option>
-              <option value="qbittorrent">qBittorrent (Port 3306)</option>
-              <option value="deluge">Deluge (Port 3307)</option>
-              <option value="rtorrent">rTorrent (Port 3308)</option>
-            </select>
-          </div>
-
-          {/* Configuration Transmission */}
-          {formData.client_type === 'transmission' && (
-            <>
-              <div className="form-group">
-                <label>URL Transmission</label>
-                <input
-                  type="text"
-                  value={formData.transmission_url}
-                  onChange={(e) => setFormData({ ...formData, transmission_url: e.target.value })}
-                  placeholder="http://transmission:9091/transmission/rpc"
-                />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Utilisateur</label>
-                  <input
-                    type="text"
-                    value={formData.transmission_user}
-                    onChange={(e) => setFormData({ ...formData, transmission_user: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Mot de passe</label>
-                  <input
-                    type="password"
-                    value={formData.transmission_pass}
-                    onChange={(e) => setFormData({ ...formData, transmission_pass: e.target.value })}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Configuration qBittorrent */}
-          {formData.client_type === 'qbittorrent' && (
-            <>
-              <div className="form-group">
-                <label>URL qBittorrent</label>
-                <input
-                  type="text"
-                  value={formData.qbittorrent_url}
-                  onChange={(e) => setFormData({ ...formData, qbittorrent_url: e.target.value })}
-                  placeholder="http://qbittorrent:8080"
-                />
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Utilisateur</label>
-                  <input
-                    type="text"
-                    value={formData.qbittorrent_user}
-                    onChange={(e) => setFormData({ ...formData, qbittorrent_user: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Mot de passe</label>
-                  <input
-                    type="password"
-                    value={formData.qbittorrent_pass}
-                    onChange={(e) => setFormData({ ...formData, qbittorrent_pass: e.target.value })}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* Configuration Deluge */}
-          {formData.client_type === 'deluge' && (
-            <>
-              <div className="form-group">
-                <label>URL Deluge</label>
-                <input
-                  type="text"
-                  value={formData.deluge_url}
-                  onChange={(e) => setFormData({ ...formData, deluge_url: e.target.value })}
-                  placeholder="http://deluge:8112/json"
-                />
-              </div>
-              <div className="form-group">
-                <label>Mot de passe</label>
-                <input
-                  type="password"
-                  value={formData.deluge_pass}
-                  onChange={(e) => setFormData({ ...formData, deluge_pass: e.target.value })}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Configuration rTorrent */}
-          {formData.client_type === 'rtorrent' && (
-            <div className="form-group">
-              <label>URL rTorrent XMLRPC</label>
-              <input
-                type="text"
-                value={formData.rtorrent_url}
-                onChange={(e) => setFormData({ ...formData, rtorrent_url: e.target.value })}
-                placeholder="http://rtorrent:5000/RPC2"
-              />
-            </div>
-          )}
-
-          <div className="form-actions">
-            <button onClick={() => handleTestClient(formData.client_type)} disabled={testing} className="test-button">
-              {testing ? '⏳ Test en cours...' : '🔍 Tester la connexion'}
-            </button>
-            <button onClick={handleSave} className="save-button">
-              💾 Sauvegarder
-            </button>
-          </div>
+        <h2>🔧 Client Actif</h2>
+        <div className="current-client-info">
+          <p>Client actuellement sélectionné: <strong>{currentClient?.type || 'Aucun'}</strong></p>
+          <p className="info-text">Configurez chaque client individuellement ci-dessus, puis testez et sauvegardez.</p>
         </div>
       </div>
 
