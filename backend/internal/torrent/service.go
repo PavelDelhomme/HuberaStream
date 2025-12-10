@@ -31,15 +31,21 @@ func NewTorrentService(db *gorm.DB, cfg *config.Config, clientType ClientType) (
 		return nil, err
 	}
 
+	postProcessor := NewPostProcessor(db, cfg)
+
 	service := &TorrentService{
-		db:         db,
-		cfg:        cfg,
-		client:     client,
-		clientType: clientType,
+		db:            db,
+		cfg:           cfg,
+		client:        client,
+		clientType:    clientType,
+		postProcessor: postProcessor,
 	}
 
 	// Démarrer le service de mise à jour périodique
 	service.startUpdateService()
+	
+	// Démarrer le service de post-traitement
+	service.startPostProcessingService()
 
 	return service, nil
 }
@@ -95,6 +101,19 @@ func (s *TorrentService) startUpdateService() {
 	}()
 }
 
+func (s *TorrentService) startPostProcessingService() {
+	postProcessTicker := time.NewTicker(30 * time.Second) // Vérifier toutes les 30 secondes
+
+	go func() {
+		for range postProcessTicker.C {
+			ctx := context.Background()
+			if err := s.postProcessor.ProcessCompletedTorrents(ctx); err != nil {
+				log.Printf("Erreur lors du post-traitement des torrents: %v", err)
+			}
+		}
+	}()
+}
+
 func (s *TorrentService) updateAllTorrents() {
 	ctx := context.Background()
 
@@ -111,6 +130,18 @@ func (s *TorrentService) updateAllTorrents() {
 	for _, torrent := range torrents {
 		if err := s.UpdateTorrentStatus(ctx, &torrent); err != nil {
 			log.Printf("Erreur lors de la mise à jour du torrent %s: %v", torrent.ID, err)
+		}
+	}
+
+	// Vérifier les torrents terminés et les marquer comme completed si nécessaire
+	var downloadingTorrents []models.Torrent
+	if err := s.db.Where("status = ?", models.TorrentStatusDownloading).Find(&downloadingTorrents).Error; err == nil {
+		for _, torrent := range downloadingTorrents {
+			status, err := s.GetTorrentStatus(ctx, torrent.ID.String())
+			if err == nil && status.Progress >= 100 && status.Status == models.TorrentStatusSeeding {
+				torrent.Status = models.TorrentStatusCompleted
+				s.db.Save(&torrent)
+			}
 		}
 	}
 }
