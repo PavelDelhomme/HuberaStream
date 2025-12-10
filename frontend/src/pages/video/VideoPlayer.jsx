@@ -48,14 +48,19 @@ const VideoPlayerPage = () => {
         if (response.data.status === 'processing') {
           startStatusPolling(id)
         }
+        
+        // Si la vidéo est en erreur, afficher un message approprié
+        if (response.data.status === 'error') {
+          setError('Cette vidéo est invalide ou a rencontré une erreur lors du traitement. Elle ne peut pas être visionnée.')
+        }
       } catch (err) {
-        // Si 404, essayer de récupérer le statut (pour les vidéos en traitement)
+        // Si 404, essayer de récupérer le statut (pour les vidéos en traitement ou en erreur)
         if (err.response?.status === 404 && user) {
           try {
             const statusResponse = await api.get(`/videos/${id}/status`)
             if (statusResponse.data) {
               // Créer un objet vidéo minimal avec les infos du statut
-              setVideo({
+              const videoData = {
                 id: statusResponse.data.video_id,
                 title: statusResponse.data.title || 'Vidéo en traitement',
                 description: statusResponse.data.description || '',
@@ -63,10 +68,22 @@ const VideoPlayerPage = () => {
                 thumbnail_path: statusResponse.data.thumbnail_path,
                 formats: [],
                 progress: statusResponse.data.progress,
-                formats_count: statusResponse.data.formats_count
-              })
-              // Démarrer le polling
-              startStatusPolling(id)
+                formats_count: statusResponse.data.formats_count,
+                views: 0, // Valeur par défaut pour éviter les erreurs
+                user: null
+              }
+              
+              // Si la vidéo est en erreur, afficher un message approprié
+              if (statusResponse.data.status === 'error') {
+                setError('Cette vidéo est invalide ou a rencontré une erreur lors du traitement. Elle ne peut pas être visionnée.')
+              }
+              
+              setVideo(videoData)
+              
+              // Démarrer le polling seulement si en traitement
+              if (statusResponse.data.status === 'processing') {
+                startStatusPolling(id)
+              }
             } else {
               throw err
             }
@@ -229,7 +246,7 @@ const VideoPlayerPage = () => {
           <h1 className="video-title">{video.title}</h1>
           <div className="video-meta-info">
             <span className="video-views-count">
-              {video.views.toLocaleString()} vues
+              {(video.views || 0).toLocaleString()} vues
             </span>
             {video.user && (
               <span className="video-author-name">{video.user.username}</span>

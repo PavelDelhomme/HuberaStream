@@ -250,11 +250,14 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	}
 
 	// Si la vidéo n'est pas prête, seuls le propriétaire et les admins peuvent la voir
+	// Cela inclut les vidéos en traitement (processing) et en erreur (error)
 	if video.Status != models.VideoStatusReady {
 		if !isOwner && !isAdmin {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
+		// Pour les vidéos en erreur, retourner quand même la vidéo aux admins/propriétaires
+		// pour qu'ils puissent voir les détails de l'erreur
 	}
 
 	// Si la vidéo n'est pas publique, seuls le propriétaire et les admins peuvent la voir
