@@ -274,9 +274,16 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	}
 
 	// Si la vidéo n'est pas publique, seuls le propriétaire et les admins peuvent la voir
+	// MAIS: Pour les vidéos en traitement, permettre l'accès même si elles ne sont pas publiques
+	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
 	if !video.IsPublic && !isOwner && !isAdmin {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
-		return
+		// Si la vidéo est en traitement, permettre l'accès même si elle n'est pas publique
+		if video.Status == models.VideoStatusProcessing {
+			// Permettre l'accès pour les vidéos en traitement (même si pas publique)
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+			return
+		}
 	}
 
 	// Incrémenter les vues seulement si la vidéo est prête et publique
@@ -344,9 +351,18 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 		progress = 100
 	} else if video.Status == models.VideoStatusProcessing {
 		// Estimation basée sur le nombre de formats (5 formats max: 4 progressifs + 1 HLS)
-		progress = int((float64(formatCount) / 5.0) * 100)
-		if progress > 90 {
-			progress = 90 // Ne pas dépasser 90% tant que le statut n'est pas "ready"
+		// Si aucun format n'a été créé, on est au début du traitement (5-10%)
+		if formatCount == 0 {
+			progress = 5 // Début du traitement (génération miniature, analyse, etc.)
+		} else {
+			progress = int((float64(formatCount) / 5.0) * 100)
+			if progress > 90 {
+				progress = 90 // Ne pas dépasser 90% tant que le statut n'est pas "ready"
+			}
+			// S'assurer qu'on a au moins 10% si un format a été créé
+			if progress < 10 {
+				progress = 10
+			}
 		}
 	} else if video.Status == models.VideoStatusError {
 		progress = 0

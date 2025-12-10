@@ -201,9 +201,12 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 		}
 
 		// Vérifier si la vidéo n'a aucun format
+		// MAIS: Ne pas supprimer les vidéos en cours de traitement (processing)
+		// car elles peuvent encore être en train de générer des formats
 		var formatCount int64
 		h.db.Model(&models.VideoFormat{}).Where("video_id = ?", video.ID).Count(&formatCount)
-		if formatCount == 0 {
+		if formatCount == 0 && video.Status != models.VideoStatusProcessing {
+			// Seulement supprimer si la vidéo n'est pas en traitement
 			shouldDelete = true
 			reasons = append(reasons, "aucun format disponible")
 		}
@@ -253,6 +256,9 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 		}
 	}
 
+	// Les stats seront automatiquement mises à jour car elles comptent directement depuis la base
+	// Pas besoin de les mettre à jour manuellement ici
+	
 	c.JSON(http.StatusOK, gin.H{
 		"message":       "Nettoyage terminé",
 		"deleted_count": deletedCount,
