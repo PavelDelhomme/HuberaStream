@@ -165,6 +165,9 @@ services:
     networks:
       - streammake-network
     restart: unless-stopped
+    # Note: Le mot de passe qBittorrent doit être configuré via le WebUI
+    # ou via le fichier de config après le premier démarrage
+    # Le mot de passe temporaire est affiché dans les logs au premier démarrage
 
   deluge:
     image: lscr.io/linuxserver/deluge:latest

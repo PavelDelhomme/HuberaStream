@@ -212,6 +212,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		{
 			scrapers.POST("/search", scraperHandler.Search)
 			scrapers.GET("/details", scraperHandler.GetTorrentDetails)
+			scrapers.GET("/browse-1337x", scraperHandler.BrowseCategory1337x)
+			scrapers.POST("/crawler/start", scraperHandler.StartCrawler)
+			scrapers.POST("/crawler/stop", scraperHandler.StopCrawler)
+			scrapers.GET("/crawler/status", scraperHandler.GetCrawlerStatus)
 		}
 
 		// Upload vidéo (admin seulement)
