@@ -3,7 +3,8 @@
 # Script de tests complets pour TOUTES les fonctionnalités de StreamMake
 # Usage: make test-comprehensive ou ./scripts/test-comprehensive.sh
 
-set -e
+# Ne pas utiliser set -e pour permettre la continuation même en cas d'erreur
+# set -e
 
 BASE_URL="${BASE_URL:-http://localhost:3300}"
 API_URL="${API_URL:-$BASE_URL/api}"
