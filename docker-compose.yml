@@ -206,6 +206,8 @@ services:
       - "3310:5000" # rTorrent XMLRPC
       - "3311:6881" # rTorrent DHT port
       - "3311:6881/udp"
+      - "3312:51413" # rTorrent Peer port (TCP)
+      - "3312:51413/udp" # rTorrent Peer port (UDP)
     networks:
       - streammake-network
     restart: unless-stopped
