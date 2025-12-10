@@ -17,7 +17,7 @@ const VideoPlayerPage = () => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (id) {
+    if (id && !fetchingVideo) {
       fetchVideo()
       fetchRelatedVideos()
     }
@@ -26,7 +26,8 @@ const VideoPlayerPage = () => {
     return () => {
       // Le cleanup sera géré dans startStatusPolling
     }
-  }, [id])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]) // Ne pas inclure fetchingVideo pour éviter les boucles
 
   const fetchVideo = async () => {
     // Éviter les appels multiples
