@@ -264,6 +264,76 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	c.JSON(http.StatusOK, video)
 }
 
+// GetVideoStatus retourne le statut de traitement d'une vidéo
+func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
+	id := c.Param("id")
+	videoID, err := uuid.Parse(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
+
+	var video models.Video
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+
+	// Vérifier les permissions (propriétaire ou admin)
+	userID, exists := c.Get("user_id")
+	isOwner := false
+	isAdmin := false
+	
+	if exists {
+		userIDStr, ok := userID.(string)
+		if ok {
+			userUUID, err := uuid.Parse(userIDStr)
+			if err == nil {
+				if video.UserID == userUUID {
+					isOwner = true
+				}
+				var user models.User
+				if err := h.db.Where("id = ?", userUUID).First(&user).Error; err == nil {
+					isAdmin = user.Role == models.RoleAdmin
+				}
+			}
+		}
+	}
+
+	if !isOwner && !isAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Permission refusée"})
+		return
+	}
+
+	// Compter les formats créés
+	var formatCount int64
+	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
+
+	// Calculer le pourcentage de progression (approximatif)
+	progress := 0
+	if video.Status == models.VideoStatusReady {
+		progress = 100
+	} else if video.Status == models.VideoStatusProcessing {
+		// Estimation basée sur le nombre de formats (5 formats max: 4 progressifs + 1 HLS)
+		progress = int((float64(formatCount) / 5.0) * 100)
+		if progress > 90 {
+			progress = 90 // Ne pas dépasser 90% tant que le statut n'est pas "ready"
+		}
+	} else if video.Status == models.VideoStatusError {
+		progress = 0
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"video_id": videoID,
+		"status":   string(video.Status),
+		"progress": progress,
+		"formats_count": formatCount,
+		"thumbnail_path": video.ThumbnailPath,
+		"title": video.Title,
+		"description": video.Description,
+	})
+}
+
 func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 	id := c.Param("id")
 	videoID, err := uuid.Parse(id)
