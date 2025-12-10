@@ -122,3 +122,7 @@ install-torrents:
 	@echo "${YELLOW}  - qBittorrent: http://localhost:3306${NC}"
 	@echo "${YELLOW}  - Deluge: http://localhost:3307${NC}"
 	@echo "${YELLOW}  - ruTorrent: http://localhost:3308${NC}"
+
+clean-test-videos:
+	@echo "${GREEN}Nettoyage des vidéos de test...${NC}"
+	@./scripts/clean-test-videos.sh
