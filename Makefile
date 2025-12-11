@@ -56,12 +56,30 @@ restart:
 	@echo "${GREEN}✅ Tous les services ont été redémarrés${NC}"
 
 logs:
-	@echo "${GREEN}Affichage des logs de tous les services (Ctrl+C pour quitter)...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs -f
+	@echo "${GREEN}Affichage des logs de tous les services (sans suivi automatique)...${NC}"
+	@echo "${YELLOW}Astuce: Utilisez 'make logs-follow' pour suivre en temps réel${NC}"
+	@echo "${YELLOW}Astuce: Utilisez 'make logs-backend' pour voir uniquement les logs backend${NC}"
+	@echo "${YELLOW}Astuce: Utilisez 'make logs-history' pour voir l'historique complet${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=200 | less -R
+
+logs-follow:
+	@echo "${GREEN}Affichage des logs en temps réel (Ctrl+C pour quitter)...${NC}"
+	@echo "${YELLOW}Astuce: Utilisez 'make logs' pour voir les logs sans suivi (scrollable)${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f
+
+logs-scroll:
+	@echo "${GREEN}Affichage des logs avec possibilité de scroller (Ctrl+C pour quitter)...${NC}"
+	@echo "${YELLOW}Utilisez 'q' pour quitter, 'F' pour suivre en temps réel${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 | less -R +F
+
+logs-history:
+	@echo "${GREEN}Affichage de l'historique complet des logs (sans suivi en temps réel)...${NC}"
+	@echo "${YELLOW}Utilisez 'q' pour quitter, '↑' et '↓' pour naviguer${NC}"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=1000 | less -R
 
 logs-%:
 	@echo "${GREEN}Affichage des logs du service $* (Ctrl+C pour quitter)...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs -f $*
+	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=200 -f $*
 
 clean:
 	@echo "${YELLOW}Nettoyage des conteneurs, volumes et réseaux...${NC}"

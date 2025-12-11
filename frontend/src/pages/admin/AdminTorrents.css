@@ -12,6 +12,51 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.header-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.toggle-refresh {
+  padding: 8px 16px;
+  background-color: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.toggle-refresh:hover {
+  background-color: #333333;
+  border-color: #555555;
+}
+
+.toggle-refresh.active {
+  background-color: #1a4d1a;
+  border-color: #2d7a2d;
+}
+
+.refresh-button {
+  padding: 8px 16px;
+  background-color: #2a2a2a;
+  border: 1px solid #404040;
+  border-radius: 6px;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.refresh-button:hover {
+  background-color: #333333;
+  border-color: #555555;
 }
 
 .admin-header h1 {

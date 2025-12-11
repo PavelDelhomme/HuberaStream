@@ -11,7 +11,9 @@ const AdminTorrents = () => {
   const [activeTab, setActiveTab] = useState('list') // 'list', 'search', 'browse'
   const [torrents, setTorrents] = useState([])
   const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true) // Chargement initial uniquement
   const [refreshing, setRefreshing] = useState({})
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   
   // Recherche
   const [searchQuery, setSearchQuery] = useState('')
@@ -47,22 +49,41 @@ const AdminTorrents = () => {
       navigate('/')
       return
     }
-    fetchTorrents()
+    fetchTorrents(true) // Chargement initial
     fetchCategories()
-    // Auto-refresh toutes les 5 secondes
-    const interval = setInterval(fetchTorrents, 5000)
+    // Auto-refresh toutes les 5 secondes en arrière-plan (sans bloquer l'UI)
+    const interval = setInterval(() => {
+      if (autoRefreshEnabled) {
+        fetchTorrentsBackground()
+      }
+    }, 5000)
     return () => clearInterval(interval)
-  }, [user, authLoading, isAdmin, navigate])
+  }, [user, authLoading, isAdmin, navigate, autoRefreshEnabled])
 
-  const fetchTorrents = async () => {
+  const fetchTorrents = async (isInitial = false) => {
     try {
-      setLoading(true)
+      // Ne mettre loading à true que lors du chargement initial
+      if (isInitial || torrents.length === 0) {
+        setLoading(true)
+      }
       const response = await api.get('/admin/torrents')
       setTorrents(response.data.torrents || [])
     } catch (error) {
       console.error('Erreur:', error)
     } finally {
       setLoading(false)
+      setInitialLoading(false)
+    }
+  }
+
+  // Rafraîchissement en arrière-plan sans bloquer l'UI
+  const fetchTorrentsBackground = async () => {
+    try {
+      const response = await api.get('/admin/torrents')
+      setTorrents(response.data.torrents || [])
+    } catch (error) {
+      // Ignorer les erreurs en arrière-plan pour ne pas perturber l'utilisateur
+      console.error('Erreur lors du rafraîchissement en arrière-plan:', error)
     }
   }
 
@@ -90,7 +111,12 @@ const AdminTorrents = () => {
   const handlePauseTorrent = async (torrentId) => {
     try {
       await api.post(`/admin/torrents/${torrentId}/pause`)
-      fetchTorrents()
+      // Mettre à jour localement sans recharger toute la liste
+      setTorrents(prev => prev.map(t => 
+        t.id === torrentId ? { ...t, status: 'paused' } : t
+      ))
+      // Rafraîchir en arrière-plan
+      fetchTorrentsBackground()
     } catch (error) {
       console.error('Erreur:', error)
       alert('Erreur lors de la mise en pause')
@@ -100,7 +126,12 @@ const AdminTorrents = () => {
   const handleResumeTorrent = async (torrentId) => {
     try {
       await api.post(`/admin/torrents/${torrentId}/resume`)
-      fetchTorrents()
+      // Mettre à jour localement sans recharger toute la liste
+      setTorrents(prev => prev.map(t => 
+        t.id === torrentId ? { ...t, status: 'downloading' } : t
+      ))
+      // Rafraîchir en arrière-plan
+      fetchTorrentsBackground()
     } catch (error) {
       console.error('Erreur:', error)
       alert('Erreur lors de la reprise')
@@ -113,7 +144,10 @@ const AdminTorrents = () => {
     }
     try {
       await api.delete(`/admin/torrents/${torrentId}`)
-      fetchTorrents()
+      // Mettre à jour localement sans recharger toute la liste
+      setTorrents(prev => prev.filter(t => t.id !== torrentId))
+      // Rafraîchir en arrière-plan pour synchroniser
+      fetchTorrentsBackground()
     } catch (error) {
       console.error('Erreur:', error)
       alert('Erreur lors de la suppression')
@@ -169,7 +203,7 @@ const AdminTorrents = () => {
         add_to_library: addToLibrary
       })
       alert(addToLibrary ? '✅ Torrent ajouté à la bibliothèque ! Il sera téléchargé et la vidéo sera visible sur l\'accueil une fois le traitement terminé.' : 'Torrent ajouté avec succès !')
-      fetchTorrents()
+      fetchTorrentsBackground() // Rafraîchir en arrière-plan
       setActiveTab('list')
     } catch (error) {
       console.error('Erreur:', error)
@@ -181,7 +215,11 @@ const AdminTorrents = () => {
     try {
       const response = await api.post(`/admin/torrents/${torrentId}/toggle-library`)
       alert(response.data.message || 'Flag "Ajouter à la bibliothèque" mis à jour')
-      fetchTorrents()
+      // Mettre à jour localement
+      setTorrents(prev => prev.map(t => 
+        t.id === torrentId ? { ...t, add_to_library: !t.add_to_library } : t
+      ))
+      fetchTorrentsBackground() // Rafraîchir en arrière-plan
     } catch (error) {
       console.error('Erreur:', error)
       alert('Erreur: ' + (error.response?.data?.error || error.message))
@@ -201,7 +239,7 @@ const AdminTorrents = () => {
         category_id: '',
         sub_category_id: ''
       })
-      fetchTorrents()
+      fetchTorrentsBackground() // Rafraîchir en arrière-plan
     } catch (error) {
       console.error('Erreur:', error)
       alert('Erreur lors de l\'ajout du torrent')
@@ -246,7 +284,8 @@ const AdminTorrents = () => {
     }
   }, [browseCategory, browsePage, browseLanguage])
 
-  if (loading && torrents.length === 0) {
+  // Afficher le spinner uniquement lors du chargement initial
+  if (initialLoading && torrents.length === 0) {
     return (
       <div className="admin-torrents">
         <LoadingSpinner message="Chargement des torrents..." />
@@ -258,9 +297,23 @@ const AdminTorrents = () => {
     <div className="admin-torrents">
       <div className="admin-header">
         <h1>📥 Gestion des Torrents</h1>
-        <button onClick={() => setShowAddForm(!showAddForm)} className="add-button">
-          {showAddForm ? 'Annuler' : '+ Ajouter manuellement'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="header-controls">
+            <button
+              onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+              className={`toggle-refresh ${autoRefreshEnabled ? 'active' : ''}`}
+              title={autoRefreshEnabled ? 'Désactiver le rafraîchissement automatique' : 'Activer le rafraîchissement automatique'}
+            >
+              {autoRefreshEnabled ? '⏸️ Auto-refresh ON' : '▶️ Auto-refresh OFF'}
+            </button>
+            <button onClick={fetchTorrents} className="refresh-button" title="Rafraîchir maintenant">
+              🔄 Rafraîchir
+            </button>
+          </div>
+          <button onClick={() => setShowAddForm(!showAddForm)} className="add-button">
+            {showAddForm ? 'Annuler' : '+ Ajouter manuellement'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

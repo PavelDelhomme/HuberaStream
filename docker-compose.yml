@@ -53,6 +53,8 @@ services:
       # Monter les points de montage DVD si disponibles
       - /mnt/cdrom:/mnt/cdrom:ro
       - /media/cdrom:/media/cdrom:ro
+      # Partager le volume de config qBittorrent pour configuration automatique
+      - qbittorrent_config:/config/qbittorrent:ro
     environment:
       DB_HOST: postgres
       DB_PORT: 5432

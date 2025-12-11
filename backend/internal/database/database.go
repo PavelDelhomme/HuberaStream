@@ -51,6 +51,8 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SubCategory{},
 		&models.Torrent{},
 		&models.TorrentConfig{},
+		&models.UploadSession{},
+		&models.UploadChunk{},
 	)
 }
 

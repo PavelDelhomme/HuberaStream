@@ -1,10 +1,16 @@
 package video
 
 import (
+	"encoding/json"
 	"fmt"
+	"image"
+	"image/color"
+	"image/jpeg"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -13,6 +19,7 @@ type Processor struct {
 	storagePath      string
 	thumbnailPath    string
 	ffmpegPath       string
+	ffprobePath      string
 }
 
 func NewProcessor(storagePath, thumbnailPath string) *Processor {
@@ -20,11 +27,17 @@ func NewProcessor(storagePath, thumbnailPath string) *Processor {
 	if path := os.Getenv("FFMPEG_PATH"); path != "" {
 		ffmpegPath = path
 	}
+	
+	ffprobePath := "ffprobe"
+	if path := os.Getenv("FFPROBE_PATH"); path != "" {
+		ffprobePath = path
+	}
 
 	return &Processor{
 		storagePath:   storagePath,
 		thumbnailPath: thumbnailPath,
 		ffmpegPath:    ffmpegPath,
+		ffprobePath:   ffprobePath,
 	}
 }
 
@@ -246,5 +259,171 @@ func (p *Processor) TranscodeToProgressive(videoPath string, videoID uuid.UUID, 
 	}
 
 	return outputPath, nil
+}
+
+// VideoMetadata contient les métadonnées extraites d'une vidéo
+type VideoMetadata struct {
+	Title       string `json:"title,omitempty"`
+	Author      string `json:"author,omitempty"`
+	Description string `json:"description,omitempty"`
+	Duration    int    `json:"duration"` // en secondes
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+	Bitrate     int64  `json:"bitrate"` // en bits/s
+	Codec       string `json:"codec,omitempty"`
+	Format      string `json:"format,omitempty"`
+}
+
+// ExtractMetadata extrait les métadonnées d'un fichier vidéo avec ffprobe
+func (p *Processor) ExtractMetadata(videoPath string) (*VideoMetadata, error) {
+	// Vérifier que le fichier existe
+	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("fichier vidéo non trouvé: %s", videoPath)
+	}
+
+	// Utiliser ffprobe pour extraire les métadonnées en JSON
+	cmd := exec.Command(
+		p.ffprobePath,
+		"-v", "quiet",
+		"-print_format", "json",
+		"-show_format",
+		"-show_streams",
+		videoPath,
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de l'extraction des métadonnées (ffprobe): %w, output: %s", err, string(output))
+	}
+
+	// Parser le JSON
+	var probeData struct {
+		Format struct {
+			Duration string            `json:"duration"`
+			BitRate  string            `json:"bit_rate"`
+			Format   string            `json:"format_name"`
+			Tags     map[string]string `json:"tags"`
+		} `json:"format"`
+		Streams []struct {
+			CodecType string `json:"codec_type"`
+			CodecName string `json:"codec_name"`
+			Width     int    `json:"width"`
+			Height    int    `json:"height"`
+			BitRate   string `json:"bit_rate"`
+		} `json:"streams"`
+	}
+
+	if err := json.Unmarshal(output, &probeData); err != nil {
+		return nil, fmt.Errorf("erreur lors du parsing JSON: %w", err)
+	}
+
+	metadata := &VideoMetadata{}
+
+	// Extraire la durée
+	if probeData.Format.Duration != "" {
+		if duration, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
+			metadata.Duration = int(duration)
+		}
+	}
+
+	// Extraire les dimensions et codec depuis le stream vidéo
+	for _, stream := range probeData.Streams {
+		if stream.CodecType == "video" {
+			metadata.Width = stream.Width
+			metadata.Height = stream.Height
+			metadata.Codec = stream.CodecName
+			if stream.BitRate != "" {
+				if bitrate, err := strconv.ParseInt(stream.BitRate, 10, 64); err == nil {
+					metadata.Bitrate = bitrate
+				}
+			}
+			break
+		}
+	}
+
+	// Extraire les tags (title, author, description)
+	if probeData.Format.Tags != nil {
+		if title, ok := probeData.Format.Tags["title"]; ok {
+			metadata.Title = strings.TrimSpace(title)
+		}
+		if author, ok := probeData.Format.Tags["author"]; ok {
+			metadata.Author = strings.TrimSpace(author)
+		}
+		if description, ok := probeData.Format.Tags["description"]; ok {
+			metadata.Description = strings.TrimSpace(description)
+		}
+		// Aussi vérifier les variantes de clés
+		if metadata.Title == "" {
+			if title, ok := probeData.Format.Tags["TITLE"]; ok {
+				metadata.Title = strings.TrimSpace(title)
+			}
+		}
+		if metadata.Author == "" {
+			if author, ok := probeData.Format.Tags["AUTHOR"]; ok {
+				metadata.Author = strings.TrimSpace(author)
+			}
+			if author, ok := probeData.Format.Tags["artist"]; ok {
+				metadata.Author = strings.TrimSpace(author)
+			}
+		}
+	}
+
+	// Extraire le format
+	metadata.Format = probeData.Format.Format
+
+	// Extraire le bitrate du format si pas déjà défini
+	if metadata.Bitrate == 0 && probeData.Format.BitRate != "" {
+		if bitrate, err := strconv.ParseInt(probeData.Format.BitRate, 10, 64); err == nil {
+			metadata.Bitrate = bitrate
+		}
+	}
+
+	return metadata, nil
+}
+
+// GenerateThumbnailFromTitle génère une miniature textuelle depuis un titre
+func (p *Processor) GenerateThumbnailFromTitle(title string) (string, error) {
+	// Créer un UUID temporaire pour le nom de fichier
+	tempID := uuid.New()
+	thumbnailName := fmt.Sprintf("temp_%s.jpg", tempID.String())
+	thumbnailPath := filepath.Join(p.thumbnailPath, thumbnailName)
+
+	// S'assurer que le dossier existe
+	if err := os.MkdirAll(p.thumbnailPath, 0755); err != nil {
+		return "", fmt.Errorf("erreur lors de la création du dossier: %w", err)
+	}
+
+	// Dimensions de la miniature (format 16:9)
+	width := 1280
+	height := 720
+
+	// Créer une image avec un fond dégradé
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	
+	// Fond dégradé (rouge vers noir, style Netflix)
+	for y := 0; y < height; y++ {
+		ratio := float64(y) / float64(height)
+		// Dégradé de rouge (#ff0000) vers noir (#000000)
+		r := uint8(255 * (1 - ratio*0.7))
+		g := uint8(0)
+		b := uint8(0)
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.RGBA{r, g, b, 255})
+		}
+	}
+
+	// Créer le fichier
+	file, err := os.Create(thumbnailPath)
+	if err != nil {
+		return "", fmt.Errorf("erreur lors de la création du fichier: %w", err)
+	}
+	defer file.Close()
+
+	// Encoder en JPEG
+	if err := jpeg.Encode(file, img, &jpeg.Options{Quality: 90}); err != nil {
+		return "", fmt.Errorf("erreur lors de l'encodage JPEG: %w", err)
+	}
+
+	return thumbnailPath, nil
 }
 

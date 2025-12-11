@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -169,6 +170,28 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	title := videoModel.Title
 	description := videoModel.Description
 
+	// Extraire les métadonnées AVANT de générer la miniature pour avoir plus d'infos
+	metadata, err := h.processor.ExtractMetadata(videoPath)
+	if err == nil && metadata != nil {
+		// Mettre à jour la vidéo avec les métadonnées extraites
+		updates := make(map[string]interface{})
+		if metadata.Title != "" && videoModel.Title == "" {
+			updates["title"] = metadata.Title
+			title = metadata.Title
+		}
+		if metadata.Description != "" && videoModel.Description == "" {
+			updates["description"] = metadata.Description
+			description = metadata.Description
+		}
+		if metadata.Duration > 0 && videoModel.Duration == 0 {
+			updates["duration"] = metadata.Duration
+		}
+		if len(updates) > 0 {
+			h.db.Model(&videoModel).Updates(updates)
+			fmt.Printf("Métadonnées extraites et mises à jour pour la vidéo %s\n", videoID)
+		}
+	}
+
 	// Générer la miniature depuis la vidéo (essayer plusieurs positions pour trouver une bonne frame)
 	thumbnailPath, err := h.processor.GenerateThumbnail(videoPath, videoID)
 	if err != nil {
@@ -299,6 +322,26 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	fmt.Printf("Traitement terminé pour la vidéo %s: %d format(s) total (%d progressifs, %d HLS)\n", 
 		videoID, formatCount, progressiveCount, hlsCount)
 	
+	// Vérification de l'intégrité du fichier original après traitement
+	// Récupérer le checksum stocké en base
+	var storedVideo models.Video
+	if err := h.db.Where("id = ?", videoID).First(&storedVideo).Error; err == nil && storedVideo.Checksum != "" {
+		fmt.Printf("🔍 Vérification de l'intégrité du fichier original pour la vidéo %s...\n", videoID)
+		currentChecksum, err := h.calculateFileChecksum(videoPath)
+		if err != nil {
+			fmt.Printf("⚠️  Erreur lors de la vérification d'intégrité: %v\n", err)
+		} else if currentChecksum != storedVideo.Checksum {
+			fmt.Printf("❌ ERREUR D'INTÉGRITÉ DÉTECTÉE pour la vidéo %s!\n", videoID)
+			fmt.Printf("   Checksum attendu: %s\n", storedVideo.Checksum)
+			fmt.Printf("   Checksum actuel:  %s\n", currentChecksum)
+			fmt.Printf("   Le fichier a été corrompu pendant le traitement!\n")
+			h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
+			return
+		} else {
+			fmt.Printf("✅ Vérification d'intégrité réussie pour la vidéo %s (checksum: %s)\n", videoID, currentChecksum[:16]+"...")
+		}
+	}
+	
 	if formatCount == 0 {
 		fmt.Printf("❌ AUCUN FORMAT CRÉÉ POUR LA VIDÉO %s - La vidéo ne sera pas lisible\n", videoID)
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
@@ -316,6 +359,22 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 			fmt.Printf("✅ Statut mis à jour à 'ready' pour la vidéo %s\n", videoID)
 		}
 	}
+}
+
+// calculateFileChecksum calcule le checksum SHA256 d'un fichier
+func (h *UploadHandler) calculateFileChecksum(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("erreur lors de l'ouverture du fichier: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("erreur lors du calcul du checksum: %w", err)
+	}
+
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 // cleanupPartialFormats supprime les formats partiels créés lors d'une annulation
@@ -424,5 +483,207 @@ func (h *UploadHandler) generateTextThumbnail(videoID uuid.UUID, title string, d
 	// Le texte peut être ajouté plus tard si nécessaire avec une bibliothèque de rendu de texte.
 
 	return thumbnailPath, nil
+}
+
+// GenerateThumbnailFromTitle génère une miniature depuis un titre (sans fichier vidéo)
+func (h *UploadHandler) GenerateThumbnailFromTitle(c *gin.Context) {
+	title := c.Query("title")
+	if title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Paramètre 'title' requis"})
+		return
+	}
+
+	thumbnailPath, err := h.processor.GenerateThumbnailFromTitle(title)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur lors de la génération: %v", err)})
+		return
+	}
+
+	// Retourner l'URL de la miniature (relative au serveur)
+	// Le frontend pourra l'afficher via /api/thumbnails/...
+	thumbnailName := filepath.Base(thumbnailPath)
+	c.JSON(http.StatusOK, gin.H{
+		"thumbnail_path": thumbnailPath,
+		"thumbnail_url":  fmt.Sprintf("/api/thumbnails/%s", thumbnailName),
+		"thumbnail_name": thumbnailName,
+	})
+}
+
+// ExtractVideoMetadata extrait les métadonnées d'un fichier vidéo uploadé
+func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
+	log.Printf("[ExtractVideoMetadata] ✅ Handler appelé pour %s", c.Request.URL.Path)
+	log.Printf("[ExtractVideoMetadata] Début de l'extraction des métadonnées")
+	
+	// Récupérer le fichier
+	file, err := c.FormFile("video")
+	if err != nil {
+		log.Printf("[ExtractVideoMetadata] Erreur lors de la récupération du fichier: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Fichier vidéo requis"})
+		return
+	}
+
+	log.Printf("[ExtractVideoMetadata] Fichier reçu: %s (taille: %d)", file.Filename, file.Size)
+
+	// Sauvegarder temporairement le fichier
+	tempDir := filepath.Join(h.cfg.VideoStoragePath, "temp")
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		log.Printf("[ExtractVideoMetadata] Erreur lors de la création du dossier temporaire: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la création du dossier temporaire"})
+		return
+	}
+
+	tempPath := filepath.Join(tempDir, fmt.Sprintf("metadata_%d_%s", time.Now().Unix(), file.Filename))
+	log.Printf("[ExtractVideoMetadata] Sauvegarde temporaire dans: %s", tempPath)
+	
+	if err := c.SaveUploadedFile(file, tempPath); err != nil {
+		log.Printf("[ExtractVideoMetadata] Erreur lors de l'enregistrement temporaire: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'enregistrement temporaire"})
+		return
+	}
+
+	log.Printf("[ExtractVideoMetadata] Fichier sauvegardé, début de l'extraction des métadonnées")
+
+	// Nettoyer le fichier temporaire après extraction
+	defer func() {
+		if err := os.Remove(tempPath); err != nil {
+			log.Printf("[ExtractVideoMetadata] Erreur lors de la suppression du fichier temporaire: %v", err)
+		} else {
+			log.Printf("[ExtractVideoMetadata] Fichier temporaire supprimé: %s", tempPath)
+		}
+	}()
+
+	// Extraire les métadonnées
+	metadata, err := h.processor.ExtractMetadata(tempPath)
+	if err != nil {
+		log.Printf("[ExtractVideoMetadata] Erreur lors de l'extraction des métadonnées: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur lors de l'extraction: %v", err)})
+		return
+	}
+
+	log.Printf("[ExtractVideoMetadata] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d", 
+		metadata.Title, metadata.Duration, metadata.Width, metadata.Height)
+	
+	c.JSON(http.StatusOK, metadata)
+}
+
+// ExtractVideoMetadataFromID extrait les métadonnées d'une vidéo déjà uploadée (via son ID)
+func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
+	videoIDParam := c.Param("id")
+	videoID, err := uuid.Parse(videoIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
+
+	log.Printf("[ExtractVideoMetadataFromID] Extraction des métadonnées pour la vidéo %s", videoID)
+
+	// Récupérer la vidéo
+	var video models.Video
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+
+	// Vérifier que la vidéo a un fichier (chercher dans les formats ou utiliser l'ID)
+	// Construire le chemin du fichier original
+	// Le fichier original est généralement stocké avec le nom: {videoID}_{timestamp}.{ext}
+	// Chercher dans le répertoire de stockage
+	videoPath := ""
+	
+	// Essayer de trouver le fichier original dans le répertoire de stockage
+	// Le fichier peut être nommé avec l'ID de la vidéo
+	videoDir := h.cfg.VideoStoragePath
+	entries, err := os.ReadDir(videoDir)
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), videoID.String()) {
+				videoPath = filepath.Join(videoDir, entry.Name())
+				break
+			}
+		}
+	}
+	
+	// Si pas trouvé, essayer avec le nom de fichier original si disponible
+	if videoPath == "" {
+		// Chercher dans les formats pour trouver le fichier original
+		var formats []models.VideoFormat
+		h.db.Where("video_id = ?", videoID).Find(&formats)
+		if len(formats) > 0 {
+			// Utiliser le premier format pour trouver le répertoire
+			formatPath := formats[0].FilePath
+			if formatPath != "" {
+				// Le fichier original devrait être dans le même répertoire
+				formatDir := filepath.Dir(formatPath)
+				entries, err := os.ReadDir(formatDir)
+				if err == nil {
+					for _, entry := range entries {
+						if !entry.IsDir() && strings.HasPrefix(entry.Name(), videoID.String()) {
+							videoPath = filepath.Join(formatDir, entry.Name())
+							break
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	if videoPath == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Fichier vidéo original non trouvé"})
+		return
+	}
+	if _, err := os.Stat(videoPath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Fichier vidéo non trouvé"})
+		return
+	}
+
+	log.Printf("[ExtractVideoMetadataFromID] Fichier trouvé: %s", videoPath)
+
+	// Extraire les métadonnées
+	metadata, err := h.processor.ExtractMetadata(videoPath)
+	if err != nil {
+		log.Printf("[ExtractVideoMetadataFromID] Erreur lors de l'extraction des métadonnées: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur lors de l'extraction: %v", err)})
+		return
+	}
+
+	log.Printf("[ExtractVideoMetadataFromID] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d", 
+		metadata.Title, metadata.Duration, metadata.Width, metadata.Height)
+
+	// Mettre à jour la vidéo avec les métadonnées extraites
+	updates := make(map[string]interface{})
+	if metadata.Title != "" && video.Title == "" {
+		updates["title"] = metadata.Title
+	}
+	if metadata.Description != "" && video.Description == "" {
+		updates["description"] = metadata.Description
+	}
+	// Note: Le champ Author n'existe pas dans le modèle Video actuel
+	// On peut l'ajouter à la description si nécessaire
+	if metadata.Author != "" && !strings.Contains(video.Description, metadata.Author) {
+		if video.Description == "" {
+			updates["description"] = fmt.Sprintf("Par %s", metadata.Author)
+		} else {
+			updates["description"] = fmt.Sprintf("Par %s\n\n%s", metadata.Author, video.Description)
+		}
+	}
+	if metadata.Duration > 0 && video.Duration == 0 {
+		updates["duration"] = metadata.Duration
+	}
+	
+	// Appliquer les mises à jour
+	if len(updates) > 0 {
+		if err := h.db.Model(&video).Updates(updates).Error; err != nil {
+			log.Printf("[ExtractVideoMetadataFromID] Erreur lors de la mise à jour de la vidéo: %v", err)
+			// Ne pas échouer si la mise à jour échoue, on retourne quand même les métadonnées
+		} else {
+			log.Printf("[ExtractVideoMetadataFromID] Vidéo mise à jour avec succès")
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"metadata": metadata,
+		"video": video,
+		"message": "Métadonnées extraites et vidéo mise à jour",
+	})
 }
 

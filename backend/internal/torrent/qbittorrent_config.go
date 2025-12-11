@@ -3,20 +3,20 @@ package torrent
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"crypto/sha512"
 	"golang.org/x/crypto/pbkdf2"
 )
 
 // ConfigureQBittorrentPassword configure automatiquement le mot de passe qBittorrent
+// Cette fonction modifie directement le fichier de configuration dans le volume partagé
 func ConfigureQBittorrentPassword(ctx context.Context, url, username, password string) error {
 	// Attendre que qBittorrent soit prêt
 	if err := waitForQBittorrent(ctx, url); err != nil {
@@ -24,8 +24,10 @@ func ConfigureQBittorrentPassword(ctx context.Context, url, username, password s
 	}
 
 	// Essayer de modifier directement le fichier de configuration
+	// Le volume qbittorrent_config est monté à /config/qbittorrent dans le backend
 	configPaths := []string{
-		"/config/qBittorrent/qBittorrent.conf",
+		"/config/qbittorrent/qBittorrent/qBittorrent.conf", // Volume partagé depuis docker-compose
+		"/config/qBittorrent/qBittorrent.conf",              // Ancien chemin
 		"/app/config/qBittorrent/qBittorrent.conf",
 		filepath.Join(os.Getenv("HOME"), ".config/qBittorrent/qBittorrent.conf"),
 	}
@@ -39,9 +41,13 @@ func ConfigureQBittorrentPassword(ctx context.Context, url, username, password s
 	}
 
 	if configPath == "" {
-		// Si on est dans Docker, chercher dans le volume
-		// Le volume est monté à /config
-		configPath = "/config/qBittorrent/qBittorrent.conf"
+		// Si on est dans Docker, chercher dans le volume partagé
+		// Le volume est monté à /config/qbittorrent
+		configPath = "/config/qbittorrent/qBittorrent/qBittorrent.conf"
+		// Créer le répertoire si nécessaire
+		if err := os.MkdirAll(filepath.Dir(configPath), 0755); err != nil {
+			return fmt.Errorf("erreur lors de la création du répertoire: %w", err)
+		}
 	}
 
 	// Lire le fichier de configuration
@@ -184,41 +190,11 @@ WebUI\\Port=8080
 }
 
 // ConfigureQBittorrentFromDocker configure qBittorrent depuis un conteneur Docker
+// NOTE: Cette fonction n'est plus utilisée car Docker n'est pas disponible dans le conteneur backend.
+// Utilisez ConfigureQBittorrentPassword à la place, qui modifie directement le fichier dans le volume partagé.
 func ConfigureQBittorrentFromDocker(ctx context.Context, containerName, username, password string) error {
-	// Modifier le fichier de configuration dans le conteneur Docker
-	configPath := "/config/qBittorrent/qBittorrent.conf"
-	
-	// Générer le hash
-	hash := generatePBKDF2Hash(password)
-
-	// Créer un script temporaire pour modifier la config
-	script := fmt.Sprintf(`
-		if [ -f %s ]; then
-			# Sauvegarder
-			cp %s %s.backup
-			# Modifier
-			sed -i "s/^WebUI\\\\Username=.*/WebUI\\\\Username=%s/" %s
-			if grep -q "WebUI\\\\Password_PBKDF2=" %s; then
-				sed -i "s/^WebUI\\\\Password_PBKDF2=.*/WebUI\\\\Password_PBKDF2=%s/" %s
-			else
-				echo "WebUI\\\\Password_PBKDF2=%s" >> %s
-			fi
-		else
-			mkdir -p $(dirname %s)
-			echo "[Preferences]" > %s
-			echo "WebUI\\\\Username=%s" >> %s
-			echo "WebUI\\\\Password_PBKDF2=%s" >> %s
-			echo "WebUI\\\\Address=*" >> %s
-			echo "WebUI\\\\Port=8080" >> %s
-		fi
-	`, configPath, configPath, configPath, username, configPath, configPath, configPath, hash, configPath, hash, configPath, configPath, configPath, username, configPath, hash, configPath, configPath)
-
-	// Exécuter dans le conteneur
-	cmd := exec.CommandContext(ctx, "docker", "exec", containerName, "sh", "-c", script)
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("erreur lors de la modification de la configuration: %w", err)
-	}
-
-	return nil
+	// Cette fonction est désactivée car Docker n'est pas disponible dans le conteneur backend
+	// Utilisez ConfigureQBittorrentPassword qui modifie directement le fichier dans le volume partagé
+	return fmt.Errorf("configuration via Docker exec non disponible dans le conteneur backend - utilisez ConfigureQBittorrentPassword avec le volume partagé")
 }
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import { splitFileIntoChunks, calculateChunksHash, uploadChunksParallel } from '../../utils/chunkUpload'
 import './Upload.css'
 
 const Upload = () => {
@@ -16,10 +17,12 @@ const Upload = () => {
   })
   const [videoFile, setVideoFile] = useState(null)
   const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [categories, setCategories] = useState([])
   const [subCategories, setSubCategories] = useState([])
+  const [extractingMetadata, setExtractingMetadata] = useState(false)
 
   React.useEffect(() => {
     // Attendre que le chargement de l'authentification soit terminé
@@ -44,6 +47,80 @@ const Upload = () => {
       setSubCategories([])
     }
   }, [formData.category_id])
+
+  // Générer automatiquement une miniature quand le titre change
+  React.useEffect(() => {
+    if (formData.title && formData.title.trim() !== '' && !videoFile) {
+      generateThumbnailFromTitle(formData.title)
+    }
+  }, [formData.title])
+
+  const generateThumbnailFromTitle = async (title) => {
+    if (!title || title.trim() === '') return
+    
+    try {
+      const response = await api.get('/admin/thumbnails/generate', {
+        params: { title: title.trim() }
+      })
+      if (response.data.thumbnail_url) {
+        setThumbnailPreview(response.data.thumbnail_url)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la génération de la miniature:', error)
+      // Ne pas afficher d'erreur à l'utilisateur, c'est optionnel
+    }
+  }
+
+  const extractVideoMetadata = async (file) => {
+    if (!file) return
+    
+    setExtractingMetadata(true)
+    try {
+      const formData = new FormData()
+      formData.append('video', file)
+      
+      const response = await api.post('/admin/videos/extract-metadata', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      })
+      
+      const metadata = response.data
+      
+      // Pré-remplir les champs avec les métadonnées extraites
+      const newFormData = { ...formData }
+      
+      if (metadata.title && metadata.title.trim() !== '' && (!newFormData.title || newFormData.title.trim() === '')) {
+        newFormData.title = metadata.title.trim()
+      }
+      
+      if (metadata.description && metadata.description.trim() !== '' && (!newFormData.description || newFormData.description.trim() === '')) {
+        newFormData.description = metadata.description.trim()
+      }
+      
+      // Si on a un auteur, on peut l'ajouter à la description
+      if (metadata.author && metadata.author.trim() !== '') {
+        if (newFormData.description) {
+          newFormData.description = `Par ${metadata.author}\n\n${newFormData.description}`
+        } else {
+          newFormData.description = `Par ${metadata.author}`
+        }
+      }
+      
+      setFormData(newFormData)
+      
+      // Générer aussi une miniature depuis le titre si disponible
+      if (metadata.title) {
+        await generateThumbnailFromTitle(metadata.title)
+      }
+      
+    } catch (error) {
+      console.error('Erreur lors de l\'extraction des métadonnées:', error)
+      // Ne pas bloquer l'upload si l'extraction échoue
+    } finally {
+      setExtractingMetadata(false)
+    }
+  }
 
   const fetchCategories = async () => {
     try {
@@ -174,7 +251,7 @@ const Upload = () => {
               type="file"
               id="video"
               accept="video/*"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files[0]
                 if (file) {
                   setVideoFile(file)
@@ -189,6 +266,9 @@ const Upload = () => {
                   if (!formData.title || formData.title.trim() === '' || formData.title === 'null') {
                     setFormData({ ...formData, title: cleanTitle })
                   }
+                  
+                  // Extraire les métadonnées du fichier vidéo
+                  await extractVideoMetadata(file)
                 }
               }}
               required
@@ -207,9 +287,31 @@ const Upload = () => {
               type="file"
               id="thumbnail"
               accept="image/*"
-              onChange={(e) => setThumbnailFile(e.target.files[0])}
+              onChange={(e) => {
+                const file = e.target.files[0]
+                setThumbnailFile(file)
+                if (file) {
+                  // Afficher un aperçu de la miniature uploadée
+                  const reader = new FileReader()
+                  reader.onloadend = () => {
+                    setThumbnailPreview(reader.result)
+                  }
+                  reader.readAsDataURL(file)
+                } else {
+                  setThumbnailPreview(null)
+                }
+              }}
               disabled={uploading}
             />
+            {thumbnailPreview && (
+              <div className="thumbnail-preview">
+                <img src={thumbnailPreview} alt="Aperçu miniature" />
+                <p className="thumbnail-info">✨ Miniature générée automatiquement</p>
+              </div>
+            )}
+            {extractingMetadata && (
+              <p className="metadata-extracting">🔍 Extraction des métadonnées en cours...</p>
+            )}
           </div>
 
           <div className="form-group">

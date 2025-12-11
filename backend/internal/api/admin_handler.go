@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"streammake/internal/config"
 	"streammake/internal/models"
@@ -201,12 +202,23 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 		}
 
 		// Vérifier si la vidéo n'a aucun format
-		// MAIS: Ne pas supprimer les vidéos en cours de traitement (processing)
-		// car elles peuvent encore être en train de générer des formats
 		var formatCount int64
 		h.db.Model(&models.VideoFormat{}).Where("video_id = ?", video.ID).Count(&formatCount)
-		if formatCount == 0 && video.Status != models.VideoStatusProcessing {
-			// Seulement supprimer si la vidéo n'est pas en traitement
+		
+		// Vérifier si la vidéo est bloquée en processing depuis trop longtemps (> 2 heures)
+		if video.Status == models.VideoStatusProcessing {
+			timeSinceCreation := time.Since(video.CreatedAt)
+			if timeSinceCreation > 2*time.Hour && formatCount == 0 {
+				// Vidéo bloquée en processing depuis plus de 2 heures sans format
+				shouldDelete = true
+				reasons = append(reasons, fmt.Sprintf("bloquée en processing depuis %v (aucun format)", timeSinceCreation))
+			} else if timeSinceCreation > 6*time.Hour {
+				// Vidéo en processing depuis plus de 6 heures, même avec des formats
+				shouldDelete = true
+				reasons = append(reasons, fmt.Sprintf("bloquée en processing depuis %v (trop long)", timeSinceCreation))
+			}
+		} else if formatCount == 0 {
+			// Seulement supprimer si la vidéo n'est pas en traitement et n'a aucun format
 			shouldDelete = true
 			reasons = append(reasons, "aucun format disponible")
 		}

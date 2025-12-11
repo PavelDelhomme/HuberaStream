@@ -227,17 +227,41 @@
 
 .status-filter {
   padding: 12px 20px;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(20, 20, 20, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   color: #ffffff;
   font-size: 14px;
   cursor: pointer;
   outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23ffffff' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 15px center;
+  padding-right: 40px;
 }
 
 .status-filter:focus {
   border-color: #ff0000;
+  background-color: rgba(30, 30, 30, 0.95);
+}
+
+/* Styles pour les options du select en mode sombre */
+.status-filter option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  padding: 10px;
+}
+
+.status-filter option:hover {
+  background-color: #2a2a2a;
+}
+
+.status-filter option:checked {
+  background-color: #ff0000;
+  color: #ffffff;
 }
 
 .videos-table-container {

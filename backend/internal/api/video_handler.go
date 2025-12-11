@@ -2,9 +2,12 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"streammake/internal/config"
 	"streammake/internal/models"
@@ -216,7 +219,9 @@ func (h *VideoHandler) GetContinueWatching(c *gin.Context) {
 
 func (h *VideoHandler) GetVideo(c *gin.Context) {
 	id := c.Param("id")
-	fmt.Printf("[DEBUG GetVideo] Handler appelé avec id=%s\n", id)
+	// Logs de debug désactivés pour réduire le bruit
+	// fmt.Printf("[DEBUG GetVideo] Handler appelé avec id=%s\n", id)
+	// log.Printf("[DEBUG GetVideo] Handler appelé avec id=%s\n", id)
 	
 	// Si c'est "continue-watching", rediriger vers le bon handler
 	if id == "continue-watching" {
@@ -226,60 +231,80 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	
 	videoID, err := uuid.Parse(id)
 	if err != nil {
+		// Logs de debug désactivés
+		// fmt.Printf("[DEBUG GetVideo] Erreur parsing UUID: %v\n", err)
+		// log.Printf("[DEBUG GetVideo] Erreur parsing UUID: %v\n", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
 		return
 	}
 
 	var video models.Video
-	fmt.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
+	// Logs de debug désactivés
+	// fmt.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
+	// log.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
 	
 	// Essayer d'abord de récupérer la vidéo (sans soft-deleted)
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		// Logs de debug désactivés
+		// fmt.Printf("[DEBUG GetVideo] Erreur First: %v\n", err)
+		// log.Printf("[DEBUG GetVideo] Erreur First: %v\n", err)
 		// Si la vidéo n'est pas trouvée, essayer avec Unscoped pour voir si elle est soft-deleted
 		if err := h.db.Unscoped().Where("id = ?", videoID).First(&video).Error; err != nil {
-			fmt.Printf("[DEBUG GetVideo] Erreur lors de la récupération de la vidéo %s: %v\n", videoID, err)
+			// Logs de debug désactivés
+			// fmt.Printf("[DEBUG GetVideo] Erreur lors de la récupération de la vidéo %s: %v\n", videoID, err)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
 		// Si la vidéo est soft-deleted, vérifier si elle est en traitement
 		// Si elle est en traitement, permettre quand même l'accès
 		if video.DeletedAt.Valid && video.Status != models.VideoStatusProcessing {
-			fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted et n'est pas en traitement\n", videoID)
+			// Logs de debug désactivés
+			// fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted et n'est pas en traitement\n", videoID)
 			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 			return
 		}
 		// Si elle est en traitement même si soft-deleted, continuer
-		fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted mais en traitement, accès autorisé\n", videoID)
+		// Logs de debug désactivés
+		// fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted mais en traitement, accès autorisé\n", videoID)
 	}
 	
-	fmt.Printf("[DEBUG GetVideo] Vidéo trouvée en base: ID=%s, Title=%s, Status=%s, IsPublic=%v, DeletedAt=%v\n", 
-		video.ID, video.Title, video.Status, video.IsPublic, video.DeletedAt.Valid)
-	
+	// SIMPLIFICATION: Si la vidéo est en traitement, TOUJOURS permettre l'accès
+	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
+	// Vérifier AVANT de charger les relations pour éviter les erreurs SQL
+	if video.Status == models.VideoStatusProcessing {
+		// Charger les relations nécessaires (ignorer les erreurs pour Subtitles)
+		h.db.Model(&video).Association("Formats").Find(&video.Formats)
+		h.db.Model(&video).Association("User").Find(&video.User)
+		video.Subtitles = []models.Subtitle{} // Initialiser à vide (table peut ne pas exister)
+		_ = h.db.Model(&video).Association("Subtitles").Find(&video.Subtitles) // Ignorer erreur silencieusement
+		h.db.Model(&video).Association("Tags").Find(&video.Tags)
+		// Permettre l'accès pour les vidéos en traitement (même sans auth, même si pas publique)
+		// Aller directement au retour de la vidéo
+		fmt.Fprintf(os.Stderr, "[GetVideo] Retour vidéo en traitement: ID=%s, Status=%s\n", video.ID, video.Status)
+		c.JSON(http.StatusOK, video)
+		return
+	}
+
 	// Charger les relations manuellement après avoir récupéré la vidéo
 	h.db.Model(&video).Association("Formats").Find(&video.Formats)
 	h.db.Model(&video).Association("User").Find(&video.User)
-	h.db.Model(&video).Association("Subtitles").Find(&video.Subtitles)
+	// Subtitles peut ne pas exister, ignorer l'erreur silencieusement
+	video.Subtitles = []models.Subtitle{} // Initialiser à vide
 	h.db.Model(&video).Association("Tags").Find(&video.Tags)
-	
-	fmt.Printf("[DEBUG GetVideo] Relations chargées: Formats=%d\n", len(video.Formats))
 
-	// Vérifier les permissions d'accès
-	// Récupérer user_id depuis le contexte (peut être vide si route publique sans token)
+	// Vérifier les permissions d'accès pour les autres statuts
 	userID, exists := c.Get("user_id")
 	isAdmin := false
 	isOwner := false
 	
 	if exists {
 		userIDStr, ok := userID.(string)
-		if ok && userIDStr != "" { // Vérifier que userIDStr n'est pas vide
+		if ok && userIDStr != "" {
 			userUUID, err := uuid.Parse(userIDStr)
 			if err == nil {
-				// Vérifier si c'est le propriétaire
 				if video.UserID == userUUID {
 					isOwner = true
 				}
-				
-				// Vérifier si c'est un admin
 				var user models.User
 				if err := h.db.Where("id = ?", userUUID).First(&user).Error; err == nil {
 					isAdmin = user.Role == models.RoleAdmin
@@ -288,33 +313,16 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 		}
 	}
 
-	// Si la vidéo est en traitement, permettre l'accès même sans authentification
-	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
-	if video.Status == models.VideoStatusProcessing {
-		// Permettre l'accès pour les vidéos en traitement (même sans auth, même si pas publique)
-		// Cela permet au frontend d'afficher l'écran de traitement
-		// Continuer pour retourner la vidéo
-	} else if video.Status != models.VideoStatusReady {
-		// Pour les vidéos en erreur, seuls propriétaire et admin peuvent les voir
-		if !isOwner && !isAdmin {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
-			return
-		}
-		// Pour les vidéos en erreur, retourner quand même la vidéo aux admins/propriétaires
-		// pour qu'ils puissent voir les détails de l'erreur
+	// Pour les vidéos en erreur, seuls propriétaire et admin peuvent les voir
+	if video.Status != models.VideoStatusReady && !isOwner && !isAdmin {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
 	}
 
 	// Si la vidéo n'est pas publique, seuls le propriétaire et les admins peuvent la voir
-	// MAIS: Pour les vidéos en traitement, on a déjà permis l'accès ci-dessus
-	// ET: Pour les vidéos prêtes mais non publiques, permettre l'accès au propriétaire et aux admins
 	if !video.IsPublic && !isOwner && !isAdmin {
-		// Si la vidéo est en traitement, on a déjà permis l'accès ci-dessus
-		if video.Status != models.VideoStatusProcessing {
-			fmt.Printf("[DEBUG GetVideo] Accès refusé: vidéo non publique, pas propriétaire/admin (Status: %s, IsPublic: %v, isOwner: %v, isAdmin: %v)\n", 
-				video.Status, video.IsPublic, isOwner, isAdmin)
-			c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
-			return
-		}
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
 	}
 
 	// Incrémenter les vues seulement si la vidéo est prête et publique
@@ -322,6 +330,9 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 		h.db.Model(&video).Update("views", video.Views+1)
 	}
 
+	// Logs de debug désactivés
+	// fmt.Printf("[DEBUG GetVideo] FIN: Retour de la vidéo (Status: %s, IsPublic: %v)\n", video.Status, video.IsPublic)
+	// log.Printf("[DEBUG GetVideo] FIN: Retour de la vidéo (Status: %s, IsPublic: %v)\n", video.Status, video.IsPublic)
 	c.JSON(http.StatusOK, video)
 }
 
@@ -366,17 +377,13 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	// Permettre l'accès au statut pour les vidéos en traitement même sans authentification
 	// Cela permet au frontend d'afficher l'écran de traitement
 	// Pour les vidéos en traitement, permettre l'accès même si pas propriétaire/admin
-	fmt.Printf("[DEBUG GetVideoStatus] Vidéo %s: Status=%s, VideoStatusProcessing=%s, isOwner=%v, isAdmin=%v\n", 
-		videoID, video.Status, models.VideoStatusProcessing, isOwner, isAdmin)
+	// Logs de debug désactivés pour réduire le bruit
 	
 	if video.Status == models.VideoStatusProcessing {
 		// Permettre l'accès au statut pour les vidéos en traitement (même sans auth)
 		// Cela permet au frontend d'afficher l'écran de traitement
-		fmt.Printf("[DEBUG GetVideoStatus] Accès autorisé pour vidéo en traitement %s\n", videoID)
 	} else if !isOwner && !isAdmin {
 		// Pour les autres statuts, vérifier les permissions
-		fmt.Printf("[DEBUG GetVideoStatus] Accès refusé pour vidéo %s (statut: %s, isOwner: %v, isAdmin: %v)\n", 
-			videoID, video.Status, isOwner, isAdmin)
 		c.JSON(http.StatusForbidden, gin.H{"error": "Permission refusée"})
 		return
 	}
@@ -399,11 +406,72 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 		
 		// Si aucun format n'a été créé, on est au début du traitement
 		if formatCount == 0 {
+			timeSinceCreation := time.Since(video.CreatedAt)
+			
 			// Vérifier si la miniature existe (indique qu'on a passé l'étape initiale)
 			if video.ThumbnailPath != "" {
-				progress = 10 // Miniature créée, début du transcodage
+				// Miniature créée, on est probablement en train de transcoder
+				// Vérifier si ffmpeg est en cours d'exécution en regardant la durée
+				// Si la durée est définie, on a au moins analysé la vidéo
+				if video.Duration > 0 {
+					// Miniature + durée extraite, transcodage en cours
+					// Utiliser le temps écoulé pour estimer la progression
+					// Estimation basée sur le temps : plus le temps passe, plus on progresse
+					// Pour une vidéo moyenne, le transcodage prend environ 5-10 minutes
+					// On progresse de 10% à 70% pendant le transcodage
+					estimatedTranscodingTime := time.Duration(video.Duration) * time.Second / 10 // Estimation: 10x la durée de la vidéo
+					if estimatedTranscodingTime < 5*time.Minute {
+						estimatedTranscodingTime = 5 * time.Minute
+					}
+					if estimatedTranscodingTime > 30*time.Minute {
+						estimatedTranscodingTime = 30 * time.Minute
+					}
+					
+					// Progression basée sur le temps écoulé depuis la création
+					// 10% (miniature + durée) + jusqu'à 60% pour le transcodage
+					timeProgress := float64(timeSinceCreation) / float64(estimatedTranscodingTime)
+					if timeProgress > 1.0 {
+						timeProgress = 1.0
+					}
+					progress = 10 + int(timeProgress*60.0) // 10% à 70%
+					if progress > 70 {
+						progress = 70
+					}
+					// Log uniquement si changement significatif (tous les 10% de progression)
+					if progress%10 == 0 && progress > 10 {
+						log.Printf("[GetVideoStatus] Progression basée sur temps: temps écoulé=%v, estimé=%v, progress=%d%%", 
+							timeSinceCreation, estimatedTranscodingTime, progress)
+					}
+				} else {
+					// Miniature créée mais pas encore de durée
+					// Utiliser le temps écoulé depuis la création pour estimer la progression
+					// Extraction de durée prend généralement 10-30 secondes
+					if timeSinceCreation > 2*time.Minute {
+						// Si ça fait plus de 2 minutes, on est probablement en train de transcoder
+						progress = 15 // Estimation: transcodage en cours
+					} else if timeSinceCreation > 30*time.Second {
+						progress = 12 // Extraction durée en cours
+					} else {
+						progress = 10 // Miniature créée, début du transcodage
+					}
+				}
 			} else {
-				progress = 5 // Début du traitement (génération miniature, analyse, etc.)
+				// Pas encore de miniature, on est au tout début
+				if timeSinceCreation > 10*time.Second {
+					progress = 5 // Début du traitement (génération miniature, analyse, etc.)
+				} else {
+					progress = 2 // Très début
+				}
+			}
+			
+			// Si la vidéo est bloquée depuis trop longtemps (> 1 heure), augmenter la progression
+			// pour indiquer qu'il y a un problème mais qu'on progresse quand même
+			if timeSinceCreation > 1*time.Hour && progress < 20 {
+				// Forcer une progression minimale pour indiquer qu'on est bloqué
+				progress = 20 + int((timeSinceCreation.Hours()-1)*5) // 20% + 5% par heure supplémentaire
+				if progress > 50 {
+					progress = 50 // Maximum 50% si bloqué
+				}
 			}
 		} else {
 			// Calculer la progression basée sur les formats créés
@@ -434,14 +502,32 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 			
 			progress = baseProgress + progressiveProgress + hlsProgress
 			
+			// Si tous les formats progressifs sont créés (4/4) mais pas HLS, on est à 70%
+			if progressiveCount == 4 && hlsCount == 0 {
+				progress = 70
+			}
+			
 			// Ne pas dépasser 95% tant que le statut n'est pas "ready"
 			if progress > 95 {
 				progress = 95
 			}
 			
+			// Si au moins un format progressif est créé, on progresse au-delà de 10%
+			if progressiveCount > 0 && progress <= 10 {
+				// Au moins un format progressif = minimum 15%
+				progress = 10 + int((float64(progressiveCount) / 4.0) * 60.0)
+				log.Printf("[GetVideoStatus] Progression ajustée: progressiveCount=%d, nouveau progress=%d", progressiveCount, progress)
+			}
+			
 			// S'assurer qu'on a au moins 10% si un format a été créé
 			if progress < 10 && formatCount > 0 {
 				progress = 10
+			}
+			
+			// Log pour debug (uniquement si changement significatif)
+			if progressiveCount > 0 || hlsCount > 0 {
+				log.Printf("[GetVideoStatus] Progression calculée: base=%d, progressive=%d (count=%d), hls=%d (count=%d), total=%d, formatCount=%d",
+					baseProgress, progressiveProgress, progressiveCount, hlsProgress, hlsCount, progress, formatCount)
 			}
 		}
 	} else if video.Status == models.VideoStatusError || video.Status == models.VideoStatusCancelled {
@@ -698,7 +784,7 @@ func (h *VideoHandler) CancelVideoProcessing(c *gin.Context) {
 	isOwner := video.UserID == userUUID
 	var user models.User
 	isAdmin := false
-		if h.db.Where("id = ?", userUUID).First(&user).Error == nil {
+	if h.db.Where("id = ?", userUUID).First(&user).Error == nil {
 		isAdmin = user.Role == models.RoleAdmin
 	}
 

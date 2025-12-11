@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
-	"time"
 
 	"streammake/internal/api"
 	"streammake/internal/database"
 	"streammake/internal/config"
-	"streammake/internal/torrent"
 )
 
 func main() {
@@ -35,30 +32,11 @@ func main() {
 		log.Fatalf("Erreur lors de la création du dossier de stockage thumbnails: %v", err)
 	}
 
-	// Configurer automatiquement qBittorrent si nécessaire
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		defer cancel()
-		
-		// Attendre un peu que qBittorrent démarre
-		time.Sleep(10 * time.Second)
-		
-		if cfg.TorrentClientQBittorrentURL != "" && cfg.TorrentClientQBittorrentPass != "" {
-			log.Printf("🔧 Configuration automatique de qBittorrent...")
-			if err := torrent.ConfigureQBittorrentFromDocker(
-				ctx,
-				"streammake-qbittorrent",
-				cfg.TorrentClientQBittorrentUser,
-				cfg.TorrentClientQBittorrentPass,
-			); err != nil {
-				log.Printf("⚠️  Erreur lors de la configuration automatique de qBittorrent: %v", err)
-				log.Printf("   Vous pouvez configurer qBittorrent manuellement via http://localhost:3306")
-			} else {
-				log.Printf("✅ qBittorrent configuré automatiquement avec succès!")
-				log.Printf("   Redémarrez qBittorrent pour que les changements prennent effet")
-			}
-		}
-	}()
+	// Note: La configuration automatique de qBittorrent via Docker exec n'est pas possible
+	// car Docker n'est pas disponible dans le conteneur backend.
+	// L'utilisateur doit configurer qBittorrent manuellement via l'interface web:
+	// http://localhost:3306 (utilisateur: admin, mot de passe: adminadmin par défaut)
+	// ou via les variables d'environnement QBITTORRENT_USER et QBITTORRENT_PASS
 
 	// Initialiser le routeur API
 	router := api.SetupRouter(db, cfg)

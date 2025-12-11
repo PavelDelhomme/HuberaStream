@@ -3,9 +3,9 @@ package api
 import (
 	"log"
 	"net/http"
-	"strings"
 	"streammake/internal/config"
 	"streammake/internal/middleware"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -13,7 +13,7 @@ import (
 
 func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	router := gin.New()
-	
+
 	// Ajouter les middlewares de base (logger et recovery)
 	router.Use(gin.Logger())
 	router.Use(gin.Recovery())
@@ -23,7 +23,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	router.Use(func(c *gin.Context) {
 		// Logger TOUTES les requêtes pour debug (y compris GET)
 		if strings.Contains(c.Request.URL.Path, "/api/videos/") || strings.Contains(c.Request.URL.Path, "/api/thumbnails/") {
-			log.Printf("[EARLY-DEBUG] %s %s - RemoteAddr: %s, Origin: %s, ClientIP: %s", 
+			log.Printf("[EARLY-DEBUG] %s %s - RemoteAddr: %s, Origin: %s, ClientIP: %s",
 				c.Request.Method,
 				c.Request.URL.Path,
 				c.Request.RemoteAddr,
@@ -43,6 +43,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	authHandler := NewAuthHandler(db, cfg)
 	uploadHandler := NewUploadHandler(db, cfg)
 	videoHandler := NewVideoHandler(db, cfg, uploadHandler)
+	chunkUploadHandler := NewChunkUploadHandler(db, cfg, uploadHandler)
 	playlistHandler := NewPlaylistHandler(db)
 	streamHandler := NewStreamHandler(db, cfg)
 	adminHandler := NewAdminHandler(db, cfg)
@@ -66,13 +67,13 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 		// Route continue-watching (chemin différent pour éviter le conflit avec /videos/:id)
 		api.GET("/continue-watching", videoHandler.GetContinueWatching)
-		
+
 		// Catégories (publiques - accessibles sans authentification)
 		api.GET("/categories", categoryHandler.ListCategories)
-		
+
 		// Servir les thumbnails (publiques) - utiliser un handler dédié
 		api.GET("/thumbnails/:filename", streamHandler.ServeThumbnail)
-		
+
 		// Vidéos publiques (avec authentification optionnelle)
 		videos := api.Group("/videos")
 		// Ajouter le middleware d'authentification optionnelle pour permettre l'accès aux vidéos en traitement
@@ -98,6 +99,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			videos.PUT("/:id", videoHandler.UpdateVideo)
 			videos.DELETE("/:id", videoHandler.DeleteVideo)
 			videos.POST("/:id/download", videoHandler.DownloadFromStream)
+			videos.POST("/:id/cancel", videoHandler.CancelVideoProcessing)
 		}
 
 		// Extraction DVD (admin seulement)
@@ -161,9 +163,27 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// Statistiques
 		admin.GET("/stats", adminHandler.GetStats)
 
-		// Nettoyage des vidéos invalides
-		admin.GET("/videos/invalid", adminHandler.ListInvalidVideos)
-		admin.POST("/videos/clean-invalid", adminHandler.CleanInvalidVideos)
+		// IMPORTANT: Créer un groupe pour toutes les routes /videos pour éviter les conflits
+		// Les routes spécifiques doivent être AVANT les routes avec paramètres
+		videosAdmin := admin.Group("/videos")
+		{
+			// Routes spécifiques AVANT les routes avec paramètres
+			// Extraction de métadonnées (doit être la PREMIÈRE route pour éviter les conflits)
+			videosAdmin.POST("/extract-metadata", func(c *gin.Context) {
+				log.Printf("[DEBUG-ROUTE] ✅ Handler extract-metadata appelé pour %s", c.Request.URL.Path)
+				uploadHandler.ExtractVideoMetadata(c)
+			})
+			videosAdmin.POST("/upload", uploadHandler.UploadVideo)
+			videosAdmin.GET("/invalid", adminHandler.ListInvalidVideos)
+			videosAdmin.POST("/clean-invalid", adminHandler.CleanInvalidVideos)
+
+			// Routes avec paramètres (après les routes spécifiques)
+			videosAdmin.POST("/:id/extract-metadata", uploadHandler.ExtractVideoMetadataFromID)
+		}
+		log.Printf("[Routes] ✅ Groupe /admin/videos créé avec extract-metadata, upload, invalid, clean-invalid, et :id/extract-metadata")
+
+		// Génération de miniature depuis titre
+		admin.GET("/thumbnails/generate", uploadHandler.GenerateThumbnailFromTitle)
 
 		// Catégories
 		categories := admin.Group("/categories")
@@ -223,19 +243,28 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			scrapers.GET("/crawler/status", scraperHandler.GetCrawlerStatus)
 		}
 
-		// Upload vidéo (admin seulement)
-		admin.POST("/videos/upload", uploadHandler.UploadVideo)
+		// Upload par chunks (avec pause/reprise)
+		chunks := admin.Group("/uploads")
+		{
+			chunks.POST("/init", chunkUploadHandler.InitUploadSession)
+			chunks.POST("/:session_id/chunk", chunkUploadHandler.UploadChunk)
+			chunks.GET("/:session_id/status", chunkUploadHandler.GetUploadStatus)
+			chunks.POST("/:session_id/pause", chunkUploadHandler.PauseUpload)
+			chunks.POST("/:session_id/resume", chunkUploadHandler.ResumeUpload)
+			chunks.POST("/:session_id/finalize", chunkUploadHandler.FinalizeUpload)
+			chunks.POST("/:session_id/cancel", chunkUploadHandler.CancelUpload)
+		}
 	}
 
 	// Handler pour les routes non trouvées (debug)
 	router.NoRoute(func(c *gin.Context) {
+		log.Printf("[NoRoute] Route non trouvée: %s %s", c.Request.Method, c.Request.URL.Path)
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Route non trouvée",
-			"path":  c.Request.URL.Path,
+			"error":  "Route non trouvée",
+			"path":   c.Request.URL.Path,
 			"method": c.Request.Method,
 		})
 	})
 
 	return router
 }
-

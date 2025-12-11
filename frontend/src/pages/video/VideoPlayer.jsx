@@ -187,23 +187,26 @@ const VideoPlayerPage = () => {
   // Polling du statut pour les vidéos en traitement
   const startStatusPolling = (videoId) => {
     let pollCount = 0
-    const maxPollAttempts = 300 // Maximum 10 minutes (300 * 2s = 600s)
+    const maxPollAttempts = 1800 // Maximum 60 minutes (1800 * 2s = 3600s) pour les grandes vidéos
     
     const pollInterval = setInterval(async () => {
       pollCount++
       
       // Arrêter le polling après un certain nombre de tentatives pour éviter les boucles infinies
       if (pollCount > maxPollAttempts) {
-        console.warn(`Polling arrêté après ${maxPollAttempts} tentatives pour la vidéo ${videoId}`)
+        console.warn(`Polling arrêté après ${maxPollAttempts} tentatives (${maxPollAttempts * 2 / 60} minutes) pour la vidéo ${videoId}`)
         clearInterval(pollInterval)
-        setError('Le traitement prend plus de temps que prévu. Veuillez actualiser la page.')
+        setError(`Le traitement prend plus de temps que prévu (plus de ${maxPollAttempts * 2 / 60} minutes). Le traitement continue en arrière-plan. Vous pouvez fermer cette page et revenir plus tard.`)
         return
       }
       
       try {
         const statusResponse = await api.get(`/videos/${videoId}/status`)
         if (statusResponse.data) {
-          console.log(`[Polling ${pollCount}] Statut: ${statusResponse.data.status}, Progression: ${statusResponse.data.progress}%, Formats: ${statusResponse.data.formats_count}`)
+          // Log uniquement tous les 10 polls pour réduire le spam
+          if (pollCount % 10 === 0 || statusResponse.data.status !== 'processing') {
+            console.log(`[Polling ${pollCount}] Statut: ${statusResponse.data.status}, Progression: ${statusResponse.data.progress}%, Formats: ${statusResponse.data.formats_count}`)
+          }
           
           // Mettre à jour le statut et la progression
           setVideo(prev => ({
@@ -263,11 +266,19 @@ const VideoPlayerPage = () => {
         }
       } catch (err) {
         console.error(`Erreur lors du polling du statut (tentative ${pollCount}):`, err)
+        // Arrêter le polling si la vidéo est supprimée (404) ou erreur serveur (502)
+        if (err.response?.status === 404) {
+          console.error('Vidéo supprimée (404), arrêt du polling')
+          clearInterval(pollInterval)
+          setError('Vidéo supprimée ou non trouvée.')
+          setLoading(false)
+          return
+        }
         // Ne pas arrêter le polling immédiatement en cas d'erreur
         // Attendre quelques tentatives avant d'abandonner
         if (pollCount > 10) {
-          if (err.response?.status === 404 || err.response?.status === 502) {
-            console.error('Vidéo non trouvée ou erreur serveur après plusieurs tentatives, arrêt du polling')
+          if (err.response?.status === 502) {
+            console.error('Erreur serveur (502) après plusieurs tentatives, arrêt du polling')
             clearInterval(pollInterval)
             setError('Impossible de récupérer le statut de la vidéo. Veuillez actualiser la page.')
           } else if (pollCount > 20) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"streammake/internal/config"
@@ -159,6 +160,21 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 			}
 		case "rtorrent":
 			testCfg.TorrentClientRTorrentURL = url
+		}
+	}
+
+	// Si c'est qBittorrent et qu'on n'a pas de mot de passe, essayer de configurer automatiquement
+	if req.ClientType == "qbittorrent" && testCfg.TorrentClientQBittorrentPass == "" {
+		// Essayer de configurer automatiquement via le volume partagé
+		ctx := c.Request.Context()
+		log.Printf("🔧 Configuration automatique de qBittorrent via volume partagé...")
+		if err := torrent.ConfigureQBittorrentPassword(ctx, testCfg.TorrentClientQBittorrentURL, testCfg.TorrentClientQBittorrentUser, "adminadmin"); err == nil {
+			// Configuration réussie, mettre à jour le mot de passe
+			testCfg.TorrentClientQBittorrentPass = "adminadmin"
+			log.Printf("✅ Configuration automatique de qBittorrent réussie")
+		} else {
+			log.Printf("⚠️  Erreur lors de la configuration automatique de qBittorrent: %v", err)
+			log.Printf("    Vous pouvez configurer qBittorrent manuellement via http://localhost:3306")
 		}
 	}
 
