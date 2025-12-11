@@ -60,7 +60,7 @@ func (h *ChunkUploadHandler) InitUploadSession(c *gin.Context) {
 		FileName  string          `json:"file_name" binding:"required"`
 		FileSize  int64           `json:"file_size" binding:"required"`
 		ChunkSize int64           `json:"chunk_size"` // Optionnel, défaut 5MB
-		Metadata  json.RawMessage `json:"metadata"` // title, description, category_id, etc.
+		Metadata  json.RawMessage `json:"metadata"`   // title, description, category_id, etc.
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {

@@ -167,42 +167,63 @@ const Upload = () => {
     setProgress(0)
 
     try {
-      const uploadData = new FormData()
-      uploadData.append('video', videoFile)
-      uploadData.append('title', finalFormData.title)
-      uploadData.append('description', finalFormData.description || '')
-      if (finalFormData.category_id) {
-        uploadData.append('category_id', finalFormData.category_id)
+      // Étape 1: Initialiser la session d'upload
+      const metadata = {
+        title: finalFormData.title,
+        description: finalFormData.description || '',
+        category_id: finalFormData.category_id || null,
+        sub_category_id: finalFormData.sub_category_id || null,
+        is_public: finalFormData.is_public,
       }
-      if (finalFormData.sub_category_id) {
-        uploadData.append('sub_category_id', finalFormData.sub_category_id)
-      }
-      uploadData.append('is_public', finalFormData.is_public)
+      
+      const initResponse = await api.post('/admin/uploads/init', {
+        file_name: videoFile.name,
+        file_size: videoFile.size,
+        metadata: metadata,
+      })
+      
+      const sessionId = initResponse.data.session_id
+      console.log('✅ Session d\'upload initialisée:', sessionId)
+      setProgress(5)
 
-      const response = await api.post('/admin/videos/upload', uploadData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          )
-          setProgress(percentCompleted)
-        },
+      // Étape 2: Diviser le fichier en chunks
+      const chunks = splitFileIntoChunks(videoFile)
+      console.log(`📦 Fichier divisé en ${chunks.length} chunks`)
+
+      // Étape 3: Calculer les hash de tous les chunks
+      const chunksWithHash = await calculateChunksHash(chunks)
+      console.log('✅ Hash calculés pour tous les chunks')
+      setProgress(10)
+
+      // Étape 4: Uploader les chunks en parallèle avec progression
+      await uploadChunksParallel(sessionId, chunksWithHash, api, (progressData) => {
+        // Progression de l'upload: 10% à 90% (10% pour init + hash, 80% pour upload, 10% pour finalisation)
+        const uploadProgress = 10 + (progressData.progress * 0.8)
+        setProgress(Math.round(uploadProgress))
+        console.log(`📤 Upload: ${Math.round(progressData.progress)}% (${progressData.uploadedChunks}/${progressData.totalChunks} chunks)`)
       })
 
-      // Upload thumbnail si fourni
-      if (thumbnailFile && response.data.video_id) {
+      setProgress(90)
+
+      // Étape 5: Finaliser l'upload
+      const finalizeResponse = await api.post(`/admin/uploads/${sessionId}/finalize`)
+      console.log('✅ Upload finalisé:', finalizeResponse.data)
+      setProgress(95)
+
+      // Étape 6: Uploader la miniature si fournie
+      if (thumbnailFile && finalizeResponse.data.video_id) {
         const thumbnailData = new FormData()
         thumbnailData.append('thumbnail', thumbnailFile)
-        await api.post(`/videos/${response.data.video_id}/thumbnail`, thumbnailData, {
+        await api.post(`/videos/${finalizeResponse.data.video_id}/thumbnail`, thumbnailData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
         })
+        console.log('✅ Miniature uploadée')
       }
 
-      const videoId = response.data.video_id
+      setProgress(100)
+      const videoId = finalizeResponse.data.video_id
       
       if (videoId) {
         alert('✅ Vidéo uploadée avec succès! Le traitement peut prendre quelques instants.')
