@@ -118,6 +118,10 @@ test-comprehensive:
 	@echo "${GREEN}Tests complets backend + frontend...${NC}"
 	@./scripts/test-comprehensive.sh
 
+test-metadata:
+	@echo "${GREEN}Test de recherche de métadonnées pour RED_ONE.webm...${NC}"
+	@./scripts/test-metadata.sh
+
 install-deps:
 	@echo "${GREEN}Installation des dépendances Go...${NC}"
 	cd backend && go mod tidy

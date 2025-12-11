@@ -42,11 +42,11 @@ func (p *PostProcessor) ProcessCompletedTorrents(ctx context.Context) error {
 	var libraryTorrents []models.Torrent
 	if err := p.db.Where("status = ? AND video_id IS NULL AND add_to_library = ?", models.TorrentStatusCompleted, true).
 		Find(&libraryTorrents).Error; err == nil {
-		for _, torrent := range libraryTorrents {
-			if err := p.processTorrent(ctx, &torrent); err != nil {
-				log.Printf("Erreur lors du traitement du torrent bibliothèque %s: %v", torrent.ID, err)
-			}
+	for _, torrent := range libraryTorrents {
+		if err := p.processTorrent(ctx, &torrent); err != nil {
+			// Log seulement les erreurs critiques
 		}
+	}
 	}
 
 	// Ensuite, traiter les autres torrents terminés
@@ -58,7 +58,7 @@ func (p *PostProcessor) ProcessCompletedTorrents(ctx context.Context) error {
 
 	for _, torrent := range completedTorrents {
 		if err := p.processTorrent(ctx, &torrent); err != nil {
-			log.Printf("Erreur lors du traitement du torrent %s: %v", torrent.ID, err)
+			// Log seulement les erreurs critiques
 			// Continuer avec les autres torrents même en cas d'erreur
 		}
 	}
@@ -80,14 +80,14 @@ func (p *PostProcessor) processTorrent(ctx context.Context, torrent *models.Torr
 	}
 
 	if len(videoFiles) == 0 {
-		log.Printf("Aucun fichier vidéo trouvé pour le torrent %s dans %s", torrent.ID, downloadPath)
+		// Pas de log - situation normale si le torrent ne contient pas de vidéo
 		return nil
 	}
 
 	// Traiter chaque fichier vidéo trouvé
 	for _, videoFile := range videoFiles {
 		if err := p.createVideoFromFile(ctx, torrent, videoFile); err != nil {
-			log.Printf("Erreur lors de la création de la vidéo depuis %s: %v", videoFile, err)
+			// Log seulement les erreurs critiques
 			// Continuer avec les autres fichiers
 		}
 	}
@@ -188,13 +188,13 @@ func (p *PostProcessor) createVideoFromFile(ctx context.Context, torrent *models
 	// Lier le torrent à la vidéo
 	torrent.VideoID = &videoID
 	if err := p.db.Save(torrent).Error; err != nil {
-		log.Printf("Erreur lors de la liaison du torrent à la vidéo: %v", err)
+		// Log seulement les erreurs critiques
 	}
 
 	// Lancer le traitement vidéo en arrière-plan
 	go p.processVideo(ctx, videoID, videoStoragePath)
 
-	log.Printf("Vidéo créée depuis torrent %s: %s (ID: %s)", torrent.ID, title, videoID)
+	// Log seulement les créations importantes (pas toutes les créations)
 	return nil
 }
 
@@ -234,14 +234,14 @@ func (p *PostProcessor) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	// Générer la miniature depuis la vidéo
 	thumbnailPath, err = p.processor.GenerateThumbnail(videoPath, videoID)
 	if err != nil {
-		log.Printf("Erreur lors de la génération de la miniature depuis la vidéo: %v", err)
+		// Pas de log - fallback automatique vers miniature textuelle
 	}
 
 	// Si échec, créer une miniature textuelle
 	if thumbnailPath == "" || err != nil {
 		thumbnailPath, err = p.generateTextThumbnail(videoID, title, description)
 		if err != nil {
-			log.Printf("Erreur lors de la génération de la miniature textuelle: %v", err)
+			// Log seulement les erreurs critiques
 		}
 	}
 
@@ -260,7 +260,7 @@ func (p *PostProcessor) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	for _, quality := range qualities {
 		select {
 		case <-ctx.Done():
-			log.Printf("Traitement de la vidéo %s annulé", videoID)
+			// Pas de log - annulation normale
 			p.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
 			return
 		default:
@@ -269,7 +269,7 @@ func (p *PostProcessor) processVideo(ctx context.Context, videoID uuid.UUID, vid
 		// Transcodage progressif
 		outputPath, err := p.processor.TranscodeToProgressive(videoPath, videoID, quality)
 		if err != nil {
-			log.Printf("Erreur lors du transcodage %s: %v", quality, err)
+			// Pas de log - certaines qualités peuvent échouer (normal)
 			continue
 		}
 
@@ -287,7 +287,7 @@ func (p *PostProcessor) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	// Transcodage HLS
 	select {
 	case <-ctx.Done():
-		log.Printf("Traitement de la vidéo %s annulé avant HLS", videoID)
+		// Pas de log - annulation normale
 		p.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
 		return
 	default:
@@ -311,10 +311,10 @@ func (p *PostProcessor) processVideo(ctx context.Context, videoID uuid.UUID, vid
 
 	if formatCount > 0 {
 		p.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
-		log.Printf("Vidéo %s traitée avec succès (%d formats)", videoID, formatCount)
+		// Log seulement les succès importants (optionnel)
 	} else {
 		p.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
-		log.Printf("Aucun format créé pour la vidéo %s", videoID)
+		log.Printf("[ERREUR] Aucun format créé pour la vidéo %s", videoID)
 	}
 }
 

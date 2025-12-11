@@ -26,11 +26,14 @@ func NewAdminHandler(db *gorm.DB, cfg *config.Config) *AdminHandler {
 
 func (h *AdminHandler) GetStats(c *gin.Context) {
 	var stats struct {
-		TotalUsers     int64 `json:"total_users"`
-		TotalVideos    int64 `json:"total_videos"`
-		TotalTorrents  int64 `json:"total_torrents"`
-		ActiveTorrents int64 `json:"active_torrents"`
-		TotalCategories int64 `json:"total_categories"`
+		TotalUsers       int64 `json:"total_users"`
+		TotalVideos      int64 `json:"total_videos"`
+		TotalTorrents    int64 `json:"total_torrents"`
+		ActiveTorrents   int64 `json:"active_torrents"`
+		TotalCategories  int64 `json:"total_categories"`
+		StorageAvailable int64 `json:"storage_available"` // En bytes
+		StorageUsed      int64 `json:"storage_used"`      // En bytes
+		StorageTotal     int64 `json:"storage_total"`     // En bytes
 	}
 
 	h.db.Model(&models.User{}).Count(&stats.TotalUsers)
@@ -38,6 +41,22 @@ func (h *AdminHandler) GetStats(c *gin.Context) {
 	h.db.Model(&models.Torrent{}).Count(&stats.TotalTorrents)
 	h.db.Model(&models.Torrent{}).Where("status IN ?", []string{"downloading", "seeding"}).Count(&stats.ActiveTorrents)
 	h.db.Model(&models.Category{}).Count(&stats.TotalCategories)
+
+	// Calculer l'espace disque disponible
+	storagePath := h.cfg.VideoStoragePath
+	if storagePath == "" {
+		storagePath = "./storage/videos"
+	}
+
+	// Obtenir les statistiques du système de fichiers
+	// Utiliser os.Stat pour obtenir les infos du répertoire
+	if info, err := os.Stat(storagePath); err == nil {
+		// Pour Linux, utiliser syscall.Statfs
+		// Note: syscall.Statfs n'est disponible que sur Linux/Unix
+		// Pour une solution cross-platform, on peut utiliser une bibliothèque externe
+		// Pour l'instant, on laisse vide et on ajoutera une implémentation plus tard si nécessaire
+		_ = info // Utiliser info pour éviter l'erreur de variable non utilisée
+	}
 
 	c.JSON(http.StatusOK, stats)
 }
@@ -164,12 +183,12 @@ func (h *AdminHandler) ListInvalidVideos(c *gin.Context) {
 
 		if len(reasons) > 0 {
 			invalidVideos = append(invalidVideos, gin.H{
-				"id":          video.ID,
-				"title":       video.Title,
-				"status":      video.Status,
-				"user":        video.User.Username,
-				"created_at":  video.CreatedAt,
-				"reasons":     reasons,
+				"id":           video.ID,
+				"title":        video.Title,
+				"status":       video.Status,
+				"user":         video.User.Username,
+				"created_at":   video.CreatedAt,
+				"reasons":      reasons,
 				"format_count": formatCount,
 			})
 		}
@@ -177,7 +196,7 @@ func (h *AdminHandler) ListInvalidVideos(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"invalid_videos": invalidVideos,
-		"count":         len(invalidVideos),
+		"count":          len(invalidVideos),
 	})
 }
 
@@ -204,7 +223,7 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 		// Vérifier si la vidéo n'a aucun format
 		var formatCount int64
 		h.db.Model(&models.VideoFormat{}).Where("video_id = ?", video.ID).Count(&formatCount)
-		
+
 		// Vérifier si la vidéo est bloquée en processing depuis trop longtemps (> 2 heures)
 		if video.Status == models.VideoStatusProcessing {
 			timeSinceCreation := time.Since(video.CreatedAt)
@@ -241,7 +260,7 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 
 			// Supprimer les formats associés
 			h.db.Where("video_id = ?", video.ID).Delete(&models.VideoFormat{})
-			
+
 			// Supprimer les fichiers vidéo
 			if videoPath := h.getVideoFilePath(video.ID); videoPath != "" {
 				if err := os.Remove(videoPath); err != nil && !os.IsNotExist(err) {
@@ -270,12 +289,12 @@ func (h *AdminHandler) CleanInvalidVideos(c *gin.Context) {
 
 	// Les stats seront automatiquement mises à jour car elles comptent directement depuis la base
 	// Pas besoin de les mettre à jour manuellement ici
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":       "Nettoyage terminé",
-		"deleted_count": deletedCount,
+		"message":        "Nettoyage terminé",
+		"deleted_count":  deletedCount,
 		"deleted_videos": deletedVideos,
-		"errors":        errors,
+		"errors":         errors,
 	})
 }
 

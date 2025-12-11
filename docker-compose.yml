@@ -145,11 +145,15 @@ services:
     volumes:
       - torrent_storage:/downloads
       - torrent_config:/config
+      - torrent_watch:/watch # Dossier pour surveiller les nouveaux torrents
     ports:
       - "3305:9091" # Transmission Web UI
     networks:
       - streammake-network
     restart: unless-stopped
+    # Créer les dossiers nécessaires au démarrage
+    entrypoint: >
+      /bin/sh -c " mkdir -p /downloads/complete /downloads/incomplete /watch 2>/dev/null || true && /init "
 
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
@@ -194,15 +198,20 @@ services:
     restart: unless-stopped
 
   rtorrent:
-    image: linuxserver/rutorrent:latest
+    # Image mise à jour : l'ancienne image linuxserver/rutorrent est dépréciée
+    image: crazymax/rtorrent-rutorrent:latest
     container_name: streammake-rtorrent
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Paris
+      - RTORRENT_DHT_PORT=6881
+      - RTORRENT_INC_PORT=50000
+      - RTORRENT_MAX_PEERS=200
+      - RTORRENT_MAX_PEERS_GLOBAL=200
     volumes:
-      - torrent_storage:/downloads
-      - rtorrent_config:/config
+      - torrent_storage:/data
+      - rtorrent_config:/home/rtorrent/.rtorrent
     ports:
       - "3308:80" # ruTorrent Web UI
       - "3310:5000" # rTorrent XMLRPC
@@ -221,6 +230,7 @@ volumes:
   thumbnail_storage:
   torrent_storage:
   torrent_config:
+  torrent_watch: # Volume pour le dossier watch de Transmission
   qbittorrent_config:
   deluge_config:
   rtorrent_config:

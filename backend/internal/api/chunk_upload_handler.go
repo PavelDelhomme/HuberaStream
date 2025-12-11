@@ -434,16 +434,6 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 		return
 	}
 
-	// Vérifier que tous les chunks sont uploadés
-	if session.UploadedChunks < session.TotalChunks {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":          "Tous les chunks ne sont pas encore uploadés",
-			"uploaded_chunks": session.UploadedChunks,
-			"total_chunks":    session.TotalChunks,
-		})
-		return
-	}
-
 	// Récupérer tous les chunks triés par index
 	var chunks []models.UploadChunk
 	if err := h.db.Where("session_id = ?", sessionID).Order("chunk_index ASC").Find(&chunks).Error; err != nil {
@@ -451,10 +441,35 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 		return
 	}
 
-	if len(chunks) != session.TotalChunks {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Nombre de chunks incorrect"})
+	// Compter réellement les chunks dans la base de données
+	actualChunkCount := len(chunks)
+	
+	// Vérifier que tous les chunks sont uploadés (utiliser le comptage réel plutôt que le compteur de session)
+	if actualChunkCount < session.TotalChunks {
+		log.Printf("[FinalizeUpload] ⚠️  Chunks manquants: %d/%d uploadés (session: %s)", 
+			actualChunkCount, session.TotalChunks, sessionID)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":          "Tous les chunks ne sont pas encore uploadés",
+			"uploaded_chunks": actualChunkCount,
+			"total_chunks":    session.TotalChunks,
+			"session_uploaded_chunks": session.UploadedChunks, // Pour debug
+		})
 		return
 	}
+
+	if actualChunkCount != session.TotalChunks {
+		log.Printf("[FinalizeUpload] ⚠️  Nombre de chunks incorrect: %d attendu, %d trouvé (session: %s)", 
+			session.TotalChunks, actualChunkCount, sessionID)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Nombre de chunks incorrect",
+			"expected": session.TotalChunks,
+			"found": actualChunkCount,
+		})
+		return
+	}
+	
+	log.Printf("[FinalizeUpload] ✅ Tous les chunks sont présents: %d/%d (session: %s)", 
+		actualChunkCount, session.TotalChunks, sessionID)
 
 	// Assembler les chunks
 	videoID := uuid.New()
@@ -508,9 +523,20 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 
 	// Parser les métadonnées
 	var metadata struct {
-		Title         string     `json:"title"`
-		Description   string     `json:"description"`
-		CategoryID    *uuid.UUID `json:"category_id"`
+		Title          string     `json:"title"`
+		Description    string     `json:"description"`
+		CategoryID     *uuid.UUID `json:"category_id"`
+		// Métadonnées enrichies
+		Director       string     `json:"director"`
+		Actors         string     `json:"actors"`
+		ReleaseDate    string     `json:"release_date"`
+		ProductionYear int        `json:"production_year"`
+		Synopsis       string     `json:"synopsis"`
+		Genre          string     `json:"genre"`
+		Rating         float64    `json:"rating"`
+		IMDBID         string     `json:"imdb_id"`
+		TMDBID         int        `json:"tmdb_id"`
+		PosterURL      string     `json:"poster_url"`
 		SubCategoryID *uuid.UUID `json:"sub_category_id"`
 		IsPublic      bool       `json:"is_public"`
 	}
@@ -523,15 +549,26 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 
 	// Créer l'entrée vidéo
 	videoModel := models.Video{
-		ID:            videoID,
-		Title:         metadata.Title,
-		Description:   metadata.Description,
-		UserID:        session.UserID,
-		Status:        models.VideoStatusProcessing,
-		CategoryID:    metadata.CategoryID,
-		SubCategoryID: metadata.SubCategoryID,
-		IsPublic:      metadata.IsPublic,
-		Checksum:      finalChecksum,
+		ID:              videoID,
+		Title:           metadata.Title,
+		Description:     metadata.Description,
+		UserID:          session.UserID,
+		Status:          models.VideoStatusProcessing,
+		CategoryID:      metadata.CategoryID,
+		SubCategoryID:   metadata.SubCategoryID,
+		IsPublic:        metadata.IsPublic,
+		Checksum:        finalChecksum,
+		// Métadonnées enrichies
+		Director:        metadata.Director,
+		Actors:          metadata.Actors,
+		ReleaseDate:     metadata.ReleaseDate,
+		ProductionYear:  metadata.ProductionYear,
+		Synopsis:        metadata.Synopsis,
+		Genre:           metadata.Genre,
+		Rating:          metadata.Rating,
+		IMDBID:          metadata.IMDBID,
+		TMDBID:          metadata.TMDBID,
+		PosterURL:       metadata.PosterURL,
 	}
 
 	if err := h.db.Create(&videoModel).Error; err != nil {

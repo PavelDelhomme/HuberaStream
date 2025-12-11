@@ -51,14 +51,21 @@ const AdminTorrents = () => {
     }
     fetchTorrents(true) // Chargement initial
     fetchCategories()
-    // Auto-refresh toutes les 5 secondes en arrière-plan (sans bloquer l'UI)
+    // Auto-refresh toutes les 5 secondes UNIQUEMENT s'il y a des torrents actifs
     const interval = setInterval(() => {
       if (autoRefreshEnabled) {
-        fetchTorrentsBackground()
+        // Vérifier s'il y a des torrents actifs (pending, downloading, seeding)
+        const hasActiveTorrents = torrents.some(t => 
+          t.status === 'pending' || t.status === 'downloading' || t.status === 'seeding'
+        )
+        // Ne rafraîchir que s'il y a des torrents actifs
+        if (hasActiveTorrents) {
+          fetchTorrentsBackground()
+        }
       }
     }, 5000)
     return () => clearInterval(interval)
-  }, [user, authLoading, isAdmin, navigate, autoRefreshEnabled])
+  }, [user, authLoading, isAdmin, navigate, autoRefreshEnabled, torrents])
 
   const fetchTorrents = async (isInitial = false) => {
     try {

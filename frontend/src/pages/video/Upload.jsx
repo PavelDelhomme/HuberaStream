@@ -23,6 +23,10 @@ const Upload = () => {
   const [categories, setCategories] = useState([])
   const [subCategories, setSubCategories] = useState([])
   const [extractingMetadata, setExtractingMetadata] = useState(false)
+  const [searchingMetadata, setSearchingMetadata] = useState(false)
+  const [metadataResults, setMetadataResults] = useState([])
+  const [showMetadataResults, setShowMetadataResults] = useState(false)
+  const [selectedMetadata, setSelectedMetadata] = useState(null)
 
   React.useEffect(() => {
     // Attendre que le chargement de l'authentification soit terminé
@@ -69,6 +73,188 @@ const Upload = () => {
       console.error('Erreur lors de la génération de la miniature:', error)
       // Ne pas afficher d'erreur à l'utilisateur, c'est optionnel
     }
+  }
+
+  // Rechercher les métadonnées basées sur le nom de fichier (sans upload)
+  const searchMetadataFromFilename = async (filename) => {
+    if (!filename) return
+    
+    setSearchingMetadata(true)
+    setMetadataResults([])
+    setShowMetadataResults(false)
+    
+    try {
+      console.log(`🔍 Recherche automatique de métadonnées pour: "${filename}"`)
+      const response = await api.post('/admin/videos/search-metadata', {
+        filename: filename
+      })
+      
+      const results = response.data.results || []
+      
+      if (results.length > 0) {
+        setMetadataResults(results)
+        setShowMetadataResults(true)
+        console.log(`✅ ${results.length} résultat(s) trouvé(s) pour "${filename}"`)
+        
+        // Si un seul résultat et que le titre correspond exactement, sélectionner automatiquement
+        if (results.length === 1) {
+          const cleanFilename = filename.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ').toLowerCase()
+          const resultTitle = results[0].title.toLowerCase().replace(/[^a-z0-9]/g, ' ')
+          if (cleanFilename.includes(resultTitle.substring(0, 10)) || resultTitle.includes(cleanFilename.substring(0, 10))) {
+            console.log('✅ Correspondance exacte détectée, sélection automatique...')
+            setTimeout(() => {
+              selectMetadata(results[0])
+            }, 500)
+          }
+        }
+      } else {
+        console.log(`ℹ️ Aucun résultat trouvé pour "${filename}"`)
+        // Ne pas essayer l'extraction classique automatiquement car elle nécessite un upload complet
+        // L'utilisateur peut continuer sans métadonnées ou uploader le fichier pour extraction
+      }
+    } catch (error) {
+      console.error('Erreur lors de la recherche de métadonnées:', error)
+      // Ne pas essayer l'extraction classique automatiquement en cas d'erreur
+      // L'utilisateur peut continuer sans métadonnées
+    } finally {
+      setSearchingMetadata(false)
+    }
+  }
+
+  // Mapper les genres aux catégories
+  const mapGenreToCategory = (genres) => {
+    if (!genres || genres.length === 0) return null
+    
+    const genreMap = {
+      'Action': ['Action', 'Aventure'],
+      'Aventure': ['Action', 'Aventure'],
+      'Animation': ['Animation'],
+      'Comédie': ['Comédie', 'Humour'],
+      'Crime': ['Thriller', 'Policier'],
+      'Documentaire': ['Documentaire'],
+      'Drame': ['Drame'],
+      'Famille': ['Famille'],
+      'Fantastique': ['Fantastique', 'Science-Fiction'],
+      'Horreur': ['Horreur', 'Thriller'],
+      'Musique': ['Musique'],
+      'Mystère': ['Thriller', 'Mystère'],
+      'Romance': ['Romance', 'Drame'],
+      'Science-Fiction': ['Science-Fiction', 'Fantastique'],
+      'Thriller': ['Thriller'],
+      'Guerre': ['Action', 'Guerre'],
+      'Western': ['Western'],
+    }
+    
+    // Chercher la première correspondance
+    for (const genre of genres) {
+      const genreLower = genre.toLowerCase()
+      for (const [key, categoryNames] of Object.entries(genreMap)) {
+        if (genreLower.includes(key.toLowerCase()) || key.toLowerCase().includes(genreLower)) {
+          // Chercher la catégorie correspondante
+          const category = categories.find(cat => 
+            categoryNames.some(name => 
+              cat.name.toLowerCase().includes(name.toLowerCase()) ||
+              name.toLowerCase().includes(cat.name.toLowerCase())
+            )
+          )
+          if (category) {
+            return category.id
+          }
+        }
+      }
+    }
+    
+    return null
+  }
+
+  // Sélectionner une métadonnée et pré-remplir le formulaire
+  const selectMetadata = (metadata) => {
+    setSelectedMetadata(metadata)
+    setShowMetadataResults(false)
+    
+    const newFormData = { ...formData }
+    
+    // Titre (toujours remplacer si vide ou si c'est juste le nom de fichier)
+    if (metadata.title) {
+      const currentTitle = newFormData.title || ''
+      const fileName = videoFile ? videoFile.name.replace(/\.[^/.]+$/, '') : ''
+      // Remplacer si le titre actuel est vide ou identique au nom de fichier
+      if (!currentTitle || currentTitle.trim() === '' || currentTitle === fileName) {
+        newFormData.title = metadata.title
+      }
+    }
+    
+    // Description/Synopsis (construire une description complète)
+    let descriptionParts = []
+    
+    // Synopsis principal
+    if (metadata.synopsis) {
+      descriptionParts.push(metadata.synopsis)
+    } else if (metadata.description) {
+      descriptionParts.push(metadata.description)
+    }
+    
+    // Ajouter les informations supplémentaires
+    let additionalInfo = []
+    if (metadata.director) {
+      additionalInfo.push(`Réalisateur: ${metadata.director}`)
+    }
+    if (metadata.actors && metadata.actors.length > 0) {
+      additionalInfo.push(`Acteurs: ${metadata.actors.join(', ')}`)
+    }
+    if (metadata.release_date) {
+      const year = metadata.release_date.split('-')[0]
+      if (year) {
+        additionalInfo.push(`Année: ${year}`)
+      }
+    }
+    if (metadata.genre && metadata.genre.length > 0) {
+      additionalInfo.push(`Genre: ${metadata.genre.join(', ')}`)
+    }
+    if (metadata.rating && metadata.rating > 0) {
+      additionalInfo.push(`Note: ${metadata.rating.toFixed(1)}/10`)
+    }
+    
+    // Construire la description complète
+    if (descriptionParts.length > 0 || additionalInfo.length > 0) {
+      let fullDescription = descriptionParts.join('\n\n')
+      if (additionalInfo.length > 0) {
+        if (fullDescription) {
+          fullDescription += '\n\n' + additionalInfo.join(' | ')
+        } else {
+          fullDescription = additionalInfo.join(' | ')
+        }
+      }
+      
+      // Remplacer la description si elle est vide ou très courte
+      const currentDesc = newFormData.description || ''
+      if (!currentDesc || currentDesc.trim().length < 20) {
+        newFormData.description = fullDescription
+      } else {
+        // Ajouter les infos supplémentaires à la description existante
+        newFormData.description = currentDesc + '\n\n' + additionalInfo.join(' | ')
+      }
+    }
+    
+    // Sélectionner automatiquement la catégorie basée sur le genre
+    if (metadata.genre && metadata.genre.length > 0 && categories.length > 0) {
+      const categoryId = mapGenreToCategory(metadata.genre)
+      if (categoryId && !newFormData.category_id) {
+        newFormData.category_id = categoryId
+        console.log('✅ Catégorie sélectionnée automatiquement:', categoryId)
+      }
+    }
+    
+    setFormData(newFormData)
+    
+    // Générer une miniature depuis le poster si disponible
+    if (metadata.poster_url) {
+      setThumbnailPreview(metadata.poster_url)
+    } else if (metadata.title) {
+      generateThumbnailFromTitle(metadata.title)
+    }
+    
+    console.log('✅ Métadonnées sélectionnées et appliquées:', metadata)
   }
 
   const extractVideoMetadata = async (file) => {
@@ -167,13 +353,31 @@ const Upload = () => {
     setProgress(0)
 
     try {
-      // Étape 1: Initialiser la session d'upload
+      // Étape 1: Initialiser la session d'upload avec métadonnées enrichies
       const metadata = {
         title: finalFormData.title,
         description: finalFormData.description || '',
         category_id: finalFormData.category_id || null,
         sub_category_id: finalFormData.sub_category_id || null,
         is_public: finalFormData.is_public,
+        // Métadonnées enrichies si sélectionnées
+        ...(selectedMetadata && {
+          director: selectedMetadata.director || '',
+          actors: selectedMetadata.actors ? selectedMetadata.actors.join(', ') : '',
+          release_date: selectedMetadata.release_date || '',
+          production_year: selectedMetadata.production_year || null,
+          synopsis: selectedMetadata.synopsis || '',
+          genre: selectedMetadata.genre ? selectedMetadata.genre.join(', ') : '',
+          rating: selectedMetadata.rating || null,
+          imdb_id: selectedMetadata.imdb_id || '',
+          tmdb_id: selectedMetadata.tmdb_id || null,
+          poster_url: selectedMetadata.poster_url || '',
+          backdrop_url: selectedMetadata.backdrop_url || '',
+          trailer_url: selectedMetadata.trailer_url || '',
+          runtime: selectedMetadata.runtime || null,
+          writer: selectedMetadata.writer || '',
+          platform: selectedMetadata.platform || '',
+        }),
       }
       
       const initResponse = await api.post('/admin/uploads/init', {
@@ -252,8 +456,19 @@ const Upload = () => {
         setThumbnailFile(null)
       }
     } catch (error) {
-      console.error('Erreur:', error)
-      const errorMessage = error.response?.data?.error || error.message || 'Erreur lors de l\'upload'
+      console.error('❌ Erreur lors de l\'upload:', error)
+      const errorData = error.response?.data
+      let errorMessage = errorData?.error || error.message || 'Erreur lors de l\'upload'
+      
+      // Messages d'erreur plus détaillés
+      if (error.response?.status === 400) {
+        if (errorData?.uploaded_chunks !== undefined && errorData?.total_chunks !== undefined) {
+          errorMessage = `Upload incomplet: ${errorData.uploaded_chunks}/${errorData.total_chunks} chunks uploadés. Veuillez réessayer.`
+        } else if (errorMessage.includes('chunks')) {
+          errorMessage = `Erreur lors de la finalisation: ${errorMessage}. Veuillez réessayer.`
+        }
+      }
+      
       alert(`Erreur: ${errorMessage}`)
     } finally {
       setUploading(false)
@@ -276,6 +491,10 @@ const Upload = () => {
                 const file = e.target.files[0]
                 if (file) {
                   setVideoFile(file)
+                  setSelectedMetadata(null)
+                  setMetadataResults([])
+                  setShowMetadataResults(false)
+                  
                   // Extraire le nom du fichier sans extension pour le titre
                   const fileName = file.name.replace(/\.[^/.]+$/, '')
                   // Nettoyer le titre pour éviter "null"
@@ -288,17 +507,28 @@ const Upload = () => {
                     setFormData({ ...formData, title: cleanTitle })
                   }
                   
-                  // Extraire les métadonnées du fichier vidéo
-                  await extractVideoMetadata(file)
+                  // Rechercher automatiquement les métadonnées basées sur le nom de fichier
+                  await searchMetadataFromFilename(file.name)
                 }
               }}
               required
               disabled={uploading}
             />
             {videoFile && (
-              <span className="file-info">
-                📹 {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
-              </span>
+              <div className="file-info-container">
+                <span className="file-info">
+                  📹 {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(2)} MB)
+                </span>
+                {!searchingMetadata && !selectedMetadata && metadataResults.length === 0 && (
+                  <button
+                    type="button"
+                    className="search-metadata-btn"
+                    onClick={() => searchMetadataFromFilename(videoFile.name)}
+                  >
+                    🔍 Rechercher les métadonnées
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -330,8 +560,119 @@ const Upload = () => {
                 <p className="thumbnail-info">✨ Miniature générée automatiquement</p>
               </div>
             )}
+            {searchingMetadata && (
+              <div className="metadata-searching">
+                <div className="searching-spinner"></div>
+                <p className="metadata-extracting">
+                  🔍 Recherche automatique de métadonnées en cours...
+                  <br />
+                  <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                    Recherche sur AlloCiné, IMDb...
+                  </span>
+                </p>
+              </div>
+            )}
             {extractingMetadata && (
-              <p className="metadata-extracting">🔍 Extraction des métadonnées en cours...</p>
+              <p className="metadata-extracting">🔍 Extraction des métadonnées du fichier en cours...</p>
+            )}
+            
+            {/* Résultats de recherche de métadonnées */}
+            {showMetadataResults && metadataResults.length > 0 && (
+              <div className="metadata-results">
+                <h3>🎬 Résultats de recherche ({metadataResults.length})</h3>
+                <p className="metadata-results-info">
+                  Sélectionnez le film correspondant à votre vidéo :
+                </p>
+                <div className="metadata-results-grid">
+                  {metadataResults.map((result, index) => (
+                    <div 
+                      key={index} 
+                      className={`metadata-result-card ${selectedMetadata?.tmdb_id === result.tmdb_id ? 'selected' : ''}`}
+                      onClick={() => selectMetadata(result)}
+                    >
+                      {result.poster_url && (
+                        <img 
+                          src={result.poster_url} 
+                          alt={result.title}
+                          className="metadata-poster"
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                          }}
+                        />
+                      )}
+                      <div className="metadata-result-info">
+                        <h4>{result.title}</h4>
+                        {result.original_title && result.original_title !== result.title && (
+                          <p className="original-title">{result.original_title}</p>
+                        )}
+                        {result.release_date && (
+                          <p className="release-date">📅 {result.release_date}</p>
+                        )}
+                        {result.rating > 0 && (
+                          <p className="rating">⭐ {result.rating.toFixed(1)}/10</p>
+                        )}
+                        {result.genre && result.genre.length > 0 && (
+                          <p className="genre">🏷️ {result.genre.join(', ')}</p>
+                        )}
+                        {result.synopsis && (
+                          <p className="synopsis">{result.synopsis.substring(0, 150)}...</p>
+                        )}
+                        <button 
+                          type="button"
+                          className="select-metadata-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            selectMetadata(result)
+                          }}
+                        >
+                          ✓ Sélectionner
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  type="button"
+                  className="skip-metadata-btn"
+                  onClick={() => {
+                    setShowMetadataResults(false)
+                    // L'utilisateur peut continuer sans métadonnées
+                    // L'extraction classique nécessite un upload complet et peut être lente
+                  }}
+                >
+                  Ignorer et continuer sans métadonnées
+                </button>
+                
+                {videoFile && !selectedMetadata && (
+                  <button 
+                    type="button"
+                    className="extract-metadata-btn"
+                    onClick={async () => {
+                      setShowMetadataResults(false)
+                      // Optionnel: essayer l'extraction classique (peut être lente pour gros fichiers)
+                      await extractVideoMetadata(videoFile)
+                    }}
+                  >
+                    🔍 Extraire les métadonnées du fichier (peut être lent)
+                  </button>
+                )}
+              </div>
+            )}
+            
+            {selectedMetadata && (
+              <div className="selected-metadata-info">
+                <p>✅ Métadonnées sélectionnées: <strong>{selectedMetadata.title}</strong></p>
+                <button 
+                  type="button"
+                  className="change-metadata-btn"
+                  onClick={() => {
+                    setSelectedMetadata(null)
+                    setShowMetadataResults(true)
+                  }}
+                >
+                  Changer
+                </button>
+              </div>
             )}
           </div>
 
@@ -397,15 +738,18 @@ const Upload = () => {
           </div>
 
           <div className="form-group">
+            <label htmlFor="is_public" className="form-label">Visibilité</label>
             <label className="checkbox-label">
               <input
                 type="checkbox"
+                id="is_public"
                 checked={formData.is_public}
                 onChange={(e) => setFormData({ ...formData, is_public: e.target.checked })}
                 disabled={uploading}
               />
-              <span className="checkbox-text">Vidéo publique</span>
+              <span className="checkbox-text">🌐 Vidéo publique</span>
             </label>
+            <p className="form-hint">Les vidéos publiques sont visibles par tous les utilisateurs</p>
           </div>
 
           {uploading && (

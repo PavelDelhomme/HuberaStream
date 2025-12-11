@@ -49,6 +49,9 @@ type Config struct {
 	// Server
 	Port string
 	Env  string // development, production
+	
+	// Metadata
+	TMDBAPIKey string
 }
 
 func Load() *Config {
@@ -101,6 +104,9 @@ func Load() *Config {
 		// Server
 		Port: getEnv("PORT", "8080"),
 		Env:  getEnv("ENV", "development"),
+		
+		// Metadata
+		TMDBAPIKey: getEnv("TMDB_API_KEY", ""),
 	}
 }
 

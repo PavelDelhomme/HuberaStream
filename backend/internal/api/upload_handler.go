@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"streammake/internal/config"
+	"streammake/internal/metadata"
 	"streammake/internal/models"
 	"streammake/internal/video"
 
@@ -29,6 +30,7 @@ type UploadHandler struct {
 	db        *gorm.DB
 	cfg       *config.Config
 	processor *video.Processor
+	metadataService *metadata.MetadataService
 	// Suivi des traitements en cours avec context pour annulation
 	processingVideos map[uuid.UUID]context.CancelFunc
 	processingMutex  sync.RWMutex
@@ -39,6 +41,7 @@ func NewUploadHandler(db *gorm.DB, cfg *config.Config) *UploadHandler {
 		db:               db,
 		cfg:              cfg,
 		processor:        video.NewProcessor(cfg.VideoStoragePath, cfg.ThumbnailStoragePath),
+		metadataService:  metadata.NewMetadataService(cfg.TMDBAPIKey),
 		processingVideos: make(map[uuid.UUID]context.CancelFunc),
 	}
 }
@@ -69,6 +72,41 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	categoryIDStr := c.PostForm("category_id")
 	subCategoryIDStr := c.PostForm("sub_category_id")
 	isPublic := c.PostForm("is_public") != "false"
+	
+	// Métadonnées enrichies
+	director := strings.TrimSpace(c.PostForm("director"))
+	actors := strings.TrimSpace(c.PostForm("actors"))
+	releaseDate := strings.TrimSpace(c.PostForm("release_date"))
+	productionYearStr := strings.TrimSpace(c.PostForm("production_year"))
+	synopsis := strings.TrimSpace(c.PostForm("synopsis"))
+	genre := strings.TrimSpace(c.PostForm("genre"))
+	ratingStr := strings.TrimSpace(c.PostForm("rating"))
+	imdbID := strings.TrimSpace(c.PostForm("imdb_id"))
+	tmdbIDStr := strings.TrimSpace(c.PostForm("tmdb_id"))
+	posterURL := strings.TrimSpace(c.PostForm("poster_url"))
+	backdropURL := strings.TrimSpace(c.PostForm("backdrop_url"))
+	trailerURL := strings.TrimSpace(c.PostForm("trailer_url"))
+	runtimeStr := strings.TrimSpace(c.PostForm("runtime"))
+	writer := strings.TrimSpace(c.PostForm("writer"))
+	platform := strings.TrimSpace(c.PostForm("platform"))
+	
+	// Convertir les valeurs numériques
+	var productionYear int
+	if productionYearStr != "" {
+		fmt.Sscanf(productionYearStr, "%d", &productionYear)
+	}
+	var rating float64
+	if ratingStr != "" {
+		fmt.Sscanf(ratingStr, "%f", &rating)
+	}
+	var tmdbID int
+	if tmdbIDStr != "" {
+		fmt.Sscanf(tmdbIDStr, "%d", &tmdbID)
+	}
+	var runtime int
+	if runtimeStr != "" {
+		fmt.Sscanf(runtimeStr, "%d", &runtime)
+	}
 
 	var categoryID, subCategoryID *uuid.UUID
 	if categoryIDStr != "" {
@@ -110,17 +148,33 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	}
 	checksum := fmt.Sprintf("%x", hash.Sum(nil))
 
-	// Créer l'entrée en base
+	// Créer l'entrée en base avec métadonnées enrichies
 	videoModel := models.Video{
-		ID:            videoID,
-		Title:         title,
-		Description:   description,
-		UserID:        userUUID,
-		Status:        models.VideoStatusProcessing,
-		CategoryID:    categoryID,
-		SubCategoryID: subCategoryID,
-		IsPublic:      isPublic,
-		Checksum:      checksum,
+		ID:              videoID,
+		Title:           title,
+		Description:     description,
+		UserID:          userUUID,
+		Status:          models.VideoStatusProcessing,
+		CategoryID:      categoryID,
+		SubCategoryID:   subCategoryID,
+		IsPublic:        isPublic,
+		Checksum:        checksum,
+		// Métadonnées enrichies
+		Director:        director,
+		Actors:          actors,
+		ReleaseDate:     releaseDate,
+		ProductionYear:  productionYear,
+		Synopsis:        synopsis,
+		Genre:           genre,
+		Rating:          rating,
+		IMDBID:          imdbID,
+		TMDBID:          tmdbID,
+		PosterURL:       posterURL,
+		BackdropURL:     backdropURL,
+		TrailerURL:      trailerURL,
+		Runtime:         runtime,
+		Writer:          writer,
+		Platform:        platform,
 	}
 
 	if err := h.db.Create(&videoModel).Error; err != nil {
@@ -524,6 +578,16 @@ func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
 
 	log.Printf("[ExtractVideoMetadata] Fichier reçu: %s (taille: %d)", file.Filename, file.Size)
 
+	// Limiter la taille du fichier pour l'extraction de métadonnées (100MB max)
+	const maxMetadataFileSize = 100 * 1024 * 1024 // 100MB
+	if file.Size > maxMetadataFileSize {
+		log.Printf("[ExtractVideoMetadata] Fichier trop volumineux pour l'extraction de métadonnées: %d bytes", file.Size)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("Le fichier est trop volumineux pour l'extraction de métadonnées (max: 100MB, votre fichier: %.2fMB). Utilisez la recherche de métadonnées basée sur le nom de fichier.", float64(file.Size)/(1024*1024)),
+		})
+		return
+	}
+
 	// Sauvegarder temporairement le fichier
 	tempDir := filepath.Join(h.cfg.VideoStoragePath, "temp")
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
@@ -563,6 +627,112 @@ func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
 	log.Printf("[ExtractVideoMetadata] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d", 
 		metadata.Title, metadata.Duration, metadata.Width, metadata.Height)
 	
+	c.JSON(http.StatusOK, metadata)
+}
+
+// SearchMetadataFromFilename recherche des métadonnées basées sur le nom de fichier (sans upload)
+func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
+	var req struct {
+		Filename string `json:"filename" binding:"required"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Nom de fichier requis"})
+		return
+	}
+	
+	log.Printf("[SearchMetadataFromFilename] 🔍 Recherche de métadonnées pour: %s", req.Filename)
+	log.Printf("[SearchMetadataFromFilename] ⚠️  CODE MODIFIÉ - Utilisation du scraper web UNIQUEMENT (PAS DE TMDB)")
+	
+	// Utiliser UNIQUEMENT le scraper web gratuit (sans API) - PAS DE TMDB
+	webScraper := metadata.NewWebScraperService()
+	log.Printf("[SearchMetadataFromFilename] ⚡ Appel du scraper web...")
+	
+	results, err := webScraper.SearchMoviesFromFilenameWeb(req.Filename)
+	
+	if err != nil {
+		log.Printf("[SearchMetadataFromFilename] ❌ Erreur scraper web: %v", err)
+	} else {
+		log.Printf("[SearchMetadataFromFilename] ✅ Scraper web a trouvé %d résultat(s)", len(results))
+	}
+	
+	if len(results) == 0 {
+		log.Printf("[SearchMetadataFromFilename] ⚠️  Aucun résultat trouvé pour: %s", req.Filename)
+		
+		// Proposer un résultat basique basé sur le nom de fichier nettoyé
+		titleVariants := metadata.ExtractTitleFromFilename(req.Filename)
+		cleanTitle := ""
+		if len(titleVariants) > 0 {
+			// Prendre la première variante en Title Case
+			for _, variant := range titleVariants {
+				words := strings.Fields(variant)
+				if len(words) > 0 {
+					titleCase := ""
+					for i, word := range words {
+						if i > 0 {
+							titleCase += " "
+						}
+						if len(word) > 0 {
+							titleCase += strings.ToUpper(string(word[0])) + strings.ToLower(word[1:])
+						}
+					}
+					cleanTitle = titleCase
+					break
+				}
+			}
+			if cleanTitle == "" {
+				cleanTitle = titleVariants[0]
+			}
+		} else {
+			cleanTitle = strings.TrimSuffix(req.Filename, filepath.Ext(req.Filename))
+			cleanTitle = strings.ReplaceAll(cleanTitle, "_", " ")
+			cleanTitle = strings.ReplaceAll(cleanTitle, "-", " ")
+		}
+		
+		basicResult := &metadata.MovieMetadata{
+			Title:         cleanTitle,
+			OriginalTitle: cleanTitle,
+			Description:   fmt.Sprintf("Vidéo: %s", cleanTitle),
+			Synopsis:      fmt.Sprintf("Vidéo uploadée: %s", cleanTitle),
+		}
+		
+		log.Printf("[SearchMetadataFromFilename] 📝 Proposition d'un résultat basique: %s", cleanTitle)
+		c.JSON(http.StatusOK, gin.H{
+			"results": []*metadata.MovieMetadata{basicResult},
+			"count":   1,
+			"message": "Résultat basique (aucun résultat trouvé sur internet)",
+		})
+		return
+	}
+	
+	log.Printf("[SearchMetadataFromFilename] %d résultat(s) trouvé(s) pour: %s", len(results), req.Filename)
+	c.JSON(http.StatusOK, gin.H{
+		"results": results,
+		"count": len(results),
+	})
+}
+
+// GetMetadataDetails récupère les détails complets d'un film depuis TMDB
+func (h *UploadHandler) GetMetadataDetails(c *gin.Context) {
+	var req struct {
+		TMDBID int `json:"tmdb_id" binding:"required"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "TMDB ID requis"})
+		return
+	}
+	
+	log.Printf("[GetMetadataDetails] Récupération des détails pour TMDB ID: %d", req.TMDBID)
+	
+	details, err := h.metadataService.GetMovieDetails(req.TMDBID)
+	if err != nil {
+		log.Printf("[GetMetadataDetails] Erreur: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur: %v", err)})
+		return
+	}
+	
+	metadata := h.metadataService.ConvertToMovieMetadata(details)
 	c.JSON(http.StatusOK, metadata)
 }
 

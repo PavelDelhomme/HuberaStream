@@ -34,6 +34,24 @@ type Video struct {
 	SubCategoryID *uuid.UUID `gorm:"type:uuid" json:"sub_category_id"`
 	SubCategory   *SubCategory `gorm:"foreignKey:SubCategoryID" json:"sub_category,omitempty"`
 	IsPublic      bool      `gorm:"default:true" json:"is_public"`
+	
+	// Métadonnées enrichies
+	Director      string    `gorm:"type:varchar(255)" json:"director"` // Réalisateur
+	Actors        string    `gorm:"type:text" json:"actors"` // Acteurs principaux (séparés par des virgules)
+	ReleaseDate   string    `gorm:"type:varchar(50)" json:"release_date"` // Date de sortie
+	ProductionYear int      `json:"production_year"` // Année de production
+	Synopsis      string    `gorm:"type:text" json:"synopsis"` // Synopsis en français
+	Genre         string    `gorm:"type:varchar(255)" json:"genre"` // Genre(s)
+	Rating        float64   `json:"rating"` // Note (0-10)
+	IMDBID        string    `gorm:"type:varchar(20)" json:"imdb_id"` // ID IMDB
+	TMDBID        int       `json:"tmdb_id"` // ID TMDB
+	PosterURL     string    `gorm:"type:text" json:"poster_url"` // URL du poster/affiche
+	BackdropURL   string    `gorm:"type:text" json:"backdrop_url"` // URL de l'image de fond
+	TrailerURL    string    `gorm:"type:text" json:"trailer_url"` // URL de la bande annonce YouTube
+	Runtime       int       `json:"runtime"` // Durée en minutes
+	Writer        string    `gorm:"type:varchar(255)" json:"writer"` // Scénariste
+	Platform      string    `gorm:"type:varchar(255)" json:"platform"` // Plateforme (Amazon Prime Video, etc.)
+	
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`

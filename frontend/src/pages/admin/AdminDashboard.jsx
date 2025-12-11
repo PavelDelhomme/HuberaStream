@@ -126,46 +126,46 @@ const AdminDashboard = () => {
 
       {/* Statistiques principales */}
       <div className="admin-stats">
-        <div className="stat-card stat-card-users">
+        <Link to="/admin/users" className="stat-card stat-card-users">
           <div className="stat-icon">👥</div>
           <div className="stat-content">
             <h3>Utilisateurs</h3>
             <p className="stat-value">{stats?.total_users || 0}</p>
-            <Link to="/admin/users" className="stat-link">Voir tous →</Link>
+            <span className="stat-link">Voir tous →</span>
           </div>
-        </div>
-        <div className="stat-card stat-card-videos">
+        </Link>
+        <Link to="/admin/videos" className="stat-card stat-card-videos">
           <div className="stat-icon">🎬</div>
           <div className="stat-content">
             <h3>Vidéos</h3>
             <p className="stat-value">{stats?.total_videos || 0}</p>
-            <Link to="/admin/videos" className="stat-link">Gérer →</Link>
+            <span className="stat-link">Gérer →</span>
           </div>
-        </div>
-        <div className="stat-card stat-card-torrents">
+        </Link>
+        <Link to="/admin/torrents" className="stat-card stat-card-torrents">
           <div className="stat-icon">📥</div>
           <div className="stat-content">
             <h3>Torrents</h3>
             <p className="stat-value">{stats?.total_torrents || 0}</p>
-            <Link to="/admin/torrents" className="stat-link">Gérer →</Link>
+            <span className="stat-link">Gérer →</span>
           </div>
-        </div>
-        <div className="stat-card stat-card-active">
+        </Link>
+        <Link to="/admin/torrents" className="stat-card stat-card-active">
           <div className="stat-icon">⚡</div>
           <div className="stat-content">
             <h3>Torrents actifs</h3>
             <p className="stat-value">{stats?.active_torrents || 0}</p>
-            <Link to="/admin/torrents" className="stat-link">Voir →</Link>
+            <span className="stat-link">Voir →</span>
           </div>
-        </div>
-        <div className="stat-card stat-card-categories">
+        </Link>
+        <Link to="/admin/categories" className="stat-card stat-card-categories">
           <div className="stat-icon">📂</div>
           <div className="stat-content">
             <h3>Catégories</h3>
             <p className="stat-value">{stats?.total_categories || 0}</p>
-            <Link to="/admin/categories" className="stat-link">Gérer →</Link>
+            <span className="stat-link">Gérer →</span>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Actions rapides */}

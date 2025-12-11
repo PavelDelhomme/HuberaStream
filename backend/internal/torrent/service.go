@@ -3,7 +3,6 @@ package torrent
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"streammake/internal/config"
@@ -97,7 +96,15 @@ func (s *TorrentService) startUpdateService() {
 
 	go func() {
 		for range s.updateTicker.C {
-			s.updateAllTorrents()
+			// Vérifier d'abord s'il y a des torrents actifs avant de faire des requêtes
+			var count int64
+			if err := s.db.Model(&models.Torrent{}).Where("status IN ?", []models.TorrentStatus{
+				models.TorrentStatusPending,
+				models.TorrentStatusDownloading,
+				models.TorrentStatusSeeding,
+			}).Count(&count).Error; err == nil && count > 0 {
+				s.updateAllTorrents()
+			}
 		}
 	}()
 }
@@ -107,9 +114,12 @@ func (s *TorrentService) startPostProcessingService() {
 
 	go func() {
 		for range postProcessTicker.C {
-			ctx := context.Background()
-			if err := s.postProcessor.ProcessCompletedTorrents(ctx); err != nil {
-				log.Printf("Erreur lors du post-traitement des torrents: %v", err)
+			// Vérifier d'abord s'il y a des torrents terminés à traiter avant de faire des requêtes
+			var count int64
+			if err := s.db.Model(&models.Torrent{}).Where("status = ? AND video_id IS NULL", models.TorrentStatusCompleted).Count(&count).Error; err == nil && count > 0 {
+				ctx := context.Background()
+				// Traiter silencieusement, log seulement les erreurs critiques
+				_ = s.postProcessor.ProcessCompletedTorrents(ctx)
 			}
 		}
 	}()
@@ -124,19 +134,24 @@ func (s *TorrentService) updateAllTorrents() {
 		models.TorrentStatusDownloading,
 		models.TorrentStatusSeeding,
 	}).Find(&torrents).Error; err != nil {
-		log.Printf("Erreur lors de la récupération des torrents: %v", err)
+		// Log seulement les erreurs critiques
 		return
 	}
 
+	// Si aucun torrent actif, ne rien faire
+	if len(torrents) == 0 {
+		return
+	}
+
+	// Mettre à jour les statuts silencieusement (sans logs)
 	for _, torrent := range torrents {
-		if err := s.UpdateTorrentStatus(ctx, &torrent); err != nil {
-			log.Printf("Erreur lors de la mise à jour du torrent %s: %v", torrent.ID, err)
-		}
+		_ = s.UpdateTorrentStatus(ctx, &torrent) // Ignorer les erreurs non critiques
 	}
 
 	// Vérifier les torrents terminés et les marquer comme completed si nécessaire
+	// Seulement si on a des torrents en téléchargement
 	var downloadingTorrents []models.Torrent
-	if err := s.db.Where("status = ?", models.TorrentStatusDownloading).Find(&downloadingTorrents).Error; err == nil {
+	if err := s.db.Where("status = ?", models.TorrentStatusDownloading).Find(&downloadingTorrents).Error; err == nil && len(downloadingTorrents) > 0 {
 		for _, torrent := range downloadingTorrents {
 			status, err := s.GetTorrentStatus(ctx, torrent.ID.String())
 			if err == nil && status.Progress >= 100 && status.Status == models.TorrentStatusSeeding {

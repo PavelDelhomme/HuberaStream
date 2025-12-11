@@ -163,24 +163,31 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// Statistiques
 		admin.GET("/stats", adminHandler.GetStats)
 
-		// IMPORTANT: Créer un groupe pour toutes les routes /videos pour éviter les conflits
-		// Les routes spécifiques doivent être AVANT les routes avec paramètres
+		// IMPORTANT: Routes spécifiques AVANT le groupe pour éviter les conflits
+		// Toutes les routes spécifiques /videos/* doivent être AVANT le groupe videosAdmin
+
+		// Recherche de métadonnées basée sur le nom de fichier (sans upload)
+		admin.POST("/videos/search-metadata", uploadHandler.SearchMetadataFromFilename)
+
+		// Récupération des détails complets d'un film depuis TMDB
+		admin.POST("/videos/metadata-details", uploadHandler.GetMetadataDetails)
+
+		// Extraction de métadonnées (route spécifique, DOIT être la première route /videos)
+		admin.POST("/videos/extract-metadata", uploadHandler.ExtractVideoMetadata)
+
+		// Upload vidéo (route spécifique)
+		admin.POST("/videos/upload", uploadHandler.UploadVideo)
+
+		// Nettoyage des vidéos invalides
+		admin.GET("/videos/invalid", adminHandler.ListInvalidVideos)
+		admin.POST("/videos/clean-invalid", adminHandler.CleanInvalidVideos)
+
+		// Groupe pour les routes avec paramètres (après les routes spécifiques)
 		videosAdmin := admin.Group("/videos")
 		{
-			// Routes spécifiques AVANT les routes avec paramètres
-			// Extraction de métadonnées (doit être la PREMIÈRE route pour éviter les conflits)
-			videosAdmin.POST("/extract-metadata", func(c *gin.Context) {
-				log.Printf("[DEBUG-ROUTE] ✅ Handler extract-metadata appelé pour %s", c.Request.URL.Path)
-				uploadHandler.ExtractVideoMetadata(c)
-			})
-			videosAdmin.POST("/upload", uploadHandler.UploadVideo)
-			videosAdmin.GET("/invalid", adminHandler.ListInvalidVideos)
-			videosAdmin.POST("/clean-invalid", adminHandler.CleanInvalidVideos)
-
-			// Routes avec paramètres (après les routes spécifiques)
+			// Routes avec paramètres
 			videosAdmin.POST("/:id/extract-metadata", uploadHandler.ExtractVideoMetadataFromID)
 		}
-		log.Printf("[Routes] ✅ Groupe /admin/videos créé avec extract-metadata, upload, invalid, clean-invalid, et :id/extract-metadata")
 
 		// Génération de miniature depuis titre
 		admin.GET("/thumbnails/generate", uploadHandler.GenerateThumbnailFromTitle)
