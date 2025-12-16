@@ -54,6 +54,7 @@ help:
 	@echo "  ${GREEN}check-backend${NC}      Vérifier erreurs backend (go vet, gofmt)"
 	@echo "  ${GREEN}check-lint${NC}         Vérifier erreurs de linting (frontend + backend)"
 	@echo "  ${GREEN}check-compile${NC}      Vérifier compilation (frontend + backend)"
+	@echo "  ${GREEN}format-backend${NC}     Formater automatiquement le code backend (gofmt)"
 	@echo ""
 	@echo "${YELLOW}🔧 UTILITAIRES:${NC}"
 	@echo "  ${GREEN}status${NC}             Statut des services"
@@ -401,11 +402,28 @@ check-frontend:
 	@cd frontend && \
 	if command -v npm >/dev/null 2>&1; then \
 		echo "${YELLOW}📦 Installation des dépendances si nécessaire...${NC}"; \
-		[ -d node_modules ] || npm install --silent; \
-		echo "${YELLOW}🔍 Vérification ESLint...${NC}"; \
-		npm run lint 2>&1 || echo "${RED}⚠️  ESLint a trouvé des erreurs${NC}"; \
-		echo "${YELLOW}🔍 Vérification TypeScript...${NC}"; \
-		npx tsc --noEmit 2>&1 || echo "${RED}⚠️  TypeScript a trouvé des erreurs${NC}"; \
+		if [ ! -d node_modules ]; then \
+			npm install --silent; \
+		fi; \
+		if [ -f package.json ]; then \
+			echo "${YELLOW}🔍 Vérification des scripts disponibles...${NC}"; \
+			if grep -q '"lint"' package.json; then \
+				echo "${YELLOW}🔍 Vérification ESLint...${NC}"; \
+				npm run lint 2>&1 || echo "${RED}⚠️  ESLint a trouvé des erreurs${NC}"; \
+			else \
+				echo "${YELLOW}⚠️  Script 'lint' non trouvé dans package.json${NC}"; \
+			fi; \
+			if [ -f tsconfig.json ] || find src -name "*.ts" -o -name "*.tsx" | head -1 | grep -q .; then \
+				echo "${YELLOW}🔍 Vérification TypeScript...${NC}"; \
+				if [ -d node_modules/typescript ]; then \
+					npx --yes typescript tsc --noEmit 2>&1 || echo "${RED}⚠️  TypeScript a trouvé des erreurs${NC}"; \
+				else \
+					echo "${YELLOW}⚠️  TypeScript non installé, vérification ignorée${NC}"; \
+				fi; \
+			else \
+				echo "${YELLOW}ℹ️  Projet JavaScript (pas TypeScript)${NC}"; \
+			fi; \
+		fi; \
 		echo "${GREEN}✅ Vérification frontend terminée${NC}"; \
 	else \
 		echo "${RED}❌ npm n'est pas installé${NC}"; \
@@ -419,15 +437,28 @@ check-backend:
 		echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
 		go vet ./... 2>&1 || echo "${RED}⚠️  go vet a trouvé des problèmes${NC}"; \
 		echo "${YELLOW}🔍 Vérification gofmt...${NC}"; \
-		if [ -n "$$(gofmt -l .)" ]; then \
-			echo "${RED}⚠️  Fichiers non formatés:$$(gofmt -l .)${NC}"; \
-			echo "${YELLOW}💡 Exécutez 'gofmt -w .' pour corriger${NC}"; \
+		UNFORMATTED=$$(gofmt -l . 2>/dev/null | head -20); \
+		if [ -n "$$UNFORMATTED" ]; then \
+			echo "${RED}⚠️  Fichiers non formatés (premiers 20):${NC}"; \
+			echo "$$UNFORMATTED" | sed 's/^/  /'; \
+			echo "${YELLOW}💡 Exécutez 'make format-backend' pour corriger automatiquement${NC}"; \
 		else \
 			echo "${GREEN}✅ Tous les fichiers sont formatés${NC}"; \
 		fi; \
 		echo "${YELLOW}🔍 Vérification compilation...${NC}"; \
 		go build ./... 2>&1 || echo "${RED}⚠️  Erreurs de compilation${NC}"; \
 		echo "${GREEN}✅ Vérification backend terminée${NC}"; \
+	else \
+		echo "${RED}❌ Go n'est pas installé${NC}"; \
+		exit 1; \
+	fi
+
+format-backend:
+	@echo "${GREEN}🔧 Formatage du code backend avec gofmt...${NC}"
+	@if command -v go >/dev/null 2>&1; then \
+		cd backend && \
+		gofmt -w . && \
+		echo "${GREEN}✅ Code backend formaté${NC}"; \
 	else \
 		echo "${RED}❌ Go n'est pas installé${NC}"; \
 		exit 1; \
@@ -441,8 +472,15 @@ check-compile:
 	@echo "${YELLOW}📦 Compilation frontend...${NC}"
 	@cd frontend && \
 	if command -v npm >/dev/null 2>&1; then \
-		[ -d node_modules ] || npm install --silent; \
-		npm run build 2>&1 | tail -20 || echo "${RED}⚠️  Erreur de compilation frontend${NC}"; \
+		if [ ! -d node_modules ]; then \
+			echo "${YELLOW}📦 Installation des dépendances...${NC}"; \
+			npm install --silent; \
+		fi; \
+		if grep -q '"build"' package.json; then \
+			npm run build 2>&1 | tail -30 || echo "${RED}⚠️  Erreur de compilation frontend${NC}"; \
+		else \
+			echo "${YELLOW}⚠️  Script 'build' non trouvé dans package.json${NC}"; \
+		fi; \
 	else \
 		echo "${RED}❌ npm n'est pas installé${NC}"; \
 	fi
