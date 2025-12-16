@@ -392,6 +392,69 @@ shell-db:
 	@echo "${GREEN}🐚 Shell PostgreSQL...${NC}"
 	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec postgres psql -U streammake streammake_db
 
+# ============================================================================
+# VÉRIFICATION CODE
+# ============================================================================
+
+check-frontend:
+	@echo "${GREEN}🔍 Vérification du code frontend...${NC}"
+	@cd frontend && \
+	if command -v npm >/dev/null 2>&1; then \
+		echo "${YELLOW}📦 Installation des dépendances si nécessaire...${NC}"; \
+		[ -d node_modules ] || npm install --silent; \
+		echo "${YELLOW}🔍 Vérification ESLint...${NC}"; \
+		npm run lint 2>&1 || echo "${RED}⚠️  ESLint a trouvé des erreurs${NC}"; \
+		echo "${YELLOW}🔍 Vérification TypeScript...${NC}"; \
+		npx tsc --noEmit 2>&1 || echo "${RED}⚠️  TypeScript a trouvé des erreurs${NC}"; \
+		echo "${GREEN}✅ Vérification frontend terminée${NC}"; \
+	else \
+		echo "${RED}❌ npm n'est pas installé${NC}"; \
+		exit 1; \
+	fi
+
+check-backend:
+	@echo "${GREEN}🔍 Vérification du code backend...${NC}"
+	@if command -v go >/dev/null 2>&1; then \
+		cd backend && \
+		echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
+		go vet ./... 2>&1 || echo "${RED}⚠️  go vet a trouvé des problèmes${NC}"; \
+		echo "${YELLOW}🔍 Vérification gofmt...${NC}"; \
+		if [ -n "$$(gofmt -l .)" ]; then \
+			echo "${RED}⚠️  Fichiers non formatés:$$(gofmt -l .)${NC}"; \
+			echo "${YELLOW}💡 Exécutez 'gofmt -w .' pour corriger${NC}"; \
+		else \
+			echo "${GREEN}✅ Tous les fichiers sont formatés${NC}"; \
+		fi; \
+		echo "${YELLOW}🔍 Vérification compilation...${NC}"; \
+		go build ./... 2>&1 || echo "${RED}⚠️  Erreurs de compilation${NC}"; \
+		echo "${GREEN}✅ Vérification backend terminée${NC}"; \
+	else \
+		echo "${RED}❌ Go n'est pas installé${NC}"; \
+		exit 1; \
+	fi
+
+check-lint: check-frontend check-backend
+	@echo "${GREEN}✅ Vérification complète terminée${NC}"
+
+check-compile:
+	@echo "${GREEN}🔍 Vérification compilation frontend et backend...${NC}"
+	@echo "${YELLOW}📦 Compilation frontend...${NC}"
+	@cd frontend && \
+	if command -v npm >/dev/null 2>&1; then \
+		[ -d node_modules ] || npm install --silent; \
+		npm run build 2>&1 | tail -20 || echo "${RED}⚠️  Erreur de compilation frontend${NC}"; \
+	else \
+		echo "${RED}❌ npm n'est pas installé${NC}"; \
+	fi
+	@echo "${YELLOW}📦 Compilation backend...${NC}"
+	@cd backend && \
+	if command -v go >/dev/null 2>&1; then \
+		go build ./cmd/server 2>&1 || echo "${RED}⚠️  Erreur de compilation backend${NC}"; \
+	else \
+		echo "${RED}❌ Go n'est pas installé${NC}"; \
+	fi
+	@echo "${GREEN}✅ Vérification compilation terminée${NC}"
+
 install-deps:
 	@echo "${GREEN}📦 Installation des dépendances Go...${NC}"
 	@cd backend && go mod tidy
