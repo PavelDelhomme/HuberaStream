@@ -939,6 +939,222 @@ func (e *DVDExtractor) getLanguageName(code string) string {
 	return strings.ToUpper(code)
 }
 
+// analyzeDVDWithLsdvd utilise lsdvd pour analyser la structure complète du DVD
+func (e *DVDExtractor) analyzeDVDWithLsdvd(devicePath string) *DVDInfo {
+	// lsdvd peut analyser directement un device block
+	cmd := exec.Command("lsdvd", devicePath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// lsdvd peut échouer, ce n'est pas grave, on utilisera ffprobe
+		return nil
+	}
+	
+	outputStr := string(output)
+	if outputStr == "" {
+		return nil
+	}
+	
+	info := &DVDInfo{
+		AudioTracks:    []DVDTrack{},
+		SubtitleTracks: []DVDTrack{},
+		VideoTracks:    []DVDTrack{},
+	}
+	
+	// Parser la sortie de lsdvd
+	lines := strings.Split(outputStr, "\n")
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		
+		// Extraire le titre du DVD
+		if strings.HasPrefix(line, "Disc Title:") {
+			title := strings.TrimPrefix(line, "Disc Title:")
+			title = strings.TrimSpace(title)
+			if title != "" {
+				info.Title = title
+			}
+			continue
+		}
+		
+		// Parser les pistes audio
+		if strings.HasPrefix(line, "Audio:") {
+			audioMatch := regexp.MustCompile(`Audio:\s*(\d+).*?Language:\s*([a-z]{2,3}).*?Format:\s*([^,]+).*?Frequency:\s*(\d+).*?Channels:\s*(\d+)`)
+			if matches := audioMatch.FindStringSubmatch(line); len(matches) >= 6 {
+				index, _ := strconv.Atoi(matches[1])
+				language := strings.ToLower(matches[2])
+				codec := strings.TrimSpace(matches[3])
+				sampleRate := matches[4]
+				channels, _ := strconv.Atoi(matches[5])
+				
+				langName := e.getLanguageName(language)
+				if langName == "" {
+					langName = strings.ToUpper(language)
+				}
+				
+				title := fmt.Sprintf("%s - %s", langName, codec)
+				if channels > 0 {
+					if channels == 1 {
+						title += " (Mono)"
+					} else if channels == 2 {
+						title += " (Stéréo)"
+					} else if channels == 6 {
+						title += " (5.1)"
+					} else {
+						title += fmt.Sprintf(" (%d canaux)", channels)
+					}
+				}
+				if sampleRate != "" {
+					title += fmt.Sprintf(" %sHz", sampleRate)
+				}
+				
+				track := DVDTrack{
+					Index:      index,
+					Type:       "audio",
+					Codec:      codec,
+					Language:   language,
+					Title:      title,
+					Channels:   channels,
+					SampleRate: sampleRate,
+				}
+				info.AudioTracks = append(info.AudioTracks, track)
+			}
+			continue
+		}
+		
+		// Parser les sous-titres
+		if strings.HasPrefix(line, "Subtitle:") {
+			subtitleMatch := regexp.MustCompile(`Subtitle:\s*(\d+).*?Language:\s*([a-z]{2,3})`)
+			if matches := subtitleMatch.FindStringSubmatch(line); len(matches) >= 3 {
+				index, _ := strconv.Atoi(matches[1])
+				language := strings.ToLower(matches[2])
+				
+				langName := e.getLanguageName(language)
+				if langName == "" {
+					langName = strings.ToUpper(language)
+				}
+				
+				track := DVDTrack{
+					Index:     index,
+					Type:      "subtitle",
+					Language:  language,
+					Codec:     "dvd_subtitle",
+					Title:     fmt.Sprintf("%s - dvd_subtitle", langName),
+				}
+				info.SubtitleTracks = append(info.SubtitleTracks, track)
+			}
+			continue
+		}
+	}
+	
+	return info
+}
+
+// mergeAudioTracks fusionne les pistes audio de lsdvd et ffprobe
+func (e *DVDExtractor) mergeAudioTracks(lsdvdTracks, ffprobeTracks []DVDTrack) []DVDTrack {
+	ffprobeMap := make(map[int]DVDTrack)
+	for _, track := range ffprobeTracks {
+		ffprobeMap[track.Index] = track
+	}
+	
+	merged := make([]DVDTrack, 0)
+	for _, lsdvdTrack := range lsdvdTracks {
+		if ffprobeTrack, exists := ffprobeMap[lsdvdTrack.Index]; exists {
+			mergedTrack := lsdvdTrack
+			if ffprobeTrack.SampleRate != "" && mergedTrack.SampleRate == "" {
+				mergedTrack.SampleRate = ffprobeTrack.SampleRate
+			}
+			if ffprobeTrack.Channels > 0 && mergedTrack.Channels == 0 {
+				mergedTrack.Channels = ffprobeTrack.Channels
+			}
+			if ffprobeTrack.Codec != "" && mergedTrack.Codec == "" {
+				mergedTrack.Codec = ffprobeTrack.Codec
+			}
+			langName := e.getLanguageName(mergedTrack.Language)
+			if langName == "" {
+				langName = strings.ToUpper(mergedTrack.Language)
+			}
+			title := fmt.Sprintf("%s - %s", langName, mergedTrack.Codec)
+			if mergedTrack.Channels > 0 {
+				if mergedTrack.Channels == 1 {
+					title += " (Mono)"
+				} else if mergedTrack.Channels == 2 {
+					title += " (Stéréo)"
+				} else if mergedTrack.Channels == 6 {
+					title += " (5.1)"
+				} else {
+					title += fmt.Sprintf(" (%d canaux)", mergedTrack.Channels)
+				}
+			}
+			if mergedTrack.SampleRate != "" {
+				title += fmt.Sprintf(" %sHz", mergedTrack.SampleRate)
+			}
+			mergedTrack.Title = title
+			merged = append(merged, mergedTrack)
+		} else {
+			merged = append(merged, lsdvdTrack)
+		}
+	}
+	
+	for _, ffprobeTrack := range ffprobeTracks {
+		found := false
+		for _, mergedTrack := range merged {
+			if mergedTrack.Index == ffprobeTrack.Index {
+				found = true
+				break
+			}
+		}
+		if !found {
+			merged = append(merged, ffprobeTrack)
+		}
+	}
+	
+	return merged
+}
+
+// mergeSubtitleTracks fusionne les sous-titres de lsdvd et ffprobe
+func (e *DVDExtractor) mergeSubtitleTracks(lsdvdTracks, ffprobeTracks []DVDTrack) []DVDTrack {
+	ffprobeMap := make(map[int]DVDTrack)
+	for _, track := range ffprobeTracks {
+		ffprobeMap[track.Index] = track
+	}
+	
+	merged := make([]DVDTrack, 0)
+	for _, lsdvdTrack := range lsdvdTracks {
+		if ffprobeTrack, exists := ffprobeMap[lsdvdTrack.Index]; exists {
+			mergedTrack := lsdvdTrack
+			if ffprobeTrack.Codec != "" {
+				mergedTrack.Codec = ffprobeTrack.Codec
+			}
+			langName := e.getLanguageName(mergedTrack.Language)
+			if langName == "" {
+				langName = strings.ToUpper(mergedTrack.Language)
+			}
+			mergedTrack.Title = fmt.Sprintf("%s - %s", langName, mergedTrack.Codec)
+			merged = append(merged, mergedTrack)
+		} else {
+			merged = append(merged, lsdvdTrack)
+		}
+	}
+	
+	for _, ffprobeTrack := range ffprobeTracks {
+		found := false
+		for _, mergedTrack := range merged {
+			if mergedTrack.Index == ffprobeTrack.Index {
+				found = true
+				break
+			}
+		}
+		if !found {
+			merged = append(merged, ffprobeTrack)
+		}
+	}
+	
+	return merged
+}
+
 // ExtractDVD extrait le DVD avec les pistes sélectionnées
 func (e *DVDExtractor) ExtractDVD(
 	devicePath string,
