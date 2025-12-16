@@ -93,9 +93,6 @@ const DVDExtract = () => {
     }
   }
 
-  const [analyzingProgress, setAnalyzingProgress] = useState(0)
-  const [analyzingStage, setAnalyzingStage] = useState('')
-
   const handleGetDVDInfo = async () => {
     setLoading(true)
     setError('')
