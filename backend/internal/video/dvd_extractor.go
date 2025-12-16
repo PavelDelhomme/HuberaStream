@@ -728,6 +728,82 @@ func (e *DVDExtractor) parseStreamDetailsFromFFmpeg(outputStr string) map[int]ma
 	return details
 }
 
+// extractAudioFromVideoStream vérifie si l'audio est intégré dans les streams vidéo
+func (e *DVDExtractor) extractAudioFromVideoStream(devicePath string, streams []struct {
+	Index          int               `json:"index"`
+	CodecType      string            `json:"codec_type"`
+	CodecName      string            `json:"codec_name"`
+	CodecLongName  string            `json:"codec_long_name"`
+	Tags           map[string]string `json:"tags"`
+	Duration       string            `json:"duration"`
+	Width          int               `json:"width"`
+	Height         int               `json:"height"`
+	BitRate        string            `json:"bit_rate"`
+	SampleRate     string            `json:"sample_rate"`
+	Channels       int               `json:"channels"`
+	ChannelLayout  string            `json:"channel_layout"`
+	Disposition    map[string]int    `json:"disposition"`
+}) []DVDTrack {
+	var tracks []DVDTrack
+	
+	// Analyser la sortie ffmpeg pour trouver tous les streams audio, même ceux qui ne sont pas détectés par ffprobe
+	var ffmpegInput string
+	if strings.HasPrefix(devicePath, "/dev/") {
+		ffmpegInput = devicePath
+	} else {
+		ffmpegInput = devicePath
+	}
+	
+	// Utiliser ffmpeg avec une analyse plus approfondie
+	cmd := exec.Command(
+		e.ffmpegPath,
+		"-analyzeduration", "10000000", // 10 secondes
+		"-probesize", "10000000",       // 10 MB
+		"-i", ffmpegInput,
+		"-t", "1", // Analyser 1 seconde
+		"-f", "null",
+		"-",
+	)
+	output, _ := cmd.CombinedOutput() // Ignorer les erreurs
+	outputStr := string(output)
+	
+	// Parser tous les streams audio depuis la sortie ffmpeg
+	// Pattern pour capturer tous les streams audio, même ceux intégrés
+	// Exemple: Stream #0:1[0x1e0]: Video: mpeg2video
+	//          Stream #0:2[0x80](fra): Audio: ac3
+	audioPattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]\(?([a-z]{2,3})?\)?:\s*Audio:\s*([^,]+)`)
+	matches := audioPattern.FindAllStringSubmatch(outputStr, -1)
+	
+	for i, match := range matches {
+		if len(match) >= 4 {
+			streamIdx, _ := strconv.Atoi(match[1])
+			language := strings.ToLower(strings.TrimSpace(match[2]))
+			codec := strings.TrimSpace(match[3])
+			
+			if language == "" {
+				language = "fra" // Français présumé
+			}
+			
+			langName := e.getLanguageName(language)
+			if langName == "" {
+				langName = "Français présumé"
+			}
+			
+			track := DVDTrack{
+				Index:    i,
+				Type:     "audio",
+				Codec:    codec,
+				Language: language,
+				Title:    fmt.Sprintf("%s - %s", langName, codec),
+				Channels: 2, // Par défaut
+			}
+			tracks = append(tracks, track)
+		}
+	}
+	
+	return tracks
+}
+
 // extractAudioTracksFromFFmpeg extrait les pistes audio depuis ffmpeg
 func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrack {
 	// Utiliser directement le device path au lieu de dvd://1
