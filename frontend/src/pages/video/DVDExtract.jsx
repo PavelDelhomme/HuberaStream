@@ -695,18 +695,25 @@ const DVDExtract = () => {
               <p className="section-description">Sélectionnez les pistes audio à inclure</p>
               <div className="tracks-list">
                 {dvdInfo.audio_tracks && Array.isArray(dvdInfo.audio_tracks) && dvdInfo.audio_tracks.length > 0 ? (
-                  dvdInfo.audio_tracks.map((track, idx) => (
-                    <label key={idx} className="track-item">
-                      <input
-                        type="checkbox"
-                        checked={selectedAudioTracks.includes(idx)}
-                        onChange={() => toggleAudioTrack(idx)}
-                      />
-                      <span>
-                        Piste {idx + 1} - {track.language || 'Inconnu'} ({track.codec || 'Inconnu'})
-                      </span>
-                    </label>
-                  ))
+                  <>
+                    {dvdInfo.audio_tracks.map((track, idx) => (
+                      <label key={idx} className="track-item">
+                        <input
+                          type="checkbox"
+                          checked={selectedAudioTracks.includes(idx)}
+                          onChange={() => toggleAudioTrack(idx)}
+                        />
+                        <span>
+                          {track.title || `Piste ${idx + 1} - ${track.language || 'Inconnu'} (${track.codec || 'Inconnu'})`}
+                        </span>
+                      </label>
+                    ))}
+                    {selectedAudioTracks.length === 0 && (
+                      <p className="no-audio-warning" style={{ color: '#ff6b6b', marginTop: '10px', fontStyle: 'italic', padding: '10px', background: 'rgba(255, 107, 107, 0.1)', borderRadius: '8px' }}>
+                        ⚠️ Aucune piste audio sélectionnée - La vidéo sera muette
+                      </p>
+                    )}
+                  </>
                 ) : (
                   <p className="no-tracks">Aucune piste audio disponible</p>
                 )}
