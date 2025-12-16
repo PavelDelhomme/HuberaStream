@@ -195,15 +195,15 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		return
 	}
 
-	// Extraire le DVD en HLS directement
-	if err := h.extractor.ExtractDVDToHLS(
+	// Extraire le DVD (pour l'instant, on extrait juste en MP4, HLS sera ajouté plus tard)
+	outputPath := filepath.Join(outputDir, "video.mp4")
+	if err := h.extractor.ExtractDVD(
 		req.DevicePath,
-		videoID,
-		outputDir,
+		outputPath,
 		req.VideoTrackIndex,
 		req.AudioTrackIndices,
 		req.SubtitleTrackIndices,
-		req.Qualities,
+		nil, // progressCallback
 	); err != nil {
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 		return
