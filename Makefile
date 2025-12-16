@@ -317,6 +317,22 @@ logs-follow:
 		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f; \
 	fi
 
+logs-backend-frontend:
+	@echo "${GREEN}📋 Logs Backend + Frontend (scrollable, appuyez 'F' pour suivre, 'q' pour quitter)...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 streammake-backend streammake-frontend 2>&1 | less -R +F; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 streammake-backend streammake-frontend 2>&1 | less -R +F; \
+	fi
+
+logs-backend-frontend-follow:
+	@echo "${GREEN}📺 Logs Backend + Frontend en temps réel (Ctrl+C pour quitter)...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f streammake-backend streammake-frontend; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f streammake-backend streammake-frontend; \
+	fi
+
 logs-%:
 	@echo "${GREEN}📋 Logs du service $* (Ctrl+C pour quitter)...${NC}"
 	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
