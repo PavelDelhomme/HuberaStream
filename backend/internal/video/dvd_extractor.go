@@ -246,12 +246,18 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		}
 	}
 
-	// Si pas de titre, essayer d'extraire depuis ffmpeg output
+	// Utiliser ffmpeg pour obtenir plus d'informations (titre, réalisateur, langues)
 	var ffmpegOutputStr string
-	if err == nil {
+	ffmpegCmd := exec.Command(
+		"sh", "-c",
+		fmt.Sprintf("%s -i %s -t 0.1 -f null - 2>&1", e.ffmpegPath, dvdInput),
+	)
+	ffmpegOutput, ffmpegErr := ffmpegCmd.CombinedOutput()
+	if ffmpegErr == nil {
 		ffmpegOutputStr = string(ffmpegOutput)
+		
+		// Si pas de titre, essayer d'extraire depuis ffmpeg output
 		if info.Title == "" {
-			// Utiliser ffmpeg pour obtenir plus d'informations
 			title := e.extractTitleFromFFmpegOutput(ffmpegOutputStr)
 			if title != "" {
 				info.Title = title
