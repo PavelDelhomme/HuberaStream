@@ -110,6 +110,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			dvd.GET("/info", dvdHandler.GetDVDInfo)
 			dvd.POST("/extract", dvdHandler.ExtractDVD)
 			dvd.GET("/extract/:id/status", dvdHandler.GetExtractionStatus)
+			dvd.POST("/extract/:id/cancel", dvdHandler.CancelExtraction)
 		}
 
 		// Playlists
