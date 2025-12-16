@@ -16,17 +16,17 @@ type Scraper interface {
 }
 
 type TorrentResult struct {
-	Name        string
-	MagnetURL   string
-	TorrentURL  string
-	Size        int64
-	Seeders     int
-	Leechers    int
-	UploadDate  string
-	Category    string
-	Source      models.TorrentSource
-	Quality     string
-	Language    string
+	Name       string
+	MagnetURL  string
+	TorrentURL string
+	Size       int64
+	Seeders    int
+	Leechers   int
+	UploadDate string
+	Category   string
+	Source     models.TorrentSource
+	Quality    string
+	Language   string
 }
 
 type ScraperFactory struct{}
@@ -75,4 +75,3 @@ func formatSize(sizeStr string) int64 {
 
 	return int64(value * float64(multiplier))
 }
-

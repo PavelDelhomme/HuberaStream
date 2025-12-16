@@ -23,7 +23,7 @@ type Config struct {
 	JWTSecret string
 
 	// Storage
-	VideoStoragePath    string
+	VideoStoragePath     string
 	ThumbnailStoragePath string
 	TorrentStoragePath   string
 
@@ -32,24 +32,24 @@ type Config struct {
 	AdminPassword string
 
 	// Torrent
-	TorrentClientPath           string
-	TorrentClientType           string
-	TorrentDownloadPath         string
-	EnableAutoDownload          bool
-	TorrentClientTransmissionURL string
+	TorrentClientPath             string
+	TorrentClientType             string
+	TorrentDownloadPath           string
+	EnableAutoDownload            bool
+	TorrentClientTransmissionURL  string
 	TorrentClientTransmissionUser string
 	TorrentClientTransmissionPass string
-	TorrentClientQBittorrentURL string
-	TorrentClientQBittorrentUser string
-	TorrentClientQBittorrentPass string
-	TorrentClientDelugeURL      string
-	TorrentClientDelugePass     string
-	TorrentClientRTorrentURL    string
+	TorrentClientQBittorrentURL   string
+	TorrentClientQBittorrentUser  string
+	TorrentClientQBittorrentPass  string
+	TorrentClientDelugeURL        string
+	TorrentClientDelugePass       string
+	TorrentClientRTorrentURL      string
 
 	// Server
 	Port string
 	Env  string // development, production
-	
+
 	// Metadata
 	TMDBAPIKey string
 }
@@ -87,24 +87,24 @@ func Load() *Config {
 
 		// Torrent
 		// Utiliser les URLs spécifiques si définies, sinon TORRENT_CLIENT_PATH, sinon défaut
-		TorrentClientPath:           getTorrentClientPath(),
-		TorrentClientType:           getEnv("TORRENT_CLIENT_TYPE", "transmission"), // transmission, qbittorrent, deluge, rtorrent
-		TorrentDownloadPath:         getEnv("TORRENT_DOWNLOAD_PATH", "./storage/torrents/downloads"),
-		EnableAutoDownload:          getEnv("ENABLE_AUTO_DOWNLOAD", "false") == "true",
-		TorrentClientTransmissionURL: getEnv("TRANSMISSION_URL", "http://transmission:9091/transmission/rpc"),
+		TorrentClientPath:             getTorrentClientPath(),
+		TorrentClientType:             getEnv("TORRENT_CLIENT_TYPE", "transmission"), // transmission, qbittorrent, deluge, rtorrent
+		TorrentDownloadPath:           getEnv("TORRENT_DOWNLOAD_PATH", "./storage/torrents/downloads"),
+		EnableAutoDownload:            getEnv("ENABLE_AUTO_DOWNLOAD", "false") == "true",
+		TorrentClientTransmissionURL:  getEnv("TRANSMISSION_URL", "http://transmission:9091/transmission/rpc"),
 		TorrentClientTransmissionUser: getEnv("TRANSMISSION_USER", "transmission"),
 		TorrentClientTransmissionPass: getEnv("TRANSMISSION_PASS", "transmission"),
-		TorrentClientQBittorrentURL: getEnv("QBITTORRENT_URL", "http://qbittorrent:8080"),
-		TorrentClientQBittorrentUser: getEnv("QBITTORRENT_USER", "admin"),
-		TorrentClientQBittorrentPass: getEnv("QBITTORRENT_PASS", "adminadmin"),
-		TorrentClientDelugeURL:      getEnv("DELUGE_URL", "http://deluge:8112/json"),
-		TorrentClientDelugePass:     getEnv("DELUGE_PASS", "deluge"),
-		TorrentClientRTorrentURL:    getEnv("RTORRENT_URL", "http://rtorrent:5000/RPC2"),
+		TorrentClientQBittorrentURL:   getEnv("QBITTORRENT_URL", "http://qbittorrent:8080"),
+		TorrentClientQBittorrentUser:  getEnv("QBITTORRENT_USER", "admin"),
+		TorrentClientQBittorrentPass:  getEnv("QBITTORRENT_PASS", "adminadmin"),
+		TorrentClientDelugeURL:        getEnv("DELUGE_URL", "http://deluge:8112/json"),
+		TorrentClientDelugePass:       getEnv("DELUGE_PASS", "deluge"),
+		TorrentClientRTorrentURL:      getEnv("RTORRENT_URL", "http://rtorrent:5000/RPC2"),
 
 		// Server
 		Port: getEnv("PORT", "8080"),
 		Env:  getEnv("ENV", "development"),
-		
+
 		// Metadata
 		TMDBAPIKey: getEnv("TMDB_API_KEY", ""),
 	}
@@ -148,4 +148,3 @@ func getTorrentClientPath() string {
 		return "http://transmission:9091/transmission/rpc"
 	}
 }
-

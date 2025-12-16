@@ -9,7 +9,7 @@ func TestLoad(t *testing.T) {
 	// Sauvegarder les variables d'environnement actuelles
 	originalDBHost := os.Getenv("DB_HOST")
 	originalJWTSecret := os.Getenv("JWT_SECRET")
-	
+
 	// Nettoyer après le test
 	defer func() {
 		if originalDBHost != "" {
@@ -23,7 +23,7 @@ func TestLoad(t *testing.T) {
 			os.Unsetenv("JWT_SECRET")
 		}
 	}()
-	
+
 	// Test avec valeurs par défaut
 	cfg := Load()
 	if cfg.DBHost == "" {
@@ -35,11 +35,11 @@ func TestLoad(t *testing.T) {
 	if cfg.DBPort == "" {
 		t.Error("DBPort ne devrait pas être vide")
 	}
-	
+
 	// Test avec variables d'environnement
 	os.Setenv("DB_HOST", "test-host")
 	os.Setenv("JWT_SECRET", "test-secret")
-	
+
 	cfg2 := Load()
 	if cfg2.DBHost != "test-host" {
 		t.Errorf("DBHost devrait être 'test-host', a obtenu: %s", cfg2.DBHost)
@@ -51,7 +51,7 @@ func TestLoad(t *testing.T) {
 
 func TestConfig_StoragePaths(t *testing.T) {
 	cfg := Load()
-	
+
 	if cfg.VideoStoragePath == "" {
 		t.Error("VideoStoragePath ne devrait pas être vide")
 	}
@@ -65,7 +65,7 @@ func TestConfig_StoragePaths(t *testing.T) {
 
 func TestConfig_AdminConfig(t *testing.T) {
 	cfg := Load()
-	
+
 	if cfg.AdminEmail == "" {
 		t.Error("AdminEmail ne devrait pas être vide")
 	}
@@ -73,4 +73,3 @@ func TestConfig_AdminConfig(t *testing.T) {
 		t.Error("AdminPassword ne devrait pas être vide")
 	}
 }
-

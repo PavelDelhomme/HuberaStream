@@ -42,11 +42,11 @@ func (p *PostProcessor) ProcessCompletedTorrents(ctx context.Context) error {
 	var libraryTorrents []models.Torrent
 	if err := p.db.Where("status = ? AND video_id IS NULL AND add_to_library = ?", models.TorrentStatusCompleted, true).
 		Find(&libraryTorrents).Error; err == nil {
-	for _, torrent := range libraryTorrents {
-		if err := p.processTorrent(ctx, &torrent); err != nil {
-			// Log seulement les erreurs critiques
+		for _, torrent := range libraryTorrents {
+			if err := p.processTorrent(ctx, &torrent); err != nil {
+				// Log seulement les erreurs critiques
+			}
 		}
-	}
 	}
 
 	// Ensuite, traiter les autres torrents terminés
@@ -132,7 +132,7 @@ func (p *PostProcessor) createVideoFromFile(ctx context.Context, torrent *models
 		// Si aucun admin n'est trouvé, utiliser un UUID par défaut (sera corrigé plus tard)
 		adminUser.ID = uuid.MustParse("00000000-0000-0000-0000-000000000000")
 	}
-	
+
 	// Si le torrent est marqué pour la bibliothèque, la vidéo doit être publique
 	isPublic := torrent.AddToLibrary
 
@@ -357,4 +357,3 @@ func (p *PostProcessor) generateTextThumbnail(videoID uuid.UUID, title string, d
 
 	return thumbnailPath, nil
 }
-

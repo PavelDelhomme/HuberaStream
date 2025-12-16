@@ -297,4 +297,3 @@ func (c *DelugeClient) ResumeTorrent(ctx context.Context, torrentID string) erro
 	_, err := c.makeRequest(ctx, req)
 	return err
 }
-

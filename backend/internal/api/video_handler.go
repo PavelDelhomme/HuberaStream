@@ -80,7 +80,7 @@ func (h *VideoHandler) CreateVideo(c *gin.Context) {
 func (h *VideoHandler) ListVideos(c *gin.Context) {
 	var videos []models.Video
 	query := h.db.Preload("User").Preload("Formats")
-	
+
 	// Si pas de paramètre status, afficher seulement les vidéos prêtes (pour les non-admins)
 	// Les admins peuvent voir toutes les vidéos
 	userID, exists := c.Get("user_id")
@@ -91,7 +91,7 @@ func (h *VideoHandler) ListVideos(c *gin.Context) {
 			isAdmin = user.Role == models.RoleAdmin
 		}
 	}
-	
+
 	// Filtre par statut si fourni
 	statusFilter := c.Query("status")
 	if statusFilter == "all" && isAdmin {
@@ -222,13 +222,13 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	// Logs de debug désactivés pour réduire le bruit
 	// fmt.Printf("[DEBUG GetVideo] Handler appelé avec id=%s\n", id)
 	// log.Printf("[DEBUG GetVideo] Handler appelé avec id=%s\n", id)
-	
+
 	// Si c'est "continue-watching", rediriger vers le bon handler
 	if id == "continue-watching" {
 		h.GetContinueWatching(c)
 		return
 	}
-	
+
 	videoID, err := uuid.Parse(id)
 	if err != nil {
 		// Logs de debug désactivés
@@ -242,7 +242,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	// Logs de debug désactivés
 	// fmt.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
 	// log.Printf("[DEBUG GetVideo] Récupération vidéo %s\n", videoID)
-	
+
 	// Essayer d'abord de récupérer la vidéo (sans soft-deleted)
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
 		// Logs de debug désactivés
@@ -267,7 +267,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 		// Logs de debug désactivés
 		// fmt.Printf("[DEBUG GetVideo] Vidéo %s est soft-deleted mais en traitement, accès autorisé\n", videoID)
 	}
-	
+
 	// SIMPLIFICATION: Si la vidéo est en traitement, TOUJOURS permettre l'accès
 	// car le frontend a besoin de récupérer les infos pour afficher l'écran de traitement
 	// Vérifier AVANT de charger les relations pour éviter les erreurs SQL
@@ -275,7 +275,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 		// Charger les relations nécessaires (ignorer les erreurs pour Subtitles)
 		h.db.Model(&video).Association("Formats").Find(&video.Formats)
 		h.db.Model(&video).Association("User").Find(&video.User)
-		video.Subtitles = []models.Subtitle{} // Initialiser à vide (table peut ne pas exister)
+		video.Subtitles = []models.Subtitle{}                                  // Initialiser à vide (table peut ne pas exister)
 		_ = h.db.Model(&video).Association("Subtitles").Find(&video.Subtitles) // Ignorer erreur silencieusement
 		h.db.Model(&video).Association("Tags").Find(&video.Tags)
 		// Permettre l'accès pour les vidéos en traitement (même sans auth, même si pas publique)
@@ -296,7 +296,7 @@ func (h *VideoHandler) GetVideo(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	isAdmin := false
 	isOwner := false
-	
+
 	if exists {
 		userIDStr, ok := userID.(string)
 		if ok && userIDStr != "" {
@@ -357,7 +357,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	isOwner := false
 	isAdmin := false
-	
+
 	if exists {
 		userIDStr, ok := userID.(string)
 		if ok && userIDStr != "" { // Vérifier que userIDStr n'est pas vide
@@ -378,7 +378,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	// Cela permet au frontend d'afficher l'écran de traitement
 	// Pour les vidéos en traitement, permettre l'accès même si pas propriétaire/admin
 	// Logs de debug désactivés pour réduire le bruit
-	
+
 	if video.Status == models.VideoStatusProcessing {
 		// Permettre l'accès au statut pour les vidéos en traitement (même sans auth)
 		// Cela permet au frontend d'afficher l'écran de traitement
@@ -403,11 +403,11 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 		// - 10-80% : Génération des 4 formats progressifs (360p, 480p, 720p, 1080p) = 4/5 = 80%
 		// - 80-95% : Génération du format HLS = 1/5 = 20%
 		// - 95-100% : Finalisation
-		
+
 		// Si aucun format n'a été créé, on est au début du traitement
 		if formatCount == 0 {
 			timeSinceCreation := time.Since(video.CreatedAt)
-			
+
 			// Vérifier si la miniature existe (indique qu'on a passé l'étape initiale)
 			if video.ThumbnailPath != "" {
 				// Miniature créée, on est probablement en train de transcoder
@@ -426,7 +426,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 					if estimatedTranscodingTime > 30*time.Minute {
 						estimatedTranscodingTime = 30 * time.Minute
 					}
-					
+
 					// Progression basée sur le temps écoulé depuis la création
 					// 10% (miniature + durée) + jusqu'à 60% pour le transcodage
 					timeProgress := float64(timeSinceCreation) / float64(estimatedTranscodingTime)
@@ -439,7 +439,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 					}
 					// Log uniquement si changement significatif (tous les 10% de progression)
 					if progress%10 == 0 && progress > 10 {
-						log.Printf("[GetVideoStatus] Progression basée sur temps: temps écoulé=%v, estimé=%v, progress=%d%%", 
+						log.Printf("[GetVideoStatus] Progression basée sur temps: temps écoulé=%v, estimé=%v, progress=%d%%",
 							timeSinceCreation, estimatedTranscodingTime, progress)
 					}
 				} else {
@@ -463,7 +463,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 					progress = 2 // Très début
 				}
 			}
-			
+
 			// Si la vidéo est bloquée depuis trop longtemps (> 1 heure), augmenter la progression
 			// pour indiquer qu'il y a un problème mais qu'on progresse quand même
 			if timeSinceCreation > 1*time.Hour && progress < 20 {
@@ -479,7 +479,7 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 			// Chaque format progressif = 15% (4 * 15% = 60%)
 			// Le format HLS = 25% (car plus long)
 			// Total = 85% pour tous les formats, puis 15% pour la finalisation
-			
+
 			// Compter les formats progressifs et HLS séparément
 			var progressiveCount int64
 			var hlsCount int64
@@ -489,41 +489,41 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 			h.db.Model(&models.VideoFormat{}).
 				Where("video_id = ? AND format = ?", videoID, "hls").
 				Count(&hlsCount)
-			
+
 			// Calculer la progression
 			// 0-10% : Initialisation (miniature, durée)
 			// 10-70% : Formats progressifs (4 formats * 15% = 60%)
 			// 70-95% : Format HLS (25%)
 			// 95-100% : Finalisation
-			
-			baseProgress := 10 // Étape initiale terminée
+
+			baseProgress := 10                                                   // Étape initiale terminée
 			progressiveProgress := int((float64(progressiveCount) / 4.0) * 60.0) // Max 60%
-			hlsProgress := int((float64(hlsCount) / 1.0) * 25.0) // Max 25%
-			
+			hlsProgress := int((float64(hlsCount) / 1.0) * 25.0)                 // Max 25%
+
 			progress = baseProgress + progressiveProgress + hlsProgress
-			
+
 			// Si tous les formats progressifs sont créés (4/4) mais pas HLS, on est à 70%
 			if progressiveCount == 4 && hlsCount == 0 {
 				progress = 70
 			}
-			
+
 			// Ne pas dépasser 95% tant que le statut n'est pas "ready"
 			if progress > 95 {
 				progress = 95
 			}
-			
+
 			// Si au moins un format progressif est créé, on progresse au-delà de 10%
 			if progressiveCount > 0 && progress <= 10 {
 				// Au moins un format progressif = minimum 15%
-				progress = 10 + int((float64(progressiveCount) / 4.0) * 60.0)
+				progress = 10 + int((float64(progressiveCount)/4.0)*60.0)
 				log.Printf("[GetVideoStatus] Progression ajustée: progressiveCount=%d, nouveau progress=%d", progressiveCount, progress)
 			}
-			
+
 			// S'assurer qu'on a au moins 10% si un format a été créé
 			if progress < 10 && formatCount > 0 {
 				progress = 10
 			}
-			
+
 			// Log pour debug (uniquement si changement significatif)
 			if progressiveCount > 0 || hlsCount > 0 {
 				log.Printf("[GetVideoStatus] Progression calculée: base=%d, progressive=%d (count=%d), hls=%d (count=%d), total=%d, formatCount=%d",
@@ -535,13 +535,13 @@ func (h *VideoHandler) GetVideoStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"video_id": videoID,
-		"status":   string(video.Status),
-		"progress": progress,
-		"formats_count": formatCount,
+		"video_id":       videoID,
+		"status":         string(video.Status),
+		"progress":       progress,
+		"formats_count":  formatCount,
 		"thumbnail_path": video.ThumbnailPath,
-		"title": video.Title,
-		"description": video.Description,
+		"title":          video.Title,
+		"description":    video.Description,
 	})
 }
 
@@ -574,12 +574,12 @@ func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 	}
 
 	var req struct {
-		Title         string      `json:"title"`
-		Description   string      `json:"description"`
-		CategoryID    *uuid.UUID  `json:"category_id"`
-		SubCategoryID *uuid.UUID  `json:"sub_category_id"`
-		IsPublic      *bool       `json:"is_public"`
-		Status        *string     `json:"status"` // Pour permettre le changement de statut
+		Title         string     `json:"title"`
+		Description   string     `json:"description"`
+		CategoryID    *uuid.UUID `json:"category_id"`
+		SubCategoryID *uuid.UUID `json:"sub_category_id"`
+		IsPublic      *bool      `json:"is_public"`
+		Status        *string    `json:"status"` // Pour permettre le changement de statut
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -607,10 +607,10 @@ func (h *VideoHandler) UpdateVideo(c *gin.Context) {
 	if req.Status != nil {
 		status := models.VideoStatus(*req.Status)
 		// Valider le statut
-		if status == models.VideoStatusPending || 
-		   status == models.VideoStatusProcessing || 
-		   status == models.VideoStatusReady || 
-		   status == models.VideoStatusError {
+		if status == models.VideoStatusPending ||
+			status == models.VideoStatusProcessing ||
+			status == models.VideoStatusReady ||
+			status == models.VideoStatusError {
 			video.Status = status
 		}
 	}
@@ -689,7 +689,7 @@ func (h *VideoHandler) DownloadFromStream(c *gin.Context) {
 	// TODO: Implémenter le service de téléchargement
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"message": "Téléchargement démarré",
+		"message":  "Téléchargement démarré",
 		"video_id": video.ID,
 	})
 }
@@ -810,7 +810,7 @@ func (h *VideoHandler) CancelVideoProcessing(c *gin.Context) {
 	h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Traitement de la vidéo annulé avec succès",
+		"message":  "Traitement de la vidéo annulé avec succès",
 		"video_id": videoID,
 		"status":   "cancelled",
 	})

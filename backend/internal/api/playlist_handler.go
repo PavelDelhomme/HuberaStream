@@ -244,4 +244,3 @@ func (h *PlaylistHandler) RemoveVideoFromPlaylist(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Vidéo retirée de la playlist"})
 }
-

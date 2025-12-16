@@ -25,12 +25,12 @@ type Scraper1337x struct {
 type Category1337x string
 
 const (
-	CategoryPopularMovies  Category1337x = "popular-movies"
-	CategoryTV             Category1337x = "TV"
-	CategoryMovieLibrary   Category1337x = "movie-library"
-	CategoryAnime          Category1337x = "Anime"
-	CategoryDocumentaries  Category1337x = "Documentaries"
-	CategoryMovies         Category1337x = "Movies"
+	CategoryPopularMovies Category1337x = "popular-movies"
+	CategoryTV            Category1337x = "TV"
+	CategoryMovieLibrary  Category1337x = "movie-library"
+	CategoryAnime         Category1337x = "Anime"
+	CategoryDocumentaries Category1337x = "Documentaries"
+	CategoryMovies        Category1337x = "Movies"
 )
 
 func New1337xScraper() *Scraper1337x {
@@ -64,7 +64,7 @@ func (s *Scraper1337x) Search(ctx context.Context, query string, category *model
 // BrowseCategory parcourt une catégorie spécifique
 func (s *Scraper1337x) BrowseCategory(ctx context.Context, category Category1337x, page int, language string) ([]*TorrentResult, error) {
 	var categoryURL string
-	
+
 	switch category {
 	case CategoryPopularMovies:
 		categoryURL = fmt.Sprintf("%s/popular-movies", s.baseURL)

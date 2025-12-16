@@ -29,10 +29,10 @@ func (h *CategoryHandler) ListCategories(c *gin.Context) {
 
 func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 	var req struct {
-		Name        string                `json:"name" binding:"required"`
-		Type        models.CategoryType   `json:"type" binding:"required"`
-		Description string                `json:"description"`
-		Icon        string                `json:"icon"`
+		Name        string              `json:"name" binding:"required"`
+		Type        models.CategoryType `json:"type" binding:"required"`
+		Description string              `json:"description"`
+		Icon        string              `json:"icon"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -137,4 +137,3 @@ func (h *CategoryHandler) CreateSubCategory(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, subCategory)
 }
-

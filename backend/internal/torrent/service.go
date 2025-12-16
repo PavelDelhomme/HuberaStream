@@ -43,7 +43,7 @@ func NewTorrentService(db *gorm.DB, cfg *config.Config, clientType ClientType) (
 
 	// Démarrer le service de mise à jour périodique
 	service.startUpdateService()
-	
+
 	// Démarrer le service de post-traitement
 	service.startPostProcessingService()
 
@@ -70,7 +70,7 @@ func (s *TorrentService) UpdateTorrentStatus(ctx context.Context, torrent *model
 	// Note: On doit mapper l'ID du torrent dans notre DB vers l'ID du client
 	// Pour simplifier, on utilise le hash ou un identifiant unique
 	torrentID := torrent.ID.String()
-	
+
 	status, err := s.client.GetTorrentStatus(ctx, torrentID)
 	if err != nil {
 		// Le torrent n'existe peut-être pas encore dans le client
@@ -183,4 +183,3 @@ func (s *TorrentService) RemoveTorrent(ctx context.Context, torrentID string) er
 func (s *TorrentService) GetTorrentStatus(ctx context.Context, torrentID string) (*TorrentStatus, error) {
 	return s.client.GetTorrentStatus(ctx, torrentID)
 }
-

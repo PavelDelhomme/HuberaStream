@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	DefaultChunkSize = 5 * 1024 * 1024 // 5MB par chunk
+	DefaultChunkSize = 5 * 1024 * 1024  // 5MB par chunk
 	MaxChunkSize     = 50 * 1024 * 1024 // 50MB max par chunk
 )
 
@@ -36,9 +36,9 @@ type ChunkUploadHandler struct {
 }
 
 type UploadSessionState struct {
-	Session   models.UploadSession
-	Chunks    map[int]*models.UploadChunk
-	Mutex     sync.RWMutex
+	Session models.UploadSession
+	Chunks  map[int]*models.UploadChunk
+	Mutex   sync.RWMutex
 }
 
 func NewChunkUploadHandler(db *gorm.DB, cfg *config.Config, uploadHandler *UploadHandler) *ChunkUploadHandler {
@@ -89,15 +89,15 @@ func (h *ChunkUploadHandler) InitUploadSession(c *gin.Context) {
 	// Créer la session
 	sessionID := uuid.New()
 	session := models.UploadSession{
-		ID:            sessionID,
-		UserID:        userUUID,
-		FileName:      req.FileName,
-		FileSize:      req.FileSize,
-		ChunkSize:     chunkSize,
-		TotalChunks:   totalChunks,
-		Status:        models.UploadStatusPending,
-		Metadata:      string(req.Metadata),
-		TempPath:      filepath.Join(h.cfg.VideoStoragePath, "uploads", sessionID.String()),
+		ID:          sessionID,
+		UserID:      userUUID,
+		FileName:    req.FileName,
+		FileSize:    req.FileSize,
+		ChunkSize:   chunkSize,
+		TotalChunks: totalChunks,
+		Status:      models.UploadStatusPending,
+		Metadata:    string(req.Metadata),
+		TempPath:    filepath.Join(h.cfg.VideoStoragePath, "uploads", sessionID.String()),
 	}
 
 	if err := h.db.Create(&session).Error; err != nil {
@@ -120,7 +120,7 @@ func (h *ChunkUploadHandler) InitUploadSession(c *gin.Context) {
 	}
 	h.sessionsMutex.Unlock()
 
-	log.Printf("[InitUploadSession] Session créée: %s, fichier: %s, taille: %d, chunks: %d", 
+	log.Printf("[InitUploadSession] Session créée: %s, fichier: %s, taille: %d, chunks: %d",
 		sessionID, req.FileName, req.FileSize, totalChunks)
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -169,7 +169,7 @@ func (h *ChunkUploadHandler) UploadChunk(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Index de chunk invalide"})
 		return
 	}
-	
+
 	// Récupérer le checksum du chunk (calculé côté client)
 	expectedChecksum := c.PostForm("checksum")
 
@@ -195,7 +195,7 @@ func (h *ChunkUploadHandler) UploadChunk(c *gin.Context) {
 	// Sauvegarder le chunk temporairement
 	chunkFileName := fmt.Sprintf("chunk_%d", chunkIndex)
 	chunkPath := filepath.Join(session.TempPath, chunkFileName)
-	
+
 	if err := c.SaveUploadedFile(file, chunkPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'enregistrement du chunk"})
 		return
@@ -218,7 +218,7 @@ func (h *ChunkUploadHandler) UploadChunk(c *gin.Context) {
 		return
 	}
 	chunkChecksum := fmt.Sprintf("%x", hash.Sum(nil))
-	
+
 	// Vérifier l'intégrité du chunk si un checksum a été fourni
 	if expectedChecksum != "" && chunkChecksum != expectedChecksum {
 		os.Remove(chunkPath)
@@ -226,14 +226,14 @@ func (h *ChunkUploadHandler) UploadChunk(c *gin.Context) {
 		log.Printf("[UploadChunk]   Checksum attendu: %s", expectedChecksum)
 		log.Printf("[UploadChunk]   Checksum calculé: %s", chunkChecksum)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Checksum du chunk invalide - corruption détectée",
-			"expected": expectedChecksum,
-			"got": chunkChecksum,
+			"error":       "Checksum du chunk invalide - corruption détectée",
+			"expected":    expectedChecksum,
+			"got":         chunkChecksum,
 			"chunk_index": chunkIndex,
 		})
 		return
 	} else if expectedChecksum != "" {
-		log.Printf("[UploadChunk] ✅ Intégrité validée pour chunk %d/%d (session %s): %s", 
+		log.Printf("[UploadChunk] ✅ Intégrité validée pour chunk %d/%d (session %s): %s",
 			chunkIndex+1, session.TotalChunks, sessionID, chunkChecksum[:16]+"...")
 	}
 
@@ -262,16 +262,16 @@ func (h *ChunkUploadHandler) UploadChunk(c *gin.Context) {
 	}
 	h.db.Save(&session)
 
-	log.Printf("[UploadChunk] Chunk %d/%d uploadé pour session %s (%.1f%%)", 
-		chunkIndex+1, session.TotalChunks, sessionID, 
+	log.Printf("[UploadChunk] Chunk %d/%d uploadé pour session %s (%.1f%%)",
+		chunkIndex+1, session.TotalChunks, sessionID,
 		float64(session.UploadedChunks)/float64(session.TotalChunks)*100)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":        "Chunk uploadé avec succès",
-		"chunk_index":    chunkIndex,
+		"message":         "Chunk uploadé avec succès",
+		"chunk_index":     chunkIndex,
 		"uploaded_chunks": session.UploadedChunks,
-		"total_chunks":   session.TotalChunks,
-		"progress":       float64(session.UploadedChunks) / float64(session.TotalChunks) * 100,
+		"total_chunks":    session.TotalChunks,
+		"progress":        float64(session.UploadedChunks) / float64(session.TotalChunks) * 100,
 	})
 }
 
@@ -305,32 +305,32 @@ func (h *ChunkUploadHandler) GetUploadStatus(c *gin.Context) {
 	if session.TotalChunks > 0 {
 		progress = float64(session.UploadedChunks) / float64(session.TotalChunks) * 100
 	}
-	
+
 	// Récupérer les détails des chunks pour l'historique
 	var chunks []models.UploadChunk
 	h.db.Where("session_id = ?", sessionID).Order("chunk_index ASC").Find(&chunks)
-	
+
 	// Préparer les informations des chunks
 	chunkDetails := make([]map[string]interface{}, len(chunks))
 	for i, chunk := range chunks {
 		chunkDetails[i] = map[string]interface{}{
-			"index": chunk.ChunkIndex,
-			"size": chunk.ChunkSize,
-			"checksum": chunk.Checksum,
+			"index":       chunk.ChunkIndex,
+			"size":        chunk.ChunkSize,
+			"checksum":    chunk.Checksum,
 			"uploaded_at": chunk.UploadedAt,
-			"status": "uploaded",
+			"status":      "uploaded",
 		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"session_id":     sessionID,
-		"status":         string(session.Status),
+		"session_id":      sessionID,
+		"status":          string(session.Status),
 		"uploaded_chunks": session.UploadedChunks,
-		"total_chunks":   session.TotalChunks,
-		"uploaded_bytes": session.UploadedBytes,
-		"file_size":      session.FileSize,
-		"progress":       progress,
-		"error":          session.Error,
+		"total_chunks":    session.TotalChunks,
+		"uploaded_bytes":  session.UploadedBytes,
+		"file_size":       session.FileSize,
+		"progress":        progress,
+		"error":           session.Error,
 	})
 }
 
@@ -443,32 +443,32 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 
 	// Compter réellement les chunks dans la base de données
 	actualChunkCount := len(chunks)
-	
+
 	// Vérifier que tous les chunks sont uploadés (utiliser le comptage réel plutôt que le compteur de session)
 	if actualChunkCount < session.TotalChunks {
-		log.Printf("[FinalizeUpload] ⚠️  Chunks manquants: %d/%d uploadés (session: %s)", 
+		log.Printf("[FinalizeUpload] ⚠️  Chunks manquants: %d/%d uploadés (session: %s)",
 			actualChunkCount, session.TotalChunks, sessionID)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error":          "Tous les chunks ne sont pas encore uploadés",
-			"uploaded_chunks": actualChunkCount,
-			"total_chunks":    session.TotalChunks,
+			"error":                   "Tous les chunks ne sont pas encore uploadés",
+			"uploaded_chunks":         actualChunkCount,
+			"total_chunks":            session.TotalChunks,
 			"session_uploaded_chunks": session.UploadedChunks, // Pour debug
 		})
 		return
 	}
 
 	if actualChunkCount != session.TotalChunks {
-		log.Printf("[FinalizeUpload] ⚠️  Nombre de chunks incorrect: %d attendu, %d trouvé (session: %s)", 
+		log.Printf("[FinalizeUpload] ⚠️  Nombre de chunks incorrect: %d attendu, %d trouvé (session: %s)",
 			session.TotalChunks, actualChunkCount, sessionID)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Nombre de chunks incorrect",
+			"error":    "Nombre de chunks incorrect",
 			"expected": session.TotalChunks,
-			"found": actualChunkCount,
+			"found":    actualChunkCount,
 		})
 		return
 	}
-	
-	log.Printf("[FinalizeUpload] ✅ Tous les chunks sont présents: %d/%d (session: %s)", 
+
+	log.Printf("[FinalizeUpload] ✅ Tous les chunks sont présents: %d/%d (session: %s)",
 		actualChunkCount, session.TotalChunks, sessionID)
 
 	// Assembler les chunks
@@ -523,9 +523,9 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 
 	// Parser les métadonnées
 	var metadata struct {
-		Title          string     `json:"title"`
-		Description    string     `json:"description"`
-		CategoryID     *uuid.UUID `json:"category_id"`
+		Title       string     `json:"title"`
+		Description string     `json:"description"`
+		CategoryID  *uuid.UUID `json:"category_id"`
 		// Métadonnées enrichies
 		Director       string     `json:"director"`
 		Actors         string     `json:"actors"`
@@ -537,8 +537,8 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 		IMDBID         string     `json:"imdb_id"`
 		TMDBID         int        `json:"tmdb_id"`
 		PosterURL      string     `json:"poster_url"`
-		SubCategoryID *uuid.UUID `json:"sub_category_id"`
-		IsPublic      bool       `json:"is_public"`
+		SubCategoryID  *uuid.UUID `json:"sub_category_id"`
+		IsPublic       bool       `json:"is_public"`
 	}
 	if err := json.Unmarshal([]byte(session.Metadata), &metadata); err != nil {
 		log.Printf("[FinalizeUpload] Erreur parsing métadonnées: %v", err)
@@ -549,26 +549,26 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 
 	// Créer l'entrée vidéo
 	videoModel := models.Video{
-		ID:              videoID,
-		Title:           metadata.Title,
-		Description:     metadata.Description,
-		UserID:          session.UserID,
-		Status:          models.VideoStatusProcessing,
-		CategoryID:      metadata.CategoryID,
-		SubCategoryID:   metadata.SubCategoryID,
-		IsPublic:        metadata.IsPublic,
-		Checksum:        finalChecksum,
+		ID:            videoID,
+		Title:         metadata.Title,
+		Description:   metadata.Description,
+		UserID:        session.UserID,
+		Status:        models.VideoStatusProcessing,
+		CategoryID:    metadata.CategoryID,
+		SubCategoryID: metadata.SubCategoryID,
+		IsPublic:      metadata.IsPublic,
+		Checksum:      finalChecksum,
 		// Métadonnées enrichies
-		Director:        metadata.Director,
-		Actors:          metadata.Actors,
-		ReleaseDate:     metadata.ReleaseDate,
-		ProductionYear:  metadata.ProductionYear,
-		Synopsis:        metadata.Synopsis,
-		Genre:           metadata.Genre,
-		Rating:          metadata.Rating,
-		IMDBID:          metadata.IMDBID,
-		TMDBID:          metadata.TMDBID,
-		PosterURL:       metadata.PosterURL,
+		Director:       metadata.Director,
+		Actors:         metadata.Actors,
+		ReleaseDate:    metadata.ReleaseDate,
+		ProductionYear: metadata.ProductionYear,
+		Synopsis:       metadata.Synopsis,
+		Genre:          metadata.Genre,
+		Rating:         metadata.Rating,
+		IMDBID:         metadata.IMDBID,
+		TMDBID:         metadata.TMDBID,
+		PosterURL:      metadata.PosterURL,
 	}
 
 	if err := h.db.Create(&videoModel).Error; err != nil {
@@ -585,7 +585,7 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 
 	// Vérification de l'intégrité du fichier assemblé
 	log.Printf("[FinalizeUpload] Vérification de l'intégrité du fichier assemblé (checksum: %s)", finalChecksum[:16]+"...")
-	
+
 	// Vérifier que le checksum du fichier final correspond bien
 	// (déjà calculé ci-dessus, mais on peut le vérifier à nouveau si nécessaire)
 	if session.Checksum != "" && finalChecksum != session.Checksum {
@@ -606,7 +606,7 @@ func (h *ChunkUploadHandler) FinalizeUpload(c *gin.Context) {
 		go h.uploadHandler.processVideo(ctx, videoID, videoPath)
 	}
 
-	log.Printf("[FinalizeUpload] Upload finalisé: session %s -> vidéo %s (checksum vérifié: %s)", 
+	log.Printf("[FinalizeUpload] Upload finalisé: session %s -> vidéo %s (checksum vérifié: %s)",
 		sessionID, videoID, finalChecksum[:16]+"...")
 
 	c.JSON(http.StatusOK, gin.H{
@@ -657,11 +657,11 @@ func (h *ChunkUploadHandler) CancelUpload(c *gin.Context) {
 		var video models.Video
 		if err := h.db.Where("id = ?", *session.VideoID).First(&video).Error; err == nil {
 			log.Printf("[CancelUpload] Suppression de la vidéo partielle: %s (session: %s)", *session.VideoID, sessionID)
-			
+
 			// Récupérer les formats vidéo pour supprimer les fichiers
 			var formats []models.VideoFormat
 			h.db.Where("video_id = ?", *session.VideoID).Find(&formats)
-			
+
 			// Supprimer tous les fichiers vidéo associés
 			for _, format := range formats {
 				if format.FilePath != "" {
@@ -675,14 +675,14 @@ func (h *ChunkUploadHandler) CancelUpload(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			// Supprimer la miniature s'il y en a une
 			if video.ThumbnailPath != "" {
 				if err := os.Remove(video.ThumbnailPath); err != nil && !os.IsNotExist(err) {
 					log.Printf("[CancelUpload] Erreur lors de la suppression de la miniature %s: %v", video.ThumbnailPath, err)
 				}
 			}
-			
+
 			// Supprimer les sous-titres associés
 			var subtitles []models.Subtitle
 			h.db.Where("video_id = ?", *session.VideoID).Find(&subtitles)
@@ -693,18 +693,18 @@ func (h *ChunkUploadHandler) CancelUpload(c *gin.Context) {
 					}
 				}
 			}
-			
+
 			// Supprimer les formats et sous-titres de la base de données
 			h.db.Where("video_id = ?", *session.VideoID).Delete(&models.VideoFormat{})
 			h.db.Where("video_id = ?", *session.VideoID).Delete(&models.Subtitle{})
-			
+
 			// Supprimer la vidéo de la base de données
 			if err := h.db.Delete(&video).Error; err != nil {
 				log.Printf("[CancelUpload] Erreur lors de la suppression de la vidéo de la base: %v", err)
 			} else {
 				log.Printf("[CancelUpload] ✅ Vidéo partielle supprimée: %s", *session.VideoID)
 			}
-			
+
 			// Annuler le traitement vidéo en cours si actif
 			if h.uploadHandler != nil {
 				h.uploadHandler.processingMutex.Lock()
@@ -733,4 +733,3 @@ func (h *ChunkUploadHandler) CancelUpload(c *gin.Context) {
 		"status":  "cancelled",
 	})
 }
-

@@ -140,4 +140,3 @@ func (pm *ProxyManager) GetClientWithProxy(proxyURL string) (*http.Client, error
 		Timeout: 30 * time.Second,
 	}, nil
 }
-

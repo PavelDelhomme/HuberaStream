@@ -14,17 +14,17 @@ import (
 )
 
 type AutoDownloadService struct {
-	db            *gorm.DB
-	cfg           *config.Config
+	db             *gorm.DB
+	cfg            *config.Config
 	torrentService *TorrentService
-	scraper       scraper.Scraper
-	ticker        *time.Ticker
+	scraper        scraper.Scraper
+	ticker         *time.Ticker
 }
 
 func NewAutoDownloadService(db *gorm.DB, cfg *config.Config, torrentService *TorrentService) *AutoDownloadService {
 	return &AutoDownloadService{
-		db:            db,
-		cfg:           cfg,
+		db:             db,
+		cfg:            cfg,
 		torrentService: torrentService,
 	}
 }
@@ -176,4 +176,3 @@ func (s *AutoDownloadService) Stop() {
 		s.ticker.Stop()
 	}
 }
-

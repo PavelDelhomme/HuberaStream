@@ -14,11 +14,11 @@ import (
 )
 
 type TransmissionClient struct {
-	cfg      *config.Config
-	baseURL  string
-	username string
-	password string
-	client   *http.Client
+	cfg       *config.Config
+	baseURL   string
+	username  string
+	password  string
+	client    *http.Client
 	sessionID string
 }
 
@@ -34,19 +34,19 @@ type TransmissionResponse struct {
 }
 
 type TransmissionTorrent struct {
-	ID              int     `json:"id"`
-	Name            string  `json:"name"`
-	Status          int     `json:"status"` // 0: Stopped, 4: Downloading, 6: Seeding
-	PercentDone     float64 `json:"percentDone"`
-	TotalSize       int64   `json:"totalSize"`
-	DownloadedEver  int64   `json:"downloadedEver"`
-	UploadedEver    int64   `json:"uploadedEver"`
-	RateDownload    int64   `json:"rateDownload"`
-	RateUpload      int64   `json:"rateUpload"`
-	PeersSendingToUs int    `json:"peersSendingToUs"`
-	PeersGettingFromUs int  `json:"peersGettingFromUs"`
-	UploadRatio     float64 `json:"uploadRatio"`
-	Eta             int     `json:"eta"`
+	ID                 int     `json:"id"`
+	Name               string  `json:"name"`
+	Status             int     `json:"status"` // 0: Stopped, 4: Downloading, 6: Seeding
+	PercentDone        float64 `json:"percentDone"`
+	TotalSize          int64   `json:"totalSize"`
+	DownloadedEver     int64   `json:"downloadedEver"`
+	UploadedEver       int64   `json:"uploadedEver"`
+	RateDownload       int64   `json:"rateDownload"`
+	RateUpload         int64   `json:"rateUpload"`
+	PeersSendingToUs   int     `json:"peersSendingToUs"`
+	PeersGettingFromUs int     `json:"peersGettingFromUs"`
+	UploadRatio        float64 `json:"uploadRatio"`
+	Eta                int     `json:"eta"`
 }
 
 func NewTransmissionClient(cfg *config.Config) (*TransmissionClient, error) {
@@ -146,9 +146,9 @@ func (c *TransmissionClient) AddTorrent(ctx context.Context, torrent *models.Tor
 	}
 
 	args := map[string]interface{}{
-		"filename": filename,
+		"filename":     filename,
 		"download-dir": c.cfg.TorrentDownloadPath,
-		"paused": false,
+		"paused":       false,
 	}
 
 	_, err := c.makeRequest(ctx, "torrent-add", args)
@@ -162,7 +162,7 @@ func (c *TransmissionClient) RemoveTorrent(ctx context.Context, torrentID string
 	}
 
 	args := map[string]interface{}{
-		"ids":           []int{id},
+		"ids":               []int{id},
 		"delete-local-data": false,
 	}
 
@@ -331,4 +331,3 @@ func (c *TransmissionClient) ResumeTorrent(ctx context.Context, torrentID string
 	_, err = c.makeRequest(ctx, "torrent-start", args)
 	return err
 }
-

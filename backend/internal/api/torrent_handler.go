@@ -28,7 +28,7 @@ func NewTorrentHandler(db *gorm.DB, cfg *config.Config) *TorrentHandler {
 		// Log l'erreur mais continue sans service torrent
 		// Le service sera disponible quand le client torrent sera configuré
 	}
-	
+
 	return &TorrentHandler{
 		db:             db,
 		cfg:            cfg,
@@ -71,12 +71,12 @@ func (h *TorrentHandler) ListTorrents(c *gin.Context) {
 
 func (h *TorrentHandler) CreateTorrent(c *gin.Context) {
 	var req struct {
-		Name         string                 `json:"name" binding:"required"`
-		MagnetURL    string                 `json:"magnet_url"`
-		TorrentURL   string                 `json:"torrent_url"`
-		Source       models.TorrentSource   `json:"source"`
-		CategoryID   *uuid.UUID             `json:"category_id"`
-		SubCategoryID *uuid.UUID            `json:"sub_category_id"`
+		Name          string               `json:"name" binding:"required"`
+		MagnetURL     string               `json:"magnet_url"`
+		TorrentURL    string               `json:"torrent_url"`
+		Source        models.TorrentSource `json:"source"`
+		CategoryID    *uuid.UUID           `json:"category_id"`
+		SubCategoryID *uuid.UUID           `json:"sub_category_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -90,13 +90,13 @@ func (h *TorrentHandler) CreateTorrent(c *gin.Context) {
 	}
 
 	torrent := models.Torrent{
-		ID:           uuid.New(),
-		Name:         req.Name,
-		MagnetURL:    req.MagnetURL,
-		TorrentURL:   req.TorrentURL,
-		Source:       req.Source,
-		Status:       models.TorrentStatusPending,
-		CategoryID:   req.CategoryID,
+		ID:            uuid.New(),
+		Name:          req.Name,
+		MagnetURL:     req.MagnetURL,
+		TorrentURL:    req.TorrentURL,
+		Source:        req.Source,
+		Status:        models.TorrentStatusPending,
+		CategoryID:    req.CategoryID,
 		SubCategoryID: req.SubCategoryID,
 	}
 
@@ -301,10 +301,10 @@ func (h *TorrentHandler) GetTorrentStatus(c *gin.Context) {
 // DownloadFrom1337x télécharge un torrent depuis 1337x
 func (h *TorrentHandler) DownloadFrom1337x(c *gin.Context) {
 	var req struct {
-		TorrentURL   string     `json:"torrent_url" binding:"required"`
-		CategoryID   *uuid.UUID `json:"category_id"`
+		TorrentURL    string     `json:"torrent_url" binding:"required"`
+		CategoryID    *uuid.UUID `json:"category_id"`
 		SubCategoryID *uuid.UUID `json:"sub_category_id"`
-		AddToLibrary bool       `json:"add_to_library"` // Nouveau champ pour marquer pour la bibliothèque
+		AddToLibrary  bool       `json:"add_to_library"` // Nouveau champ pour marquer pour la bibliothèque
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -322,18 +322,18 @@ func (h *TorrentHandler) DownloadFrom1337x(c *gin.Context) {
 
 	// Créer le torrent
 	torrent := models.Torrent{
-		ID:           uuid.New(),
-		Name:         result.Name,
-		MagnetURL:    result.MagnetURL,
-		TorrentURL:   req.TorrentURL,
-		Source:       models.TorrentSource1337x,
-		Status:       models.TorrentStatusPending,
-		CategoryID:   req.CategoryID,
+		ID:            uuid.New(),
+		Name:          result.Name,
+		MagnetURL:     result.MagnetURL,
+		TorrentURL:    req.TorrentURL,
+		Source:        models.TorrentSource1337x,
+		Status:        models.TorrentStatusPending,
+		CategoryID:    req.CategoryID,
 		SubCategoryID: req.SubCategoryID,
-		Size:         result.Size,
-		Seeders:      result.Seeders,
-		Leechers:     result.Leechers,
-		AddToLibrary: req.AddToLibrary, // Marquer pour la bibliothèque si demandé
+		Size:          result.Size,
+		Seeders:       result.Seeders,
+		Leechers:      result.Leechers,
+		AddToLibrary:  req.AddToLibrary, // Marquer pour la bibliothèque si demandé
 	}
 
 	if err := h.db.Create(&torrent).Error; err != nil {
@@ -388,7 +388,7 @@ func (h *TorrentHandler) ToggleAddToLibrary(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"torrent": torrent,
 				"message": "Flag activé mais erreur lors du démarrage du téléchargement",
-				"error": err.Error(),
+				"error":   err.Error(),
 			})
 			return
 		}
@@ -414,18 +414,18 @@ func (h *TorrentHandler) ListTorrentConfigs(c *gin.Context) {
 
 func (h *TorrentHandler) CreateTorrentConfig(c *gin.Context) {
 	var req struct {
-		Name          string                 `json:"name" binding:"required"`
-		Source        models.TorrentSource   `json:"source" binding:"required"`
-		Enabled       bool                   `json:"enabled"`
-		AutoDownload  bool                   `json:"auto_download"`
-		SearchKeywords string                `json:"search_keywords"`
-		CategoryID    *uuid.UUID             `json:"category_id"`
-		SubCategoryID *uuid.UUID            `json:"sub_category_id"`
-		MinSeeders    int                    `json:"min_seeders"`
-		MaxSize       int64                  `json:"max_size"`
-		Quality       string                 `json:"quality"`
-		Language      string                 `json:"language"`
-		CheckInterval int                    `json:"check_interval"`
+		Name           string               `json:"name" binding:"required"`
+		Source         models.TorrentSource `json:"source" binding:"required"`
+		Enabled        bool                 `json:"enabled"`
+		AutoDownload   bool                 `json:"auto_download"`
+		SearchKeywords string               `json:"search_keywords"`
+		CategoryID     *uuid.UUID           `json:"category_id"`
+		SubCategoryID  *uuid.UUID           `json:"sub_category_id"`
+		MinSeeders     int                  `json:"min_seeders"`
+		MaxSize        int64                `json:"max_size"`
+		Quality        string               `json:"quality"`
+		Language       string               `json:"language"`
+		CheckInterval  int                  `json:"check_interval"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -434,19 +434,19 @@ func (h *TorrentHandler) CreateTorrentConfig(c *gin.Context) {
 	}
 
 	config := models.TorrentConfig{
-		ID:            uuid.New(),
-		Name:          req.Name,
-		Source:        req.Source,
-		Enabled:       req.Enabled,
-		AutoDownload:  req.AutoDownload,
+		ID:             uuid.New(),
+		Name:           req.Name,
+		Source:         req.Source,
+		Enabled:        req.Enabled,
+		AutoDownload:   req.AutoDownload,
 		SearchKeywords: req.SearchKeywords,
-		CategoryID:    req.CategoryID,
-		SubCategoryID: req.SubCategoryID,
-		MinSeeders:    req.MinSeeders,
-		MaxSize:       req.MaxSize,
-		Quality:       req.Quality,
-		Language:      req.Language,
-		CheckInterval: req.CheckInterval,
+		CategoryID:     req.CategoryID,
+		SubCategoryID:  req.SubCategoryID,
+		MinSeeders:     req.MinSeeders,
+		MaxSize:        req.MaxSize,
+		Quality:        req.Quality,
+		Language:       req.Language,
+		CheckInterval:  req.CheckInterval,
 	}
 
 	if err := h.db.Create(&config).Error; err != nil {
@@ -472,11 +472,11 @@ func (h *TorrentHandler) UpdateTorrentConfig(c *gin.Context) {
 	}
 
 	var req struct {
-		Enabled       *bool  `json:"enabled"`
-		AutoDownload  *bool  `json:"auto_download"`
+		Enabled        *bool   `json:"enabled"`
+		AutoDownload   *bool   `json:"auto_download"`
 		SearchKeywords *string `json:"search_keywords"`
-		MinSeeders    *int   `json:"min_seeders"`
-		CheckInterval *int   `json:"check_interval"`
+		MinSeeders     *int    `json:"min_seeders"`
+		CheckInterval  *int    `json:"check_interval"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -523,4 +523,3 @@ func (h *TorrentHandler) DeleteTorrentConfig(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Configuration supprimée"})
 }
-

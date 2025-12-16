@@ -77,7 +77,7 @@ func (h *TorrentClientsHandler) GetCurrentTorrentClient(c *gin.Context) {
 			"transmission_pass": h.cfg.TorrentClientTransmissionPass,
 			"qbittorrent_url":   h.cfg.TorrentClientQBittorrentURL,
 			"qbittorrent_user":  h.cfg.TorrentClientQBittorrentUser,
-			"qbittorrent_pass": h.cfg.TorrentClientQBittorrentPass,
+			"qbittorrent_pass":  h.cfg.TorrentClientQBittorrentPass,
 			"deluge_url":        h.cfg.TorrentClientDelugeURL,
 			"deluge_pass":       h.cfg.TorrentClientDelugePass,
 			"rtorrent_url":      h.cfg.TorrentClientRTorrentURL,
@@ -103,9 +103,9 @@ func (h *TorrentClientsHandler) UpdateCurrentTorrentClient(c *gin.Context) {
 	// Mettre à jour la configuration (dans un vrai cas, on sauvegarderait en DB)
 	// Pour l'instant, on retourne juste un succès
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Configuration sauvegardée",
+		"message":     "Configuration sauvegardée",
 		"client_type": req.ClientType,
-		"config": req.Config,
+		"config":      req.Config,
 	})
 }
 
@@ -124,7 +124,7 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 
 	// Créer un client temporaire pour tester
 	clientType := torrent.ClientType(req.ClientType)
-	
+
 	// Créer une config temporaire pour le test
 	testCfg := *h.cfg
 	if url, ok := req.Config["url"].(string); ok {
@@ -181,7 +181,7 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 	client, err := torrent.NewTorrentClient(clientType, &testCfg)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Erreur lors de la création du client",
+			"error":   "Erreur lors de la création du client",
 			"message": err.Error(),
 		})
 		return
@@ -192,7 +192,7 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 	torrents, err := client.ListTorrents(ctx)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Erreur de connexion au client",
+			"error":   "Erreur de connexion au client",
 			"message": err.Error(),
 			"details": "Vérifiez que le client torrent est démarré et que les credentials sont corrects",
 		})
@@ -200,8 +200,8 @@ func (h *TorrentClientsHandler) TestTorrentClient(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Connexion réussie",
-		"client_type": req.ClientType,
+		"message":        "Connexion réussie",
+		"client_type":    req.ClientType,
 		"torrents_count": len(torrents),
 	})
 }

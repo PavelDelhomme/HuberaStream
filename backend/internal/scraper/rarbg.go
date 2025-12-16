@@ -25,13 +25,13 @@ type RARBGResponse struct {
 }
 
 type RARBGTorrent struct {
-	Title      string `json:"title"`
-	Category   string `json:"category"`
-	Download   string `json:"download"`
-	Seeders    string `json:"seeders"`
-	Leechers   string `json:"leechers"`
-	Size       string `json:"size"`
-	Pubdate    string `json:"pubdate"`
+	Title       string `json:"title"`
+	Category    string `json:"category"`
+	Download    string `json:"download"`
+	Seeders     string `json:"seeders"`
+	Leechers    string `json:"leechers"`
+	Size        string `json:"size"`
+	Pubdate     string `json:"pubdate"`
 	EpisodeInfo string `json:"episode_info"`
 }
 
@@ -137,4 +137,3 @@ func (s *RARBGScraper) GetTorrentDetails(ctx context.Context, torrentURL string)
 		Source:     models.TorrentSourceRARBG,
 	}, nil
 }
-

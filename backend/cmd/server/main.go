@@ -5,8 +5,8 @@ import (
 	"os"
 
 	"streammake/internal/api"
-	"streammake/internal/database"
 	"streammake/internal/config"
+	"streammake/internal/database"
 )
 
 func main() {
@@ -50,23 +50,23 @@ func main() {
 	//
 	// Le warning "You trusted all proxies" apparaît quand SetTrustedProxies n'est pas configuré
 	// mais que Gin détecte des headers X-Forwarded-For. Il faut configurer explicitement.
-	
+
 	trustedProxies := []string{
-		"172.18.0.6/32",   // IP exacte de Nginx (d'après le rapport)
-		"172.18.0.0/16",  // Réseau Docker complet (172.18.x.x)
-		"172.19.0.0/16",  // Réseau Docker alternatif (pour X-Forwarded-For)
-		"172.17.0.0/16",  // Réseau Docker bridge par défaut
-		"127.0.0.1",      // Localhost
-		"::1",            // Localhost IPv6
+		"172.18.0.6/32", // IP exacte de Nginx (d'après le rapport)
+		"172.18.0.0/16", // Réseau Docker complet (172.18.x.x)
+		"172.19.0.0/16", // Réseau Docker alternatif (pour X-Forwarded-For)
+		"172.17.0.0/16", // Réseau Docker bridge par défaut
+		"127.0.0.1",     // Localhost
+		"::1",           // Localhost IPv6
 	}
-	
+
 	if err := router.SetTrustedProxies(trustedProxies); err != nil {
 		log.Printf("Avertissement: Erreur lors de la configuration des proxies: %v", err)
 	}
-	
+
 	// Utiliser X-Forwarded-For comme plateforme de confiance
 	router.TrustedPlatform = "X-Forwarded-For"
-	
+
 	log.Printf("Configuration des proxies: IPs de confiance = %v, TrustedPlatform = %s", trustedProxies, router.TrustedPlatform)
 
 	// Démarrer le serveur
@@ -80,4 +80,3 @@ func main() {
 		log.Fatalf("Erreur lors du démarrage du serveur: %v", err)
 	}
 }
-

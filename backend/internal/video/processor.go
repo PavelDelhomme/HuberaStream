@@ -16,10 +16,10 @@ import (
 )
 
 type Processor struct {
-	storagePath      string
-	thumbnailPath    string
-	ffmpegPath       string
-	ffprobePath      string
+	storagePath   string
+	thumbnailPath string
+	ffmpegPath    string
+	ffprobePath   string
 }
 
 func NewProcessor(storagePath, thumbnailPath string) *Processor {
@@ -27,7 +27,7 @@ func NewProcessor(storagePath, thumbnailPath string) *Processor {
 	if path := os.Getenv("FFMPEG_PATH"); path != "" {
 		ffmpegPath = path
 	}
-	
+
 	ffprobePath := "ffprobe"
 	if path := os.Getenv("FFPROBE_PATH"); path != "" {
 		ffprobePath = path
@@ -50,7 +50,7 @@ func (p *Processor) GenerateThumbnail(videoPath string, videoID uuid.UUID) (stri
 	// Essayer plusieurs positions temporelles pour trouver une bonne frame
 	// Positions à essayer : 1s, 5s, 10s, 30s, 60s
 	timePositions := []string{"00:00:01", "00:00:05", "00:00:10", "00:00:30", "00:01:00"}
-	
+
 	var lastErr error
 	for _, timePos := range timePositions {
 		cmd := exec.Command(
@@ -142,18 +142,18 @@ func (p *Processor) TranscodeToHLS(videoPath string, videoID uuid.UUID, quality 
 	cmd := exec.Command(
 		p.ffmpegPath,
 		"-i", videoPath,
-		"-c:v", "libx264",              // Codec vidéo H.264
-		"-preset", "medium",             // Équilibre vitesse/qualité
-		"-crf", "23",                    // Qualité constante
-		"-c:a", "aac",                   // Codec audio AAC
-		"-b:a", "128k",                  // Bitrate audio
-		"-b:v", bitrate,                 // Bitrate vidéo
-		"-s", resolution,                // Résolution
-		"-pix_fmt", "yuv420p",           // Format de pixels compatible
-		"-hls_time", "10",               // Durée des segments (10 secondes)
-		"-hls_playlist_type", "vod",     // Type de playlist (Video On Demand)
+		"-c:v", "libx264", // Codec vidéo H.264
+		"-preset", "medium", // Équilibre vitesse/qualité
+		"-crf", "23", // Qualité constante
+		"-c:a", "aac", // Codec audio AAC
+		"-b:a", "128k", // Bitrate audio
+		"-b:v", bitrate, // Bitrate vidéo
+		"-s", resolution, // Résolution
+		"-pix_fmt", "yuv420p", // Format de pixels compatible
+		"-hls_time", "10", // Durée des segments (10 secondes)
+		"-hls_playlist_type", "vod", // Type de playlist (Video On Demand)
 		"-hls_segment_filename", segmentPattern,
-		"-y",                            // Écraser si existe
+		"-y", // Écraser si existe
 		manifestPath,
 	)
 
@@ -256,8 +256,8 @@ func (p *Processor) CompressVideo(videoPath string, videoID uuid.UUID) (string, 
 	} else {
 		// Fallback sur H.264 avec CRF optimal
 		videoCodec = "libx264"
-		videoPreset = "slow"   // Preset plus lent = meilleure compression
-		videoCRF = "20"        // CRF 20 = très haute qualité (presque lossless visuellement)
+		videoPreset = "slow" // Preset plus lent = meilleure compression
+		videoCRF = "20"      // CRF 20 = très haute qualité (presque lossless visuellement)
 	}
 
 	// Compression optimale non-destructive
@@ -265,12 +265,12 @@ func (p *Processor) CompressVideo(videoPath string, videoID uuid.UUID) (string, 
 		"-i", videoPath,
 		"-c:v", videoCodec,
 		"-preset", videoPreset,
-		"-crf", videoCRF,              // Constant Rate Factor (qualité constante, non-destructive)
-		"-c:a", "aac",                 // Codec audio AAC
-		"-b:a", "192k",                // Bitrate audio optimisé (meilleure qualité)
-		"-ac", "2",                    // Stéréo
-		"-movflags", "+faststart",     // Optimisation pour streaming web
-		"-pix_fmt", "yuv420p",         // Format de pixels compatible
+		"-crf", videoCRF, // Constant Rate Factor (qualité constante, non-destructive)
+		"-c:a", "aac", // Codec audio AAC
+		"-b:a", "192k", // Bitrate audio optimisé (meilleure qualité)
+		"-ac", "2", // Stéréo
+		"-movflags", "+faststart", // Optimisation pour streaming web
+		"-pix_fmt", "yuv420p", // Format de pixels compatible
 		"-vf", fmt.Sprintf("scale=%s:flags=lanczos", resolution), // Scaling avec Lanczos (meilleure qualité)
 		"-y",
 		outputPath,
@@ -339,15 +339,15 @@ func (p *Processor) TranscodeToProgressive(videoPath string, videoID uuid.UUID, 
 		p.ffmpegPath,
 		"-i", videoPath,
 		"-c:v", videoCodec,
-		"-preset", "medium",          // Équilibre vitesse/qualité
-		"-crf", "23",                 // Qualité constante (23 = bon équilibre)
-		"-c:a", "aac",                // Codec audio AAC (compatible web)
-		"-b:a", "128k",               // Bitrate audio
-		"-b:v", bitrate,              // Bitrate vidéo selon la qualité
-		"-s", resolution,             // Résolution
-		"-movflags", "+faststart",    // Optimisation pour streaming web
-		"-pix_fmt", "yuv420p",        // Format de pixels compatible (nécessaire pour web)
-		"-y",                         // Écraser le fichier de sortie s'il existe
+		"-preset", "medium", // Équilibre vitesse/qualité
+		"-crf", "23", // Qualité constante (23 = bon équilibre)
+		"-c:a", "aac", // Codec audio AAC (compatible web)
+		"-b:a", "128k", // Bitrate audio
+		"-b:v", bitrate, // Bitrate vidéo selon la qualité
+		"-s", resolution, // Résolution
+		"-movflags", "+faststart", // Optimisation pour streaming web
+		"-pix_fmt", "yuv420p", // Format de pixels compatible (nécessaire pour web)
+		"-y", // Écraser le fichier de sortie s'il existe
 		outputPath,
 	)
 
@@ -496,7 +496,7 @@ func (p *Processor) GenerateThumbnailFromTitle(title string) (string, error) {
 
 	// Créer une image avec un fond dégradé
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	
+
 	// Fond dégradé (rouge vers noir, style Netflix)
 	for y := 0; y < height; y++ {
 		ratio := float64(y) / float64(height)
@@ -523,4 +523,3 @@ func (p *Processor) GenerateThumbnailFromTitle(title string) (string, error) {
 
 	return thumbnailPath, nil
 }
-

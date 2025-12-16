@@ -11,7 +11,7 @@ import (
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
+
 		// Répondre immédiatement aux requêtes OPTIONS (preflight)
 		if c.Request.Method == "OPTIONS" {
 			if origin != "" {
@@ -41,7 +41,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 		// Debug: logger les requêtes POST pour identifier le problème
 		if c.Request.Method == "POST" && c.Request.URL.Path == "/api/auth/login" {
-			log.Printf("[CORS] POST /api/auth/login - Origin: %s, RemoteAddr: %s, X-Forwarded-For: %s, ClientIP: %s", 
+			log.Printf("[CORS] POST /api/auth/login - Origin: %s, RemoteAddr: %s, X-Forwarded-For: %s, ClientIP: %s",
 				origin, c.Request.RemoteAddr, c.Request.Header.Get("X-Forwarded-For"), c.ClientIP())
 		}
 

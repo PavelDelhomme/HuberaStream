@@ -55,4 +55,3 @@ func autoMigrate(db *gorm.DB) error {
 		&models.UploadChunk{},
 	)
 }
-

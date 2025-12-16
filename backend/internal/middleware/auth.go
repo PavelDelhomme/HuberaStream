@@ -91,4 +91,3 @@ func OptionalAuthMiddleware(secret string) gin.HandlerFunc {
 		c.Next()
 	}
 }
-

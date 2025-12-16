@@ -86,9 +86,9 @@ func (s *NyaaScraper) parseRow(row string) *TorrentResult {
 	}
 
 	result := &TorrentResult{
-		Name:      strings.TrimSpace(titleMatch[2]),
+		Name:       strings.TrimSpace(titleMatch[2]),
 		TorrentURL: s.baseURL + titleMatch[1],
-		Source:    models.TorrentSourceNyaa,
+		Source:     models.TorrentSourceNyaa,
 	}
 
 	// Extraire le magnet
@@ -155,4 +155,3 @@ func (s *NyaaScraper) GetTorrentDetails(ctx context.Context, torrentURL string) 
 
 	return result, nil
 }
-

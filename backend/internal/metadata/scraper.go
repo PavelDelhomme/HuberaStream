@@ -589,7 +589,7 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 		count := 0
 		selCount := doc.Find(selector).Length()
 		log.Printf("[WebScraper] Sélecteur '%s' a trouvé %d élément(s)", selector, selCount)
-		
+
 		doc.Find(selector).Each(func(i int, sel *goquery.Selection) {
 			if i >= 5 { // Limiter à 5 résultats
 				return
@@ -648,7 +648,7 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 					log.Printf("[WebScraper]   - Affiche: %s", details.PosterURL)
 					log.Printf("[WebScraper]   - Durée: %d min", details.Runtime)
 					log.Printf("[WebScraper]   - Plateforme: %s", details.Platform)
-					
+
 					// Fusionner tous les détails (les détails IMDb sont plus complets)
 					if details.Title != "" {
 						metadata.Title = details.Title
@@ -718,7 +718,7 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 			break
 		}
 	}
-	
+
 	if needsLargeSearch {
 		log.Printf("[WebScraper] ⚠️  Recherche large pour trouver les IDs IMDb (résultats standards: %d, avec ID: %d)...", len(results), func() int {
 			count := 0
@@ -729,10 +729,10 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 			}
 			return count
 		}())
-		
+
 		largeCount := doc.Find("a[href*='/title/tt']").Length()
 		log.Printf("[WebScraper] Recherche large: %d liens IMDb trouvés dans la page", largeCount)
-		
+
 		seenIDs := make(map[string]bool)
 		// Ajouter les IDs déjà trouvés
 		for _, r := range results {
@@ -740,7 +740,7 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 				seenIDs[r.IMDBID] = true
 			}
 		}
-		
+
 		doc.Find("a[href*='/title/tt']").Each(func(i int, sel *goquery.Selection) {
 			if len(results) >= 5 {
 				return
@@ -753,13 +753,13 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 			if imdbID == "" {
 				return
 			}
-			
+
 			// Éviter les doublons
 			if seenIDs[imdbID] {
 				return
 			}
 			seenIDs[imdbID] = true
-			
+
 			title := strings.TrimSpace(sel.Text())
 			if title == "" {
 				// Essayer de trouver le titre dans le parent ou les éléments proches
@@ -774,16 +774,16 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 			if title == "" {
 				title = fmt.Sprintf("Film IMDb %s", imdbID)
 			}
-			
+
 			log.Printf("[WebScraper] ✅ Résultat large trouvé: '%s' (ID: %s, lien: %s)", title, imdbID, imdbLink)
-			
+
 			// Créer un résultat basique
 			metadata := &MovieMetadata{
 				Title:         title,
 				OriginalTitle: title,
 				IMDBID:        imdbID,
 			}
-			
+
 			// TOUJOURS récupérer les détails complets si on a un ID
 			log.Printf("[WebScraper] 📥 Récupération FORCÉE des détails complets IMDb pour ID: %s", imdbID)
 			details := s.getMovieDetailsFromIMDB(imdbID)
@@ -793,10 +793,10 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 			} else {
 				log.Printf("[WebScraper] ❌ ÉCHEC récupération des détails pour IMDb ID: %s", imdbID)
 			}
-			
+
 			results = append(results, metadata)
 		})
-		
+
 		log.Printf("[WebScraper] Recherche large terminée: %d résultat(s) avec détails", len(results))
 	}
 
@@ -820,7 +820,7 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 				log.Printf("[WebScraper]   - Durée: %d min", details.Runtime)
 				log.Printf("[WebScraper]   - Plateforme: %s", details.Platform)
 				log.Printf("[WebScraper]   - Bande-annonce: %s", details.TrailerURL)
-				
+
 				// REMPLACER complètement avec les détails IMDb (plus complets)
 				result.Title = details.Title
 				result.OriginalTitle = details.OriginalTitle
@@ -839,7 +839,7 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 				result.Rating = details.Rating
 				result.IMDBID = details.IMDBID
 				result.ReleaseDate = details.ReleaseDate
-				
+
 				log.Printf("[WebScraper] ✅ Résultat #%d COMPLÈTEMENT mis à jour avec TOUS les détails IMDb", idx+1)
 			} else {
 				log.Printf("[WebScraper] ❌ IMPOSSIBLE de récupérer les détails pour IMDb ID: %s", result.IMDBID)
@@ -850,24 +850,24 @@ func (s *WebScraperService) SearchMovieOnIMDB(query string) ([]*MovieMetadata, e
 	}
 
 	log.Printf("[WebScraper] ✅ Recherche IMDb terminée: %d résultat(s) trouvé(s) pour '%s'", len(results), query)
-	
+
 	// DIAGNOSTIC FINAL: Vérifier que les résultats ont bien un IMDb ID
 	for idx, result := range results {
 		log.Printf("[WebScraper] 🔍 DIAGNOSTIC FINAL SearchMovieOnIMDB - Résultat #%d: Titre='%s', IMDb ID='%s' (VIDE=%v)", idx+1, result.Title, result.IMDBID, result.IMDBID == "")
 	}
-	
+
 	return results, nil
 }
 
 // getMovieDetailsFromIMDB récupère les détails d'un film depuis IMDb
 func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadata {
 	log.Printf("[WebScraper] 🎬 DÉBUT getMovieDetailsFromIMDB pour ID: %s", imdbID)
-	
+
 	if imdbID == "" {
 		log.Printf("[WebScraper] ❌ IMDb ID vide!")
 		return nil
 	}
-	
+
 	// Essayer d'abord la version française pour avoir le synopsis en français
 	movieURL := fmt.Sprintf("https://www.imdb.com/fr/title/%s/", imdbID)
 	log.Printf("[WebScraper] 📡 Requête IMDb URL: %s", movieURL)
@@ -889,7 +889,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 	defer resp.Body.Close()
 
 	log.Printf("[WebScraper] 📥 Réponse IMDb: status %d", resp.StatusCode)
-	
+
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("[WebScraper] ⚠️  Status code IMDb: %d, essai version anglaise...", resp.StatusCode)
 		// Essayer la version anglaise en fallback
@@ -912,7 +912,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 		log.Printf("[WebScraper] ❌ Erreur parsing IMDb: %v", err)
 		return nil
 	}
-	
+
 	log.Printf("[WebScraper] ✅ Document IMDb parsé avec succès")
 
 	details := &MovieMetadata{}
@@ -974,7 +974,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 				details.ProductionYear = year
 			}
 		}
-		log.Printf("[WebScraper] ✅ Métadonnées JSON-LD extraites: Titre=%s, Réalisateur=%s, Acteurs=%d, Genres=%d", 
+		log.Printf("[WebScraper] ✅ Métadonnées JSON-LD extraites: Titre=%s, Réalisateur=%s, Acteurs=%d, Genres=%d",
 			details.Title, details.Director, len(details.Actors), len(details.Genre))
 	}
 
@@ -1024,9 +1024,9 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 		doc.Find("li[data-testid='title-pc-principal-credit']").Each(func(i int, sel *goquery.Selection) {
 			labelText := strings.ToLower(strings.TrimSpace(sel.Text()))
 			labelSpan := strings.ToLower(strings.TrimSpace(sel.Find("span").First().Text()))
-			
-			if strings.Contains(labelText, "réalisation") || strings.Contains(labelText, "director") || 
-			   strings.Contains(labelSpan, "réalisation") || strings.Contains(labelSpan, "director") {
+
+			if strings.Contains(labelText, "réalisation") || strings.Contains(labelText, "director") ||
+				strings.Contains(labelSpan, "réalisation") || strings.Contains(labelSpan, "director") {
 				director := strings.TrimSpace(sel.Find("a").First().Text())
 				if director != "" && len(director) > 2 {
 					details.Director = director
@@ -1035,7 +1035,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 				}
 			}
 		})
-		
+
 		// STRATÉGIE 2: Chercher dans tous les liens avec href contenant /name/
 		if details.Director == "" {
 			doc.Find("a[href*='/name/']").Each(func(i int, sel *goquery.Selection) {
@@ -1044,8 +1044,8 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 				}
 				// Chercher le contexte parent pour voir si c'est un réalisateur
 				parentText := strings.ToLower(sel.Parent().Text())
-				if (strings.Contains(parentText, "réalisation") || strings.Contains(parentText, "director")) && 
-				   !strings.Contains(parentText, "scénariste") && !strings.Contains(parentText, "writer") {
+				if (strings.Contains(parentText, "réalisation") || strings.Contains(parentText, "director")) &&
+					!strings.Contains(parentText, "scénariste") && !strings.Contains(parentText, "writer") {
 					director := strings.TrimSpace(sel.Text())
 					if director != "" && len(director) > 2 && len(director) < 50 {
 						details.Director = director
@@ -1055,7 +1055,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 				}
 			})
 		}
-		
+
 		// STRATÉGIE 3: Chercher dans le texte de la page avec regex
 		if details.Director == "" {
 			pageText := doc.Text()
@@ -1080,50 +1080,50 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 	if details.Writer == "" {
 		writers := []string{}
 		seenWriters := make(map[string]bool)
-		
+
 		// STRATÉGIE 1: Chercher dans les crédits principaux
 		doc.Find("li[data-testid='title-pc-principal-credit']").Each(func(i int, sel *goquery.Selection) {
-		labelText := strings.ToLower(strings.TrimSpace(sel.Text()))
-		labelSpan := strings.ToLower(strings.TrimSpace(sel.Find("span").First().Text()))
-		
-		if strings.Contains(labelText, "scénariste") || strings.Contains(labelText, "writer") || 
-		   strings.Contains(labelText, "scénario") || strings.Contains(labelText, "written") ||
-		   strings.Contains(labelSpan, "scénariste") || strings.Contains(labelSpan, "writer") {
-			sel.Find("a").Each(func(j int, s *goquery.Selection) {
-				writer := strings.TrimSpace(s.Text())
-				if writer != "" && len(writer) > 2 && len(writer) < 50 {
-					writerLower := strings.ToLower(writer)
-					if !seenWriters[writerLower] {
-						seenWriters[writerLower] = true
-						writers = append(writers, writer)
+			labelText := strings.ToLower(strings.TrimSpace(sel.Text()))
+			labelSpan := strings.ToLower(strings.TrimSpace(sel.Find("span").First().Text()))
+
+			if strings.Contains(labelText, "scénariste") || strings.Contains(labelText, "writer") ||
+				strings.Contains(labelText, "scénario") || strings.Contains(labelText, "written") ||
+				strings.Contains(labelSpan, "scénariste") || strings.Contains(labelSpan, "writer") {
+				sel.Find("a").Each(func(j int, s *goquery.Selection) {
+					writer := strings.TrimSpace(s.Text())
+					if writer != "" && len(writer) > 2 && len(writer) < 50 {
+						writerLower := strings.ToLower(writer)
+						if !seenWriters[writerLower] {
+							seenWriters[writerLower] = true
+							writers = append(writers, writer)
+						}
 					}
-				}
-			})
-		}
+				})
+			}
 		})
-		
+
 		// STRATÉGIE 2: Chercher dans tous les liens avec contexte
 		if len(writers) == 0 {
 			doc.Find("a[href*='/name/']").Each(func(i int, sel *goquery.Selection) {
-			if i >= 100 { // Limiter
-				return
-			}
-			parentText := strings.ToLower(sel.Parent().Text())
-			if (strings.Contains(parentText, "scénariste") || strings.Contains(parentText, "writer") || 
-			    strings.Contains(parentText, "scénario") || strings.Contains(parentText, "written")) &&
-			   !strings.Contains(parentText, "director") && !strings.Contains(parentText, "réalisation") {
-				writer := strings.TrimSpace(sel.Text())
-				if writer != "" && len(writer) > 2 && len(writer) < 50 {
-					writerLower := strings.ToLower(writer)
-					if !seenWriters[writerLower] {
-						seenWriters[writerLower] = true
-						writers = append(writers, writer)
+				if i >= 100 { // Limiter
+					return
+				}
+				parentText := strings.ToLower(sel.Parent().Text())
+				if (strings.Contains(parentText, "scénariste") || strings.Contains(parentText, "writer") ||
+					strings.Contains(parentText, "scénario") || strings.Contains(parentText, "written")) &&
+					!strings.Contains(parentText, "director") && !strings.Contains(parentText, "réalisation") {
+					writer := strings.TrimSpace(sel.Text())
+					if writer != "" && len(writer) > 2 && len(writer) < 50 {
+						writerLower := strings.ToLower(writer)
+						if !seenWriters[writerLower] {
+							seenWriters[writerLower] = true
+							writers = append(writers, writer)
+						}
 					}
 				}
-			}
 			})
 		}
-		
+
 		if len(writers) > 0 {
 			details.Writer = strings.Join(writers, ", ")
 			log.Printf("[WebScraper] ✅ Scénaristes IMDb (HTML) trouvés: %s", details.Writer)
@@ -1134,49 +1134,10 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 	if len(details.Actors) == 0 {
 		actors := []string{}
 		seenActors := make(map[string]bool)
-		
+
 		// STRATÉGIE 1: Chercher avec data-testid
 		doc.Find("a[data-testid='title-cast-item__actor']").Each(func(i int, s *goquery.Selection) {
-		if i < 10 { // Limiter à 10 acteurs principaux
-			actor := strings.TrimSpace(s.Text())
-			if actor != "" && len(actor) > 2 && len(actor) < 50 {
-				actorLower := strings.ToLower(actor)
-				if !seenActors[actorLower] {
-					seenActors[actorLower] = true
-					actors = append(actors, actor)
-				}
-			}
-		}
-		})
-		
-		// STRATÉGIE 2: Chercher dans les crédits principaux "Stars"
-		if len(actors) < 3 {
-			doc.Find("li[data-testid='title-pc-principal-credit']").Each(func(i int, sel *goquery.Selection) {
-			labelText := strings.ToLower(strings.TrimSpace(sel.Text()))
-			labelSpan := strings.ToLower(strings.TrimSpace(sel.Find("span").First().Text()))
-			
-			if strings.Contains(labelText, "star") || strings.Contains(labelText, "avec") || 
-			   strings.Contains(labelSpan, "star") || strings.Contains(labelSpan, "avec") {
-				sel.Find("a").Each(func(j int, s *goquery.Selection) {
-					if j < 10 && len(actors) < 10 {
-						actor := strings.TrimSpace(s.Text())
-						if actor != "" && len(actor) > 2 && len(actor) < 50 {
-							actorLower := strings.ToLower(actor)
-							if !seenActors[actorLower] {
-								seenActors[actorLower] = true
-								actors = append(actors, actor)
-							}
-						}
-					}
-				})
-			}
-			})
-		}
-		
-		// STRATÉGIE 3: Chercher dans la section casting
-		if len(actors) < 3 {
-			doc.Find(".cast_list a[href*='/name/'], .ipc-metadata-list-item__content-container a[href*='/name/']").Each(func(i int, s *goquery.Selection) {
-			if i < 10 && len(actors) < 10 {
+			if i < 10 { // Limiter à 10 acteurs principaux
 				actor := strings.TrimSpace(s.Text())
 				if actor != "" && len(actor) > 2 && len(actor) < 50 {
 					actorLower := strings.ToLower(actor)
@@ -1186,9 +1147,48 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 					}
 				}
 			}
+		})
+
+		// STRATÉGIE 2: Chercher dans les crédits principaux "Stars"
+		if len(actors) < 3 {
+			doc.Find("li[data-testid='title-pc-principal-credit']").Each(func(i int, sel *goquery.Selection) {
+				labelText := strings.ToLower(strings.TrimSpace(sel.Text()))
+				labelSpan := strings.ToLower(strings.TrimSpace(sel.Find("span").First().Text()))
+
+				if strings.Contains(labelText, "star") || strings.Contains(labelText, "avec") ||
+					strings.Contains(labelSpan, "star") || strings.Contains(labelSpan, "avec") {
+					sel.Find("a").Each(func(j int, s *goquery.Selection) {
+						if j < 10 && len(actors) < 10 {
+							actor := strings.TrimSpace(s.Text())
+							if actor != "" && len(actor) > 2 && len(actor) < 50 {
+								actorLower := strings.ToLower(actor)
+								if !seenActors[actorLower] {
+									seenActors[actorLower] = true
+									actors = append(actors, actor)
+								}
+							}
+						}
+					})
+				}
 			})
 		}
-		
+
+		// STRATÉGIE 3: Chercher dans la section casting
+		if len(actors) < 3 {
+			doc.Find(".cast_list a[href*='/name/'], .ipc-metadata-list-item__content-container a[href*='/name/']").Each(func(i int, s *goquery.Selection) {
+				if i < 10 && len(actors) < 10 {
+					actor := strings.TrimSpace(s.Text())
+					if actor != "" && len(actor) > 2 && len(actor) < 50 {
+						actorLower := strings.ToLower(actor)
+						if !seenActors[actorLower] {
+							seenActors[actorLower] = true
+							actors = append(actors, actor)
+						}
+					}
+				}
+			})
+		}
+
 		details.Actors = actors
 		if len(actors) > 0 {
 			log.Printf("[WebScraper] ✅ Acteurs IMDb (HTML) trouvés (%d): %v", len(actors), actors)
@@ -1251,7 +1251,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 			details.ProductionYear = year
 			log.Printf("[WebScraper] ✅ Année IMDb (HTML) trouvée: %d", year)
 		}
-		
+
 		// Date de sortie complète (format YYYY-MM-DD ou texte)
 		releaseDateSelectors := []string{
 			"a[href*='/releaseinfo']",
@@ -1326,70 +1326,70 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 		}
 		log.Printf("[WebScraper] 🔍 Recherche de l'affiche IMDb pour %s...", imdbID)
 		for idx, sel := range posterSelectors {
-		posterURL := ""
-		exists := false
-		
-		// Essayer src d'abord
-		posterURL, exists = doc.Find(sel).First().Attr("src")
-		if !exists || posterURL == "" {
-			// Essayer data-src
-			posterURL, exists = doc.Find(sel).First().Attr("data-src")
-		}
-		if !exists || posterURL == "" {
-			// Essayer data-image-url
-			posterURL, exists = doc.Find(sel).First().Attr("data-image-url")
-		}
-		if !exists || posterURL == "" {
-			// Essayer data-lazy
-			posterURL, exists = doc.Find(sel).First().Attr("data-lazy")
-		}
-		
-		if posterURL != "" {
-			// Nettoyer l'URL (enlever les paramètres de taille pour avoir la meilleure qualité)
-			// IMDb utilise des URLs comme: https://m.media-amazon.com/images/M/..._V1_UX182_CR0,0,182,268_AL_.jpg
-			// On veut: https://m.media-amazon.com/images/M/..._V1_.jpg pour la meilleure qualité
-			posterURL = regexp.MustCompile(`\._[^_]+_\.`).ReplaceAllString(posterURL, "._V1_.")
-			// Enlever les paramètres de taille à la fin
-			posterURL = regexp.MustCompile(`_UX\d+_CR\d+,\d+,\d+,\d+_`).ReplaceAllString(posterURL, "_")
-			posterURL = regexp.MustCompile(`_AL_`).ReplaceAllString(posterURL, "")
-			// S'assurer qu'on a une URL complète
-			if !strings.HasPrefix(posterURL, "http") {
-				posterURL = "https://" + strings.TrimPrefix(posterURL, "//")
+			posterURL := ""
+			exists := false
+
+			// Essayer src d'abord
+			posterURL, exists = doc.Find(sel).First().Attr("src")
+			if !exists || posterURL == "" {
+				// Essayer data-src
+				posterURL, exists = doc.Find(sel).First().Attr("data-src")
 			}
-			details.PosterURL = posterURL
-			log.Printf("[WebScraper] ✅ Affiche IMDb trouvée avec sélecteur #%d '%s': %s", idx+1, sel, posterURL)
-			break
-		} else {
-			log.Printf("[WebScraper] Sélecteur #%d '%s': aucune affiche trouvée", idx+1, sel)
-		}
-	}
-		
-	// Si toujours pas d'affiche, chercher toutes les images
-	if details.PosterURL == "" {
-		log.Printf("[WebScraper] ⚠️  Aucune affiche avec sélecteurs standards, recherche large...")
-		doc.Find("img").Each(func(i int, sel *goquery.Selection) {
-			if i >= 20 { // Limiter la recherche
-				return
+			if !exists || posterURL == "" {
+				// Essayer data-image-url
+				posterURL, exists = doc.Find(sel).First().Attr("data-image-url")
 			}
-			src, _ := sel.Attr("src")
-			if src != "" && (strings.Contains(src, "media-amazon.com") || strings.Contains(src, "imdb.com")) {
-				if strings.Contains(src, "poster") || strings.Contains(src, "images") {
-					// Nettoyer l'URL
-					src = regexp.MustCompile(`\._[^_]+_\.`).ReplaceAllString(src, "._V1_.")
-					if !strings.HasPrefix(src, "http") {
-						src = "https://" + strings.TrimPrefix(src, "//")
-					}
-					details.PosterURL = src
-					log.Printf("[WebScraper] ✅ Affiche IMDb trouvée (recherche large): %s", src)
+			if !exists || posterURL == "" {
+				// Essayer data-lazy
+				posterURL, exists = doc.Find(sel).First().Attr("data-lazy")
+			}
+
+			if posterURL != "" {
+				// Nettoyer l'URL (enlever les paramètres de taille pour avoir la meilleure qualité)
+				// IMDb utilise des URLs comme: https://m.media-amazon.com/images/M/..._V1_UX182_CR0,0,182,268_AL_.jpg
+				// On veut: https://m.media-amazon.com/images/M/..._V1_.jpg pour la meilleure qualité
+				posterURL = regexp.MustCompile(`\._[^_]+_\.`).ReplaceAllString(posterURL, "._V1_.")
+				// Enlever les paramètres de taille à la fin
+				posterURL = regexp.MustCompile(`_UX\d+_CR\d+,\d+,\d+,\d+_`).ReplaceAllString(posterURL, "_")
+				posterURL = regexp.MustCompile(`_AL_`).ReplaceAllString(posterURL, "")
+				// S'assurer qu'on a une URL complète
+				if !strings.HasPrefix(posterURL, "http") {
+					posterURL = "https://" + strings.TrimPrefix(posterURL, "//")
+				}
+				details.PosterURL = posterURL
+				log.Printf("[WebScraper] ✅ Affiche IMDb trouvée avec sélecteur #%d '%s': %s", idx+1, sel, posterURL)
+				break
+			} else {
+				log.Printf("[WebScraper] Sélecteur #%d '%s': aucune affiche trouvée", idx+1, sel)
+			}
+		}
+
+		// Si toujours pas d'affiche, chercher toutes les images
+		if details.PosterURL == "" {
+			log.Printf("[WebScraper] ⚠️  Aucune affiche avec sélecteurs standards, recherche large...")
+			doc.Find("img").Each(func(i int, sel *goquery.Selection) {
+				if i >= 20 { // Limiter la recherche
 					return
 				}
+				src, _ := sel.Attr("src")
+				if src != "" && (strings.Contains(src, "media-amazon.com") || strings.Contains(src, "imdb.com")) {
+					if strings.Contains(src, "poster") || strings.Contains(src, "images") {
+						// Nettoyer l'URL
+						src = regexp.MustCompile(`\._[^_]+_\.`).ReplaceAllString(src, "._V1_.")
+						if !strings.HasPrefix(src, "http") {
+							src = "https://" + strings.TrimPrefix(src, "//")
+						}
+						details.PosterURL = src
+						log.Printf("[WebScraper] ✅ Affiche IMDb trouvée (recherche large): %s", src)
+						return
+					}
+				}
+			})
+
+			if details.PosterURL == "" {
+				log.Printf("[WebScraper] ❌ Aucune affiche trouvée (HTML) pour IMDb ID: %s", imdbID)
 			}
-		})
-		
-		if details.PosterURL == "" {
-			log.Printf("[WebScraper] ❌ Aucune affiche trouvée (HTML) pour IMDb ID: %s", imdbID)
 		}
-	}
 	}
 
 	// Plateforme - chercher dans le texte (Amazon Prime Video, Netflix, etc.) (si pas déjà défini)
@@ -1422,7 +1422,7 @@ func (s *WebScraperService) getMovieDetailsFromIMDB(imdbID string) *MovieMetadat
 			break
 		}
 	}
-	
+
 	// Si pas trouvé sur IMDb, chercher sur YouTube
 	if details.TrailerURL == "" && details.Title != "" {
 		log.Printf("[WebScraper] 🔍 Recherche bande-annonce YouTube pour '%s' (%d)...", details.Title, details.ProductionYear)
@@ -1559,13 +1559,13 @@ func (s *WebScraperService) SearchMoviesFromFilenameWeb(filename string) ([]*Mov
 	}
 
 	log.Printf("[WebScraper] Total de %d résultat(s) unique(s) trouvé(s) pour '%s'", len(allResults), filename)
-	
+
 	// CRITIQUE: Vérifier immédiatement si les résultats ont un IMDb ID
 	log.Printf("[WebScraper] 🔍 VÉRIFICATION IMMÉDIATE: Vérification des IMDb IDs dans les résultats...")
 	for idx, result := range allResults {
 		log.Printf("[WebScraper] 🔍 Résultat #%d IMMÉDIAT: Titre='%s', IMDb ID='%s' (VIDE=%v)", idx+1, result.Title, result.IMDBID, result.IMDBID == "")
 	}
-	
+
 	log.Printf("[WebScraper] 🚨 POINT DE CONTRÔLE 1: Code continue après 'Total de'")
 
 	// DIAGNOSTIC: Vérifier les IDs IMDb des résultats
@@ -1595,7 +1595,7 @@ func (s *WebScraperService) SearchMoviesFromFilenameWeb(filename string) ([]*Mov
 				log.Printf("[WebScraper]   - Durée: %d min", details.Runtime)
 				log.Printf("[WebScraper]   - Plateforme: %s", details.Platform)
 				log.Printf("[WebScraper]   - Bande-annonce: %s", details.TrailerURL)
-				
+
 				// REMPLACER complètement avec les détails IMDb (plus complets)
 				if details.Title != "" {
 					result.Title = details.Title
@@ -1966,13 +1966,13 @@ type AggregateRating struct {
 func (s *WebScraperService) extractJSONLDFromIMDB(doc *goquery.Document) *JSONLDData {
 	// Chercher toutes les balises script avec type="application/ld+json"
 	var jsonLDData *JSONLDData
-	
+
 	doc.Find("script[type='application/ld+json']").Each(func(i int, sel *goquery.Selection) {
 		jsonText := strings.TrimSpace(sel.Text())
 		if jsonText == "" {
 			return
 		}
-		
+
 		// Essayer de parser le JSON
 		var data JSONLDData
 		if err := json.Unmarshal([]byte(jsonText), &data); err != nil {
@@ -1985,7 +1985,7 @@ func (s *WebScraperService) extractJSONLDFromIMDB(doc *goquery.Document) *JSONLD
 				return
 			}
 		}
-		
+
 		// Vérifier que c'est bien un film (Movie ou VideoObject)
 		if data.Type == "Movie" || data.Type == "VideoObject" || strings.Contains(strings.ToLower(data.Type), "movie") {
 			jsonLDData = &data
@@ -1993,7 +1993,7 @@ func (s *WebScraperService) extractJSONLDFromIMDB(doc *goquery.Document) *JSONLD
 			return
 		}
 	})
-	
+
 	return jsonLDData
 }
 
@@ -2002,22 +2002,22 @@ func (s *WebScraperService) parseDuration(duration string) int {
 	// Format ISO 8601: PT2H3M = 2 heures 3 minutes
 	// PT123M = 123 minutes
 	// PT2H = 2 heures
-	
+
 	re := regexp.MustCompile(`PT(?:(\d+)H)?(?:(\d+)M)?`)
 	matches := re.FindStringSubmatch(duration)
 	if len(matches) == 0 {
 		return 0
 	}
-	
+
 	hours := 0
 	minutes := 0
-	
+
 	if len(matches) > 1 && matches[1] != "" {
 		fmt.Sscanf(matches[1], "%d", &hours)
 	}
 	if len(matches) > 2 && matches[2] != "" {
 		fmt.Sscanf(matches[2], "%d", &minutes)
 	}
-	
+
 	return hours*60 + minutes
 }

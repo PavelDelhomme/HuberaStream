@@ -24,19 +24,19 @@ type QBittorrentClient struct {
 }
 
 type QBittorrentTorrent struct {
-	Hash            string  `json:"hash"`
-	Name            string  `json:"name"`
-	State           string  `json:"state"` // downloading, seeding, paused, etc.
-	Progress        float64 `json:"progress"`
-	Size            int64   `json:"size"`
-	Downloaded      int64   `json:"downloaded"`
-	Uploaded        int64   `json:"uploaded"`
-	DlSpeed         int64   `json:"dlspeed"`
-	UpSpeed         int64   `json:"upspeed"`
-	NumSeeds        int     `json:"num_seeds"`
-	NumLeechers     int     `json:"num_leechers"`
-	Ratio           float64 `json:"ratio"`
-	Eta             int64   `json:"eta"`
+	Hash        string  `json:"hash"`
+	Name        string  `json:"name"`
+	State       string  `json:"state"` // downloading, seeding, paused, etc.
+	Progress    float64 `json:"progress"`
+	Size        int64   `json:"size"`
+	Downloaded  int64   `json:"downloaded"`
+	Uploaded    int64   `json:"uploaded"`
+	DlSpeed     int64   `json:"dlspeed"`
+	UpSpeed     int64   `json:"upspeed"`
+	NumSeeds    int     `json:"num_seeds"`
+	NumLeechers int     `json:"num_leechers"`
+	Ratio       float64 `json:"ratio"`
+	Eta         int64   `json:"eta"`
 }
 
 func NewQBittorrentClient(cfg *config.Config) (*QBittorrentClient, error) {
@@ -282,4 +282,3 @@ func (c *QBittorrentClient) ResumeTorrent(ctx context.Context, torrentID string)
 
 	return nil
 }
-

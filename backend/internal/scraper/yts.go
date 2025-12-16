@@ -18,8 +18,8 @@ type YTSScraper struct {
 }
 
 type YTSResponse struct {
-	Status string    `json:"status"`
-	Data   YTSData   `json:"data"`
+	Status string  `json:"status"`
+	Data   YTSData `json:"data"`
 }
 
 type YTSData struct {
@@ -27,18 +27,18 @@ type YTSData struct {
 }
 
 type YTSMovie struct {
-	Title    string      `json:"title"`
-	Year     int         `json:"year"`
+	Title    string       `json:"title"`
+	Year     int          `json:"year"`
 	Torrents []YTSTorrent `json:"torrents"`
 }
 
 type YTSTorrent struct {
-	URL      string `json:"url"`
-	Hash     string `json:"hash"`
-	Quality  string `json:"quality"`
-	Size     string `json:"size"`
-	Seeds    int    `json:"seeds"`
-	Peers    int    `json:"peers"`
+	URL     string `json:"url"`
+	Hash    string `json:"hash"`
+	Quality string `json:"quality"`
+	Size    string `json:"size"`
+	Seeds   int    `json:"seeds"`
+	Peers   int    `json:"peers"`
 }
 
 func NewYTSScraper() *YTSScraper {
@@ -100,4 +100,3 @@ func (s *YTSScraper) GetTorrentDetails(ctx context.Context, torrentURL string) (
 		Source:     models.TorrentSourceYTS,
 	}, nil
 }
-

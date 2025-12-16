@@ -144,4 +144,3 @@ func (h *FavoriteHandler) IsFavorite(c *gin.Context) {
 		"favorite":    favorite,
 	})
 }
-

@@ -22,8 +22,8 @@ type CrawlerService struct {
 // NewCrawlerService crée un nouveau service de crawling
 func NewCrawlerService() *CrawlerService {
 	return &CrawlerService{
-		scraper:     New1337xScraper(),
-		categories:  []Category1337x{
+		scraper: New1337xScraper(),
+		categories: []Category1337x{
 			CategoryPopularMovies,
 			CategoryTV,
 			CategoryMovieLibrary,
@@ -149,4 +149,3 @@ func (cs *CrawlerService) SetLanguages(languages []string) {
 func (cs *CrawlerService) EnableProxy(enable bool) {
 	cs.scraper.SetUseProxy(enable)
 }
-

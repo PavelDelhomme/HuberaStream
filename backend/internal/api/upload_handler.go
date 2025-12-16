@@ -27,9 +27,9 @@ import (
 )
 
 type UploadHandler struct {
-	db        *gorm.DB
-	cfg       *config.Config
-	processor *video.Processor
+	db              *gorm.DB
+	cfg             *config.Config
+	processor       *video.Processor
 	metadataService *metadata.MetadataService
 	// Suivi des traitements en cours avec context pour annulation
 	processingVideos map[uuid.UUID]context.CancelFunc
@@ -72,7 +72,7 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	categoryIDStr := c.PostForm("category_id")
 	subCategoryIDStr := c.PostForm("sub_category_id")
 	isPublic := c.PostForm("is_public") != "false"
-	
+
 	// Métadonnées enrichies
 	director := strings.TrimSpace(c.PostForm("director"))
 	actors := strings.TrimSpace(c.PostForm("actors"))
@@ -89,7 +89,7 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	runtimeStr := strings.TrimSpace(c.PostForm("runtime"))
 	writer := strings.TrimSpace(c.PostForm("writer"))
 	platform := strings.TrimSpace(c.PostForm("platform"))
-	
+
 	// Convertir les valeurs numériques
 	var productionYear int
 	if productionYearStr != "" {
@@ -150,31 +150,31 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 
 	// Créer l'entrée en base avec métadonnées enrichies
 	videoModel := models.Video{
-		ID:              videoID,
-		Title:           title,
-		Description:     description,
-		UserID:          userUUID,
-		Status:          models.VideoStatusProcessing,
-		CategoryID:      categoryID,
-		SubCategoryID:   subCategoryID,
-		IsPublic:        isPublic,
-		Checksum:        checksum,
+		ID:            videoID,
+		Title:         title,
+		Description:   description,
+		UserID:        userUUID,
+		Status:        models.VideoStatusProcessing,
+		CategoryID:    categoryID,
+		SubCategoryID: subCategoryID,
+		IsPublic:      isPublic,
+		Checksum:      checksum,
 		// Métadonnées enrichies
-		Director:        director,
-		Actors:          actors,
-		ReleaseDate:     releaseDate,
-		ProductionYear:  productionYear,
-		Synopsis:        synopsis,
-		Genre:           genre,
-		Rating:          rating,
-		IMDBID:          imdbID,
-		TMDBID:          tmdbID,
-		PosterURL:       posterURL,
-		BackdropURL:     backdropURL,
-		TrailerURL:      trailerURL,
-		Runtime:         runtime,
-		Writer:          writer,
-		Platform:        platform,
+		Director:       director,
+		Actors:         actors,
+		ReleaseDate:    releaseDate,
+		ProductionYear: productionYear,
+		Synopsis:       synopsis,
+		Genre:          genre,
+		Rating:         rating,
+		IMDBID:         imdbID,
+		TMDBID:         tmdbID,
+		PosterURL:      posterURL,
+		BackdropURL:    backdropURL,
+		TrailerURL:     trailerURL,
+		Runtime:        runtime,
+		Writer:         writer,
+		Platform:       platform,
 	}
 
 	if err := h.db.Create(&videoModel).Error; err != nil {
@@ -185,7 +185,7 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 
 	// Créer un context avec annulation pour le traitement
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Enregistrer la fonction d'annulation
 	h.processingMutex.Lock()
 	h.processingVideos[videoID] = cancel
@@ -195,7 +195,7 @@ func (h *UploadHandler) UploadVideo(c *gin.Context) {
 	go h.processVideo(ctx, videoID, videoPath)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "Vidéo uploadée avec succès",
+		"message":  "Vidéo uploadée avec succès",
 		"video_id": videoID,
 		"status":   "processing",
 	})
@@ -261,7 +261,7 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	} else {
 		fmt.Printf("Miniature générée depuis la vidéo avec succès pour %s\n", videoID)
 	}
-	
+
 	// Vérifier l'annulation après génération de la miniature
 	select {
 	case <-ctx.Done():
@@ -270,7 +270,7 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 		return
 	default:
 	}
-	
+
 	if thumbnailPath != "" {
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("thumbnail_path", thumbnailPath)
 	}
@@ -298,7 +298,7 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 
 	// Qualités à générer (du plus bas au plus haut pour permettre le fallback)
 	qualities := []string{"360p", "480p", "720p", "1080p"}
-	
+
 	// Générer les formats progressifs (MP4) pour toutes les qualités
 	for _, quality := range qualities {
 		// Vérifier l'annulation avant chaque transcodage
@@ -317,7 +317,7 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 			fmt.Printf("Erreur lors du transcodage progressif %s: %v\n", quality, err)
 			continue
 		}
-		
+
 		format := models.VideoFormat{
 			ID:       uuid.New(),
 			VideoID:  videoID,
@@ -375,7 +375,7 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	// Vérifier qu'au moins un format a été créé
 	var formatCount int64
 	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
-	
+
 	// Compter les formats par type pour le log
 	var progressiveCount int64
 	var hlsCount int64
@@ -385,10 +385,10 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 	h.db.Model(&models.VideoFormat{}).
 		Where("video_id = ? AND format = ?", videoID, "hls").
 		Count(&hlsCount)
-	
-	fmt.Printf("Traitement terminé pour la vidéo %s: %d format(s) total (%d progressifs, %d HLS)\n", 
+
+	fmt.Printf("Traitement terminé pour la vidéo %s: %d format(s) total (%d progressifs, %d HLS)\n",
 		videoID, formatCount, progressiveCount, hlsCount)
-	
+
 	// Vérification de l'intégrité du fichier original après traitement
 	// Récupérer le checksum stocké en base
 	var storedVideo models.Video
@@ -408,7 +408,7 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 			fmt.Printf("✅ Vérification d'intégrité réussie pour la vidéo %s (checksum: %s)\n", videoID, currentChecksum[:16]+"...")
 		}
 	}
-	
+
 	if formatCount == 0 {
 		fmt.Printf("❌ AUCUN FORMAT CRÉÉ POUR LA VIDÉO %s - La vidéo ne sera pas lisible\n", videoID)
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
@@ -448,7 +448,7 @@ func (h *UploadHandler) calculateFileChecksum(filePath string) (string, error) {
 func (h *UploadHandler) cleanupPartialFormats(videoID uuid.UUID) {
 	var formats []models.VideoFormat
 	h.db.Where("video_id = ?", videoID).Find(&formats)
-	
+
 	for _, format := range formats {
 		// Supprimer le fichier si c'est un format progressif
 		if format.Format == "progressive" && format.FilePath != "" {
@@ -505,7 +505,7 @@ func (h *UploadHandler) generateTextThumbnail(videoID uuid.UUID, title string, d
 
 	// Créer une image avec un fond dégradé
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	
+
 	// Fond dégradé (rouge vers noir, style Netflix)
 	for y := 0; y < height; y++ {
 		ratio := float64(y) / float64(height)
@@ -580,7 +580,7 @@ func (h *UploadHandler) GenerateThumbnailFromTitle(c *gin.Context) {
 func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
 	log.Printf("[ExtractVideoMetadata] ✅ Handler appelé pour %s", c.Request.URL.Path)
 	log.Printf("[ExtractVideoMetadata] Début de l'extraction des métadonnées")
-	
+
 	// Récupérer le fichier
 	file, err := c.FormFile("video")
 	if err != nil {
@@ -611,7 +611,7 @@ func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
 
 	tempPath := filepath.Join(tempDir, fmt.Sprintf("metadata_%d_%s", time.Now().Unix(), file.Filename))
 	log.Printf("[ExtractVideoMetadata] Sauvegarde temporaire dans: %s", tempPath)
-	
+
 	if err := c.SaveUploadedFile(file, tempPath); err != nil {
 		log.Printf("[ExtractVideoMetadata] Erreur lors de l'enregistrement temporaire: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'enregistrement temporaire"})
@@ -637,9 +637,9 @@ func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[ExtractVideoMetadata] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d", 
+	log.Printf("[ExtractVideoMetadata] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d",
 		metadata.Title, metadata.Duration, metadata.Width, metadata.Height)
-	
+
 	c.JSON(http.StatusOK, metadata)
 }
 
@@ -648,30 +648,30 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 	var req struct {
 		Filename string `json:"filename" binding:"required"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nom de fichier requis"})
 		return
 	}
-	
+
 	log.Printf("[SearchMetadataFromFilename] 🔍 Recherche de métadonnées pour: %s", req.Filename)
 	log.Printf("[SearchMetadataFromFilename] ⚠️  CODE MODIFIÉ - Utilisation du scraper web UNIQUEMENT (PAS DE TMDB)")
-	
+
 	// Utiliser UNIQUEMENT le scraper web gratuit (sans API) - PAS DE TMDB
 	webScraper := metadata.NewWebScraperService()
 	log.Printf("[SearchMetadataFromFilename] ⚡ Appel du scraper web...")
-	
+
 	results, err := webScraper.SearchMoviesFromFilenameWeb(req.Filename)
-	
+
 	if err != nil {
 		log.Printf("[SearchMetadataFromFilename] ❌ Erreur scraper web: %v", err)
 	} else {
 		log.Printf("[SearchMetadataFromFilename] ✅ Scraper web a trouvé %d résultat(s)", len(results))
 	}
-	
+
 	if len(results) == 0 {
 		log.Printf("[SearchMetadataFromFilename] ⚠️  Aucun résultat trouvé pour: %s", req.Filename)
-		
+
 		// Proposer un résultat basique basé sur le nom de fichier nettoyé
 		titleVariants := metadata.ExtractTitleFromFilename(req.Filename)
 		cleanTitle := ""
@@ -701,14 +701,14 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 			cleanTitle = strings.ReplaceAll(cleanTitle, "_", " ")
 			cleanTitle = strings.ReplaceAll(cleanTitle, "-", " ")
 		}
-		
+
 		basicResult := &metadata.MovieMetadata{
 			Title:         cleanTitle,
 			OriginalTitle: cleanTitle,
 			Description:   fmt.Sprintf("Vidéo: %s", cleanTitle),
 			Synopsis:      fmt.Sprintf("Vidéo uploadée: %s", cleanTitle),
 		}
-		
+
 		log.Printf("[SearchMetadataFromFilename] 📝 Proposition d'un résultat basique: %s", cleanTitle)
 		c.JSON(http.StatusOK, gin.H{
 			"results": []*metadata.MovieMetadata{basicResult},
@@ -717,11 +717,11 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 		})
 		return
 	}
-	
+
 	log.Printf("[SearchMetadataFromFilename] %d résultat(s) trouvé(s) pour: %s", len(results), req.Filename)
 	c.JSON(http.StatusOK, gin.H{
 		"results": results,
-		"count": len(results),
+		"count":   len(results),
 	})
 }
 
@@ -730,21 +730,21 @@ func (h *UploadHandler) GetMetadataDetails(c *gin.Context) {
 	var req struct {
 		TMDBID int `json:"tmdb_id" binding:"required"`
 	}
-	
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "TMDB ID requis"})
 		return
 	}
-	
+
 	log.Printf("[GetMetadataDetails] Récupération des détails pour TMDB ID: %d", req.TMDBID)
-	
+
 	details, err := h.metadataService.GetMovieDetails(req.TMDBID)
 	if err != nil {
 		log.Printf("[GetMetadataDetails] Erreur: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur: %v", err)})
 		return
 	}
-	
+
 	metadata := h.metadataService.ConvertToMovieMetadata(details)
 	c.JSON(http.StatusOK, metadata)
 }
@@ -772,7 +772,7 @@ func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
 	// Le fichier original est généralement stocké avec le nom: {videoID}_{timestamp}.{ext}
 	// Chercher dans le répertoire de stockage
 	videoPath := ""
-	
+
 	// Essayer de trouver le fichier original dans le répertoire de stockage
 	// Le fichier peut être nommé avec l'ID de la vidéo
 	videoDir := h.cfg.VideoStoragePath
@@ -785,7 +785,7 @@ func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	// Si pas trouvé, essayer avec le nom de fichier original si disponible
 	if videoPath == "" {
 		// Chercher dans les formats pour trouver le fichier original
@@ -809,7 +809,7 @@ func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
 			}
 		}
 	}
-	
+
 	if videoPath == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Fichier vidéo original non trouvé"})
 		return
@@ -829,7 +829,7 @@ func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
 		return
 	}
 
-	log.Printf("[ExtractVideoMetadataFromID] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d", 
+	log.Printf("[ExtractVideoMetadataFromID] Métadonnées extraites avec succès: titre=%s, durée=%d, dimensions=%dx%d",
 		metadata.Title, metadata.Duration, metadata.Width, metadata.Height)
 
 	// Mettre à jour la vidéo avec les métadonnées extraites
@@ -852,7 +852,7 @@ func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
 	if metadata.Duration > 0 && video.Duration == 0 {
 		updates["duration"] = metadata.Duration
 	}
-	
+
 	// Appliquer les mises à jour
 	if len(updates) > 0 {
 		if err := h.db.Model(&video).Updates(updates).Error; err != nil {
@@ -865,8 +865,7 @@ func (h *UploadHandler) ExtractVideoMetadataFromID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"metadata": metadata,
-		"video": video,
-		"message": "Métadonnées extraites et vidéo mise à jour",
+		"video":    video,
+		"message":  "Métadonnées extraites et vidéo mise à jour",
 	})
 }
-

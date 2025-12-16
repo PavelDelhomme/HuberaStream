@@ -16,10 +16,10 @@ import (
 )
 
 type ScraperHandler struct {
-	db           *gorm.DB
-	cfg          *config.Config
-	crawler      *scraper.CrawlerService
-	crawlerCtx   context.Context
+	db            *gorm.DB
+	cfg           *config.Config
+	crawler       *scraper.CrawlerService
+	crawlerCtx    context.Context
 	crawlerCancel context.CancelFunc
 }
 
@@ -33,10 +33,10 @@ func NewScraperHandler(db *gorm.DB, cfg *config.Config) *ScraperHandler {
 
 func (h *ScraperHandler) Search(c *gin.Context) {
 	var req struct {
-		Query        string     `json:"query" binding:"required"`
-		Source       models.TorrentSource `json:"source" binding:"required"`
-		CategoryID   *uuid.UUID `json:"category_id"`
-		SubCategoryID *uuid.UUID `json:"sub_category_id"`
+		Query         string               `json:"query" binding:"required"`
+		Source        models.TorrentSource `json:"source" binding:"required"`
+		CategoryID    *uuid.UUID           `json:"category_id"`
+		SubCategoryID *uuid.UUID           `json:"sub_category_id"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -128,10 +128,10 @@ func (h *ScraperHandler) BrowseCategory1337x(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"results": results,
-		"count":   len(results),
+		"results":  results,
+		"count":    len(results),
 		"category": categoryStr,
-		"page": page,
+		"page":     page,
 		"language": language,
 	})
 }
@@ -139,7 +139,7 @@ func (h *ScraperHandler) BrowseCategory1337x(c *gin.Context) {
 // StartCrawler démarre le crawling automatique
 func (h *ScraperHandler) StartCrawler(c *gin.Context) {
 	var req struct {
-		Interval  int      `json:"interval"` // en minutes
+		Interval   int      `json:"interval"` // en minutes
 		Categories []string `json:"categories"`
 		Languages  []string `json:"languages"`
 		UseProxy   bool     `json:"use_proxy"`
@@ -197,11 +197,11 @@ func (h *ScraperHandler) StartCrawler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Crawler démarré",
+		"message":          "Crawler démarré",
 		"interval_minutes": req.Interval,
-		"categories": req.Categories,
-		"languages": req.Languages,
-		"use_proxy": req.UseProxy,
+		"categories":       req.Categories,
+		"languages":        req.Languages,
+		"use_proxy":        req.UseProxy,
 	})
 }
 
@@ -226,4 +226,3 @@ func (h *ScraperHandler) GetCrawlerStatus(c *gin.Context) {
 		"running": h.crawler.IsRunning(),
 	})
 }
-

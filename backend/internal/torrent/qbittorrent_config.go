@@ -27,7 +27,7 @@ func ConfigureQBittorrentPassword(ctx context.Context, url, username, password s
 	// Le volume qbittorrent_config est monté à /config/qbittorrent dans le backend
 	configPaths := []string{
 		"/config/qbittorrent/qBittorrent/qBittorrent.conf", // Volume partagé depuis docker-compose
-		"/config/qBittorrent/qBittorrent.conf",              // Ancien chemin
+		"/config/qBittorrent/qBittorrent.conf",             // Ancien chemin
 		"/app/config/qBittorrent/qBittorrent.conf",
 		filepath.Join(os.Getenv("HOME"), ".config/qBittorrent/qBittorrent.conf"),
 	}
@@ -63,7 +63,7 @@ func ConfigureQBittorrentPassword(ctx context.Context, url, username, password s
 	// Modifier le fichier
 	modified := false
 	lines := strings.Split(string(configContent), "\n")
-	
+
 	for i, line := range lines {
 		if strings.HasPrefix(line, "WebUI\\Username=") {
 			lines[i] = fmt.Sprintf("WebUI\\Username=%s", username)
@@ -118,8 +118,8 @@ func generatePBKDF2Hash(password string) string {
 	}
 
 	// PBKDF2 avec SHA-512
-			hash := pbkdf2.Key([]byte(password), salt, 100000, 64, sha512.New)
-	
+	hash := pbkdf2.Key([]byte(password), salt, 100000, 64, sha512.New)
+
 	// Encoder en base64 (salt + hash)
 	combined := append(salt, hash...)
 	return base64.StdEncoding.EncodeToString(combined)
@@ -197,4 +197,3 @@ func ConfigureQBittorrentFromDocker(ctx context.Context, containerName, username
 	// Utilisez ConfigureQBittorrentPassword qui modifie directement le fichier dans le volume partagé
 	return fmt.Errorf("configuration via Docker exec non disponible dans le conteneur backend - utilisez ConfigureQBittorrentPassword avec le volume partagé")
 }
-

@@ -18,49 +18,49 @@ const (
 )
 
 type Video struct {
-	ID          uuid.UUID   `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Title       string      `gorm:"not null" json:"title"`
-	Description string      `gorm:"type:text" json:"description"`
-	UserID      uuid.UUID   `gorm:"type:uuid;not null" json:"user_id"`
-	User        User        `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Status      VideoStatus `gorm:"default:'pending'" json:"status"`
-	Duration    int         `json:"duration"` // en secondes
-	Views       int         `gorm:"default:0" json:"views"`
-	ThumbnailPath string    `json:"thumbnail_path"`
-	OriginalURL   string    `json:"original_url"` // URL source si téléchargé depuis streaming
-	Checksum      string    `gorm:"type:varchar(64)" json:"checksum"` // SHA256 checksum pour vérifier l'intégrité
-	CategoryID    *uuid.UUID `gorm:"type:uuid" json:"category_id"`
-	Category      *Category  `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	SubCategoryID *uuid.UUID `gorm:"type:uuid" json:"sub_category_id"`
+	ID            uuid.UUID    `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Title         string       `gorm:"not null" json:"title"`
+	Description   string       `gorm:"type:text" json:"description"`
+	UserID        uuid.UUID    `gorm:"type:uuid;not null" json:"user_id"`
+	User          User         `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Status        VideoStatus  `gorm:"default:'pending'" json:"status"`
+	Duration      int          `json:"duration"` // en secondes
+	Views         int          `gorm:"default:0" json:"views"`
+	ThumbnailPath string       `json:"thumbnail_path"`
+	OriginalURL   string       `json:"original_url"`                     // URL source si téléchargé depuis streaming
+	Checksum      string       `gorm:"type:varchar(64)" json:"checksum"` // SHA256 checksum pour vérifier l'intégrité
+	CategoryID    *uuid.UUID   `gorm:"type:uuid" json:"category_id"`
+	Category      *Category    `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	SubCategoryID *uuid.UUID   `gorm:"type:uuid" json:"sub_category_id"`
 	SubCategory   *SubCategory `gorm:"foreignKey:SubCategoryID" json:"sub_category,omitempty"`
-	IsPublic      bool      `gorm:"default:true" json:"is_public"`
-	
+	IsPublic      bool         `gorm:"default:true" json:"is_public"`
+
 	// Métadonnées enrichies
-	Director      string    `gorm:"type:varchar(255)" json:"director"` // Réalisateur
-	Actors        string    `gorm:"type:text" json:"actors"` // Acteurs principaux (séparés par des virgules)
-	ReleaseDate   string    `gorm:"type:varchar(50)" json:"release_date"` // Date de sortie
-	ProductionYear int      `json:"production_year"` // Année de production
-	Synopsis      string    `gorm:"type:text" json:"synopsis"` // Synopsis en français
-	Genre         string    `gorm:"type:varchar(255)" json:"genre"` // Genre(s)
-	Rating        float64   `json:"rating"` // Note (0-10)
-	IMDBID        string    `gorm:"type:varchar(20)" json:"imdb_id"` // ID IMDB
-	TMDBID        int       `json:"tmdb_id"` // ID TMDB
-	PosterURL     string    `gorm:"type:text" json:"poster_url"` // URL du poster/affiche
-	BackdropURL   string    `gorm:"type:text" json:"backdrop_url"` // URL de l'image de fond
-	TrailerURL    string    `gorm:"type:text" json:"trailer_url"` // URL de la bande annonce YouTube
-	Runtime       int       `json:"runtime"` // Durée en minutes
-	Writer        string    `gorm:"type:varchar(255)" json:"writer"` // Scénariste
-	Platform      string    `gorm:"type:varchar(255)" json:"platform"` // Plateforme (Amazon Prime Video, etc.)
-	
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	Director       string  `gorm:"type:varchar(255)" json:"director"`    // Réalisateur
+	Actors         string  `gorm:"type:text" json:"actors"`              // Acteurs principaux (séparés par des virgules)
+	ReleaseDate    string  `gorm:"type:varchar(50)" json:"release_date"` // Date de sortie
+	ProductionYear int     `json:"production_year"`                      // Année de production
+	Synopsis       string  `gorm:"type:text" json:"synopsis"`            // Synopsis en français
+	Genre          string  `gorm:"type:varchar(255)" json:"genre"`       // Genre(s)
+	Rating         float64 `json:"rating"`                               // Note (0-10)
+	IMDBID         string  `gorm:"type:varchar(20)" json:"imdb_id"`      // ID IMDB
+	TMDBID         int     `json:"tmdb_id"`                              // ID TMDB
+	PosterURL      string  `gorm:"type:text" json:"poster_url"`          // URL du poster/affiche
+	BackdropURL    string  `gorm:"type:text" json:"backdrop_url"`        // URL de l'image de fond
+	TrailerURL     string  `gorm:"type:text" json:"trailer_url"`         // URL de la bande annonce YouTube
+	Runtime        int     `json:"runtime"`                              // Durée en minutes
+	Writer         string  `gorm:"type:varchar(255)" json:"writer"`      // Scénariste
+	Platform       string  `gorm:"type:varchar(255)" json:"platform"`    // Plateforme (Amazon Prime Video, etc.)
+
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// Relations
-	Formats      []VideoFormat `gorm:"foreignKey:VideoID" json:"formats,omitempty"`
-	Subtitles    []Subtitle    `gorm:"foreignKey:VideoID" json:"subtitles,omitempty"`
-	Tags         []VideoTag    `gorm:"many2many:video_tags;" json:"tags,omitempty"`
-	Playlists    []Playlist    `gorm:"many2many:playlist_videos;" json:"playlists,omitempty"`
+	Formats   []VideoFormat `gorm:"foreignKey:VideoID" json:"formats,omitempty"`
+	Subtitles []Subtitle    `gorm:"foreignKey:VideoID" json:"subtitles,omitempty"`
+	Tags      []VideoTag    `gorm:"many2many:video_tags;" json:"tags,omitempty"`
+	Playlists []Playlist    `gorm:"many2many:playlist_videos;" json:"playlists,omitempty"`
 }
 
 type VideoFormat struct {
@@ -69,7 +69,7 @@ type VideoFormat struct {
 	Format       string    `gorm:"not null" json:"format"` // hls, dash, webrtc, progressive
 	FilePath     string    `gorm:"not null" json:"file_path"`
 	ManifestPath string    `json:"manifest_path"` // Pour HLS/DASH
-	Quality      string    `json:"quality"`      // 1080p, 720p, 480p, etc.
+	Quality      string    `json:"quality"`       // 1080p, 720p, 480p, etc.
 	Bitrate      int       `json:"bitrate"`
 	Width        int       `json:"width"`
 	Height       int       `json:"height"`
@@ -85,13 +85,12 @@ type VideoTag struct {
 }
 
 type Subtitle struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	VideoID   uuid.UUID `gorm:"type:uuid;not null" json:"video_id"`
-	Language  string    `gorm:"not null" json:"language"` // fr, en, es, etc.
-	LanguageName string `json:"language_name"` // Français, English, etc.
-	FilePath  string    `gorm:"not null" json:"file_path"` // Chemin vers le fichier .vtt ou .srt
-	IsDefault bool      `gorm:"default:false" json:"is_default"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	VideoID      uuid.UUID `gorm:"type:uuid;not null" json:"video_id"`
+	Language     string    `gorm:"not null" json:"language"`  // fr, en, es, etc.
+	LanguageName string    `json:"language_name"`             // Français, English, etc.
+	FilePath     string    `gorm:"not null" json:"file_path"` // Chemin vers le fichier .vtt ou .srt
+	IsDefault    bool      `gorm:"default:false" json:"is_default"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
-

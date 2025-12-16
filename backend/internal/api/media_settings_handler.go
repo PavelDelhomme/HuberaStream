@@ -24,17 +24,17 @@ func NewMediaSettingsHandler(db *gorm.DB, cfg *config.Config) *MediaSettingsHand
 // GetMediaSettings retourne les paramètres multimédias actuels
 func (h *MediaSettingsHandler) GetMediaSettings(c *gin.Context) {
 	settings := gin.H{
-		"video_storage_path":      h.cfg.VideoStoragePath,
-		"thumbnail_storage_path":  h.cfg.ThumbnailStoragePath,
-		"torrent_download_path":   h.cfg.TorrentDownloadPath,
-		"enable_auto_download":    h.cfg.EnableAutoDownload,
-		"default_video_quality":   "720p", // Par défaut
-		"enable_hls":              true,
-		"enable_dash":              false,
-		"hls_segment_duration":    10,
+		"video_storage_path":        h.cfg.VideoStoragePath,
+		"thumbnail_storage_path":    h.cfg.ThumbnailStoragePath,
+		"torrent_download_path":     h.cfg.TorrentDownloadPath,
+		"enable_auto_download":      h.cfg.EnableAutoDownload,
+		"default_video_quality":     "720p", // Par défaut
+		"enable_hls":                true,
+		"enable_dash":               false,
+		"hls_segment_duration":      10,
 		"max_concurrent_transcodes": 2,
-		"ffmpeg_preset":            "medium",
-		"ffmpeg_crf":              23,
+		"ffmpeg_preset":             "medium",
+		"ffmpeg_crf":                23,
 	}
 
 	c.JSON(http.StatusOK, settings)
@@ -65,7 +65,7 @@ func (h *MediaSettingsHandler) UpdateMediaSettings(c *gin.Context) {
 	// Dans un vrai cas, on sauvegarderait en base de données
 	// Pour l'instant, on retourne juste un succès
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Paramètres sauvegardés",
+		"message":  "Paramètres sauvegardés",
 		"settings": req,
 	})
 }

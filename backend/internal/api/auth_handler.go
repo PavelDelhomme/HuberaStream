@@ -108,23 +108,23 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-		// Générer le token JWT avec une expiration adaptée selon le rôle
-		// Admin : 30 jours pour une meilleure persistance en localhost
-		// User : 7 jours
-		var expiration time.Duration
-		if user.Role == models.RoleAdmin {
-			expiration = time.Hour * 24 * 30 // 30 jours pour les admins
-		} else {
-			expiration = time.Hour * 24 * 7 // 7 jours pour les utilisateurs
-		}
-		
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"user_id":  user.ID.String(),
-			"username": user.Username,
-			"role":     string(user.Role),
-			"exp":      time.Now().Add(expiration).Unix(),
-			"iat":      time.Now().Unix(), // Issued at
-		})
+	// Générer le token JWT avec une expiration adaptée selon le rôle
+	// Admin : 30 jours pour une meilleure persistance en localhost
+	// User : 7 jours
+	var expiration time.Duration
+	if user.Role == models.RoleAdmin {
+		expiration = time.Hour * 24 * 30 // 30 jours pour les admins
+	} else {
+		expiration = time.Hour * 24 * 7 // 7 jours pour les utilisateurs
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id":  user.ID.String(),
+		"username": user.Username,
+		"role":     string(user.Role),
+		"exp":      time.Now().Add(expiration).Unix(),
+		"iat":      time.Now().Unix(), // Issued at
+	})
 
 	tokenString, err := token.SignedString([]byte(h.cfg.JWTSecret))
 	if err != nil {
@@ -135,10 +135,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"token": tokenString,
 		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"role":     string(user.Role),
+			"id":        user.ID,
+			"username":  user.Username,
+			"email":     user.Email,
+			"role":      string(user.Role),
 			"is_active": user.IsActive,
 		},
 	})
@@ -160,12 +160,11 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"id":        user.ID,
-		"username":  user.Username,
-		"email":     user.Email,
-		"role":      string(user.Role),
-		"is_active": user.IsActive,
+		"id":         user.ID,
+		"username":   user.Username,
+		"email":      user.Email,
+		"role":       string(user.Role),
+		"is_active":  user.IsActive,
 		"created_at": user.CreatedAt,
 	})
 }
-

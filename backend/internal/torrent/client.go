@@ -18,19 +18,19 @@ type TorrentClient interface {
 }
 
 type TorrentStatus struct {
-	ID             string
-	Name           string
-	Status         models.TorrentStatus
-	Progress       float64
-	Size           int64
-	Downloaded     int64
-	Uploaded       int64
-	DownloadSpeed  int64
-	UploadSpeed    int64
-	Seeders        int
-	Leechers       int
-	Ratio          float64
-	ETA            int64 // en secondes
+	ID            string
+	Name          string
+	Status        models.TorrentStatus
+	Progress      float64
+	Size          int64
+	Downloaded    int64
+	Uploaded      int64
+	DownloadSpeed int64
+	UploadSpeed   int64
+	Seeders       int
+	Leechers      int
+	Ratio         float64
+	ETA           int64 // en secondes
 }
 
 type ClientType string
@@ -61,4 +61,3 @@ func NewTorrentClient(clientType ClientType, cfg *config.Config) (TorrentClient,
 		return nil, fmt.Errorf("client torrent non supporté: %s", clientType)
 	}
 }
-

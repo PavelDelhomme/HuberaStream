@@ -57,4 +57,3 @@ func (c *RTorrentClient) PauseTorrent(ctx context.Context, torrentID string) err
 func (c *RTorrentClient) ResumeTorrent(ctx context.Context, torrentID string) error {
 	return fmt.Errorf("non implémenté")
 }
-

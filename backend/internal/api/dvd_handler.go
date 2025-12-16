@@ -56,19 +56,19 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 				}
 			}
 		}
-		
+
 		c.JSON(http.StatusOK, gin.H{
-			"device": "",
-			"error": "Aucun lecteur DVD détecté automatiquement",
-			"message": err.Error(),
-			"success": false,
+			"device":            "",
+			"error":             "Aucun lecteur DVD détecté automatiquement",
+			"message":           err.Error(),
+			"success":           false,
 			"available_devices": availableDevices,
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"device": device,
+		"device":  device,
 		"message": "Lecteur DVD détecté",
 		"success": true,
 	})
@@ -84,7 +84,7 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 	info, err := h.extractor.GetDVDInfo(devicePath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Erreur lors de la lecture du DVD",
+			"error":   "Erreur lors de la lecture du DVD",
 			"message": err.Error(),
 		})
 		return
@@ -93,26 +93,26 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 	// Si on a un titre et/ou réalisateur, chercher automatiquement une miniature
 	// Essayer plusieurs variantes de recherche
 	searchQueries := []string{}
-	
+
 	if info.Title != "" && info.Title != "DVD Extraite" {
 		searchQueries = append(searchQueries, info.Title)
 		if info.Director != "" {
 			searchQueries = append(searchQueries, info.Title+" "+info.Director)
 		}
 	}
-	
+
 	// Si pas de titre mais qu'on a le device, essayer de chercher "KILL" ou autres titres connus
 	if info.Title == "" || info.Title == "DVD Extraite" {
 		// Chercher avec des termes génériques basés sur le device
 		searchQueries = append(searchQueries, "KILL film", "KILL NIKHIL NAGESH BHAT")
 	}
-	
+
 	// Chercher les métadonnées pour obtenir le poster
 	for _, searchQuery := range searchQueries {
 		if searchQuery == "" {
 			continue
 		}
-		
+
 		metadataResults, err := h.metadataService.SearchMoviesFromFilenameWeb(searchQuery)
 		if err == nil && len(metadataResults) > 0 {
 			// Prendre le premier résultat (le plus pertinent)
@@ -140,16 +140,16 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 }
 
 type ExtractDVDRequest struct {
-	DevicePath         string   `json:"device_path"`
-	Title              string   `json:"title"`
-	Description        string   `json:"description"`
-	CategoryID         string   `json:"category_id"`
-	SubCategoryID      string   `json:"sub_category_id"`
-	IsPublic           bool     `json:"is_public"`
-	VideoTrackIndex    int      `json:"video_track_index"`
-	AudioTrackIndices  []int    `json:"audio_track_indices"`
-	SubtitleTrackIndices []int  `json:"subtitle_track_indices"`
-	Qualities          []string `json:"qualities"` // ["1080p", "720p", "480p"]
+	DevicePath           string   `json:"device_path"`
+	Title                string   `json:"title"`
+	Description          string   `json:"description"`
+	CategoryID           string   `json:"category_id"`
+	SubCategoryID        string   `json:"sub_category_id"`
+	IsPublic             bool     `json:"is_public"`
+	VideoTrackIndex      int      `json:"video_track_index"`
+	AudioTrackIndices    []int    `json:"audio_track_indices"`
+	SubtitleTrackIndices []int    `json:"subtitle_track_indices"`
+	Qualities            []string `json:"qualities"` // ["1080p", "720p", "480p"]
 }
 
 // ExtractDVD extrait le DVD et crée une vidéo
@@ -207,7 +207,7 @@ func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 	go h.processDVDExtraction(videoID, req)
 
 	c.JSON(http.StatusAccepted, gin.H{
-		"message": "Extraction du DVD démarrée",
+		"message":  "Extraction du DVD démarrée",
 		"video_id": videoID,
 		"status":   "processing",
 	})
@@ -215,7 +215,7 @@ func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 
 func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDRequest) {
 	log.Printf("[DVD Extraction] Démarrage extraction pour vidéo %s", videoID)
-	
+
 	// Créer le dossier de sortie
 	outputDir := filepath.Join(h.cfg.VideoStoragePath, "dvd", videoID.String())
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
@@ -228,9 +228,9 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 	// Extraire le DVD en MP4 brut
 	outputPath := filepath.Join(outputDir, "video.mp4")
 	log.Printf("[DVD Extraction] Démarrage extraction DVD depuis %s vers %s", req.DevicePath, outputPath)
-	log.Printf("[DVD Extraction] Paramètres: video_track=%d, audio_tracks=%v, subtitle_tracks=%v, qualities=%v", 
+	log.Printf("[DVD Extraction] Paramètres: video_track=%d, audio_tracks=%v, subtitle_tracks=%v, qualities=%v",
 		req.VideoTrackIndex, req.AudioTrackIndices, req.SubtitleTrackIndices, req.Qualities)
-	
+
 	extractedPath, err := h.extractor.ExtractDVD(
 		req.DevicePath,
 		outputPath,
@@ -244,7 +244,7 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 		return
 	}
-	
+
 	log.Printf("[DVD Extraction] Extraction terminée, fichier: %s", extractedPath)
 
 	// Vérifier que le fichier extrait existe
@@ -253,7 +253,7 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 		return
 	}
-	
+
 	// Vérifier la taille du fichier
 	if fileInfo, err := os.Stat(extractedPath); err == nil {
 		log.Printf("[DVD Extraction] Fichier extrait: %s, taille: %d bytes", extractedPath, fileInfo.Size())
@@ -275,9 +275,9 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 	if videoPathToProcess == "" {
 		videoPathToProcess = outputPath
 	}
-	
+
 	log.Printf("[DVD Extraction] Démarrage traitement vidéo: %s", videoPathToProcess)
-	
+
 	// Lancer le traitement vidéo complet (compression optimale + transcodage) automatiquement
 	// C'est le même traitement que pour les uploads : compression H.265/HEVC + transcodage multi-qualités
 	if h.uploadHandler != nil {
@@ -285,7 +285,7 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		h.uploadHandler.processingMutex.Lock()
 		h.uploadHandler.processingVideos[videoID] = cancel
 		h.uploadHandler.processingMutex.Unlock()
-		
+
 		// Utiliser le même processVideo que pour les uploads
 		// Cela va automatiquement :
 		// 1. Compresser la vidéo avec H.265/HEVC (réduction ~50%)
@@ -326,7 +326,7 @@ func (h *DVDHandler) calculateFileChecksum(filePath string) (string, error) {
 // GetExtractionStatus récupère le statut de l'extraction
 func (h *DVDHandler) GetExtractionStatus(c *gin.Context) {
 	videoID := c.Param("id")
-	
+
 	var video models.Video
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
@@ -336,7 +336,7 @@ func (h *DVDHandler) GetExtractionStatus(c *gin.Context) {
 	// Compter les formats créés pour calculer la progression
 	var formatCount int64
 	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
-	
+
 	// Calculer la progression basée sur les formats créés
 	// 0-30%: Extraction, 30-50%: Compression, 50-90%: Transcodage (4 qualités), 90-100%: Finalisation
 	progress := 0
@@ -411,4 +411,3 @@ func (h *DVDHandler) CancelExtraction(c *gin.Context) {
 		"status":   "cancelled",
 	})
 }
-

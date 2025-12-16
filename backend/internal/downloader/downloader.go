@@ -152,4 +152,3 @@ func (d *Downloader) GetTaskStatus(taskID uuid.UUID) (*DownloadTask, error) {
 	// Pour l'instant, c'est une implémentation basique
 	return nil, fmt.Errorf("non implémenté")
 }
-

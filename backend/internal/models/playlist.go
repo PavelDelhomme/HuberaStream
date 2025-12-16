@@ -8,17 +8,17 @@ import (
 )
 
 type Playlist struct {
-	ID          uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
-	Name        string    `gorm:"not null" json:"name"`
-	Description string    `gorm:"type:text" json:"description"`
-	UserID      uuid.UUID `gorm:"type:uuid;not null" json:"user_id"`
-	User        User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	IsPublic    bool      `gorm:"default:false" json:"is_public"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          uuid.UUID      `gorm:"type:uuid;primary_key;default:gen_random_uuid()" json:"id"`
+	Name        string         `gorm:"not null" json:"name"`
+	Description string         `gorm:"type:text" json:"description"`
+	UserID      uuid.UUID      `gorm:"type:uuid;not null" json:"user_id"`
+	User        User           `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	IsPublic    bool           `gorm:"default:false" json:"is_public"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
-	Videos []Video        `gorm:"many2many:playlist_videos;" json:"videos,omitempty"`
+	Videos []Video         `gorm:"many2many:playlist_videos;" json:"videos,omitempty"`
 	Items  []PlaylistVideo `gorm:"foreignKey:PlaylistID" json:"items,omitempty"`
 }
 
@@ -44,4 +44,3 @@ type WatchHistory struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
-

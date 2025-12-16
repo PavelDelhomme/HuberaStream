@@ -49,7 +49,7 @@ func (h *StreamHandler) StreamVideo(c *gin.Context) {
 	if quality != "" {
 		query = query.Where("quality = ?", quality)
 	}
-	
+
 	if err := query.First(&videoFormat).Error; err != nil {
 		// Si le format n'existe pas, essayer de trouver n'importe quel format disponible
 		if err := h.db.Where("video_id = ?", videoID).First(&videoFormat).Error; err != nil {
@@ -99,7 +99,7 @@ func (h *StreamHandler) StreamVideo(c *gin.Context) {
 func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
 	filename := c.Param("filename")
 	fmt.Printf("[DEBUG ServeThumbnail] Handler appelé avec filename=%s\n", filename)
-	
+
 	if filename == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Nom de fichier requis"})
 		return
@@ -136,39 +136,39 @@ func (h *StreamHandler) ServeThumbnail(c *gin.Context) {
 func (h *StreamHandler) StreamSubtitle(c *gin.Context) {
 	videoIDParam := c.Param("id")
 	subtitleIDParam := c.Param("subtitleId")
-	
+
 	videoID, err := uuid.Parse(videoIDParam)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
 		return
 	}
-	
+
 	subtitleID, err := uuid.Parse(subtitleIDParam)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de sous-titre invalide"})
 		return
 	}
-	
+
 	// Vérifier que la vidéo existe
 	var video models.Video
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
 		return
 	}
-	
+
 	// Récupérer le sous-titre
 	var subtitle models.Subtitle
 	if err := h.db.Where("id = ? AND video_id = ?", subtitleID, videoID).First(&subtitle).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Sous-titre non trouvé"})
 		return
 	}
-	
+
 	// Vérifier si le fichier existe
 	if _, err := os.Stat(subtitle.FilePath); os.IsNotExist(err) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Fichier de sous-titre non trouvé"})
 		return
 	}
-	
+
 	// Servir le fichier avec le bon Content-Type
 	if strings.HasSuffix(subtitle.FilePath, ".vtt") {
 		c.Header("Content-Type", "text/vtt")
@@ -177,8 +177,7 @@ func (h *StreamHandler) StreamSubtitle(c *gin.Context) {
 	} else {
 		c.Header("Content-Type", "text/plain")
 	}
-	
+
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.File(subtitle.FilePath)
 }
-

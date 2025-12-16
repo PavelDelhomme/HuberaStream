@@ -149,4 +149,3 @@ func SeedDatabase(db *gorm.DB, cfg *config.Config) error {
 
 	return nil
 }
-

@@ -33,7 +33,7 @@ func TestExtractTitleFromFilename(t *testing.T) {
 			if len(variants) == 0 {
 				t.Errorf("ExtractTitleFromFilename(%q) retourne un tableau vide", tt.filename)
 			}
-			
+
 			// Vérifier qu'au moins un des variants attendus est présent
 			found := false
 			for _, expected := range tt.expected {
@@ -47,7 +47,7 @@ func TestExtractTitleFromFilename(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if !found && len(tt.expected) > 0 {
 				t.Errorf("ExtractTitleFromFilename(%q) = %v, ne contient aucun des variants attendus: %v", tt.filename, variants, tt.expected)
 			}
@@ -68,4 +68,3 @@ func TestExtractTitleFromFilename_OnlyExtension(t *testing.T) {
 		t.Errorf("ExtractTitleFromFilename(\".mp4\") devrait retourner un tableau vide, a retourné: %v", result)
 	}
 }
-
