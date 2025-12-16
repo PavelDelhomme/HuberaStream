@@ -31,14 +31,14 @@
   text-align: center;
 }
 
-/* Spinner moderne avec anneaux multiples */
+/* Spinner simple et élégant - cercle parfait */
 .loading-spinner {
   position: relative;
-  width: 80px;
-  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 80px;
+  height: 80px;
 }
 
 .loading-wrapper.size-small .loading-spinner {
@@ -56,55 +56,29 @@
   height: 120px;
 }
 
-.spinner-ring {
-  position: absolute;
+.spinner-circle {
   width: 100%;
   height: 100%;
-  border: 3px solid transparent;
+  border: 4px solid rgba(255, 255, 255, 0.1);
   border-top-color: #ff0000;
+  border-right-color: #6c5ce7;
   border-radius: 50%;
-  animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  animation: spin 1s linear infinite;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
 }
 
-.spinner-ring:nth-child(1) {
-  border-top-color: #ff0000;
-  animation-delay: 0s;
+/* Assurer que c'est toujours un cercle parfait */
+.loading-wrapper.size-small .spinner-circle {
+  border-width: 3px;
 }
 
-.spinner-ring:nth-child(2) {
-  width: 75%;
-  height: 75%;
-  border-top-color: #6c5ce7;
-  animation-delay: -0.4s;
-  animation-duration: 1s;
+.loading-wrapper.size-medium .spinner-circle {
+  border-width: 4px;
 }
 
-.spinner-ring:nth-child(3) {
-  width: 50%;
-  height: 50%;
-  border-top-color: #4dabf7;
-  animation-delay: -0.8s;
-  animation-duration: 0.8s;
-}
-
-.spinner-center {
-  position: absolute;
-  width: 20%;
-  height: 20%;
-  background: linear-gradient(135deg, #ff0000 0%, #6c5ce7 100%);
-  border-radius: 50%;
-  animation: pulse-center 1.5s ease-in-out infinite;
-  box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
-}
-
-.loading-wrapper.size-small .spinner-center {
-  width: 15%;
-  height: 15%;
-}
-
-.loading-wrapper.size-large .spinner-center {
-  width: 25%;
-  height: 25%;
+.loading-wrapper.size-large .spinner-circle {
+  border-width: 6px;
 }
 
 @keyframes spin {
@@ -113,17 +87,6 @@
   }
   100% {
     transform: rotate(360deg);
-  }
-}
-
-@keyframes pulse-center {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.3);
-    opacity: 0.7;
   }
 }
 
@@ -155,14 +118,14 @@
     padding: 30px 15px;
   }
 
-  .loading-spinner {
-    width: 60px;
-    height: 60px;
-  }
-
   .loading-wrapper.size-small .loading-spinner {
     width: 40px;
     height: 40px;
+  }
+
+  .loading-wrapper.size-medium .loading-spinner {
+    width: 60px;
+    height: 60px;
   }
 
   .loading-wrapper.size-large .loading-spinner {
