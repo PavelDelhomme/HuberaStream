@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"streammake/internal/config"
+	"streammake/internal/metadata"
 	"streammake/internal/models"
 	"streammake/internal/video"
 
@@ -15,18 +16,20 @@ import (
 )
 
 type DVDHandler struct {
-	db        *gorm.DB
-	cfg       *config.Config
-	extractor *video.DVDExtractor
-	processor *video.Processor
+	db              *gorm.DB
+	cfg             *config.Config
+	extractor       *video.DVDExtractor
+	processor       *video.Processor
+	metadataService *metadata.WebScraperService
 }
 
 func NewDVDHandler(db *gorm.DB, cfg *config.Config) *DVDHandler {
 	return &DVDHandler{
-		db:        db,
-		cfg:       cfg,
-		extractor: video.NewDVDExtractor(),
-		processor: video.NewProcessor(cfg.VideoStoragePath, cfg.ThumbnailStoragePath),
+		db:              db,
+		cfg:             cfg,
+		extractor:       video.NewDVDExtractor(),
+		processor:       video.NewProcessor(cfg.VideoStoragePath, cfg.ThumbnailStoragePath),
+		metadataService: metadata.NewWebScraperService(),
 	}
 }
 
@@ -78,6 +81,32 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 			"message": err.Error(),
 		})
 		return
+	}
+
+	// Si on a un titre et/ou réalisateur, chercher automatiquement une miniature
+	if (info.Title != "" && info.Title != "DVD Extraite") || info.Director != "" {
+		// Construire une requête de recherche
+		searchQuery := info.Title
+		if info.Director != "" {
+			searchQuery += " " + info.Director
+		}
+		
+		// Chercher les métadonnées pour obtenir le poster
+		metadataResults, err := h.metadataService.SearchMoviesFromFilenameWeb(searchQuery)
+		if err == nil && len(metadataResults) > 0 {
+			// Prendre le premier résultat (le plus pertinent)
+			bestMatch := metadataResults[0]
+			if bestMatch.PosterURL != "" {
+				info.PosterURL = bestMatch.PosterURL
+			}
+			// Enrichir aussi les autres métadonnées si manquantes
+			if info.Director == "" && bestMatch.Director != "" {
+				info.Director = bestMatch.Director
+			}
+			if info.Year == 0 && bestMatch.ProductionYear > 0 {
+				info.Year = bestMatch.ProductionYear
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, info)

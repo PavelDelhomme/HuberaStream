@@ -9,8 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 type DVDTrack struct {
@@ -27,6 +25,9 @@ type DVDTrack struct {
 
 type DVDInfo struct {
 	Title          string     `json:"title"`
+	Director       string     `json:"director,omitempty"`
+	Year           int        `json:"year,omitempty"`
+	PosterURL      string     `json:"poster_url,omitempty"`
 	Tracks         []DVDTrack `json:"tracks"`
 	VideoTracks    []DVDTrack `json:"video_tracks"`
 	AudioTracks    []DVDTrack `json:"audio_tracks"`
@@ -224,6 +225,9 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	// Initialiser tous les tableaux pour éviter les valeurs null en JSON
 	info := &DVDInfo{
 		Title:          "",
+		Director:       "",
+		Year:           0,
+		PosterURL:      "",
 		Tracks:         []DVDTrack{},
 		VideoTracks:    []DVDTrack{},
 		AudioTracks:    []DVDTrack{},
@@ -243,11 +247,19 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	}
 
 	// Si pas de titre, essayer d'extraire depuis ffmpeg output
-	if info.Title == "" {
+	if info.Title == "" && err == nil {
 		// Utiliser ffmpeg pour obtenir plus d'informations
-		title := e.extractTitleFromFFmpeg(devicePath)
+		title := e.extractTitleFromFFmpegOutput(ffmpegOutputStr)
 		if title != "" {
 			info.Title = title
+		}
+	}
+
+	// Extraire le réalisateur depuis ffmpeg output
+	if err == nil {
+		director := e.extractDirectorFromFFmpegOutput(ffmpegOutputStr)
+		if director != "" {
+			info.Director = director
 		}
 	}
 
@@ -405,44 +417,74 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	return info, nil
 }
 
-// extractTitleFromFFmpeg extrait le titre depuis la sortie de ffmpeg
-func (e *DVDExtractor) extractTitleFromFFmpeg(devicePath string) string {
-	dvdInput := "dvd://1"
-	if strings.HasPrefix(devicePath, "/dev/") {
-		dvdInput = fmt.Sprintf("dvd://1 -dvd_device %s", devicePath)
-	}
-
-	cmd := exec.Command(
-		e.ffmpegPath,
-		"-i", dvdInput,
-		"-t", "0.1",
-		"-f", "null",
-		"-",
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return ""
-	}
-
-	// Chercher le titre dans la sortie
-	outputStr := string(output)
-	
+// extractTitleFromFFmpegOutput extrait le titre depuis la sortie de ffmpeg
+func (e *DVDExtractor) extractTitleFromFFmpegOutput(outputStr string) string {
 	// Patterns pour trouver le titre
 	patterns := []*regexp.Regexp{
-		regexp.MustCompile(`title\s*:\s*([^\n]+)`),
-		regexp.MustCompile(`Title\s*:\s*([^\n]+)`),
-		regexp.MustCompile(`TITLE\s*:\s*([^\n]+)`),
-		regexp.MustCompile(`"title"\s*:\s*"([^"]+)"`),
+		regexp.MustCompile(`(?i)title\s*:\s*([^\n]+)`),
+		regexp.MustCompile(`(?i)"title"\s*:\s*"([^"]+)"`),
+		regexp.MustCompile(`(?i)Title\s*:\s*([^\n]+)`),
+		regexp.MustCompile(`(?i)DVD\s+Title\s*:\s*([^\n]+)`),
 	}
 
 	for _, pattern := range patterns {
 		matches := pattern.FindStringSubmatch(outputStr)
 		if len(matches) > 1 && matches[1] != "" {
-			return strings.TrimSpace(matches[1])
+			title := strings.TrimSpace(matches[1])
+			if title != "" && len(title) < 200 { // Éviter les faux positifs
+				return title
+			}
 		}
 	}
 
 	return ""
+}
+
+// extractDirectorFromFFmpegOutput extrait le réalisateur depuis la sortie de ffmpeg
+func (e *DVDExtractor) extractDirectorFromFFmpegOutput(outputStr string) string {
+	// Patterns pour trouver le réalisateur
+	patterns := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)director\s*:\s*([^\n]+)`),
+		regexp.MustCompile(`(?i)"director"\s*:\s*"([^"]+)"`),
+		regexp.MustCompile(`(?i)Director\s*:\s*([^\n]+)`),
+		regexp.MustCompile(`(?i)by\s+([A-Z][a-z]+\s+[A-Z][a-z]+)`), // "by John Doe"
+	}
+
+	for _, pattern := range patterns {
+		matches := pattern.FindStringSubmatch(outputStr)
+		if len(matches) > 1 && matches[1] != "" {
+			director := strings.TrimSpace(matches[1])
+			if director != "" && len(director) < 100 {
+				return director
+			}
+		}
+	}
+
+	return ""
+}
+
+// parseStreamLanguagesFromFFmpeg parse les langues depuis la sortie ffmpeg
+func (e *DVDExtractor) parseStreamLanguagesFromFFmpeg(outputStr string) map[int]string {
+	languages := make(map[int]string)
+	
+	// Pattern pour Stream #0:X(Y): Audio/Subtitle: ... (Y est souvent la langue)
+	// Exemple: Stream #0:3[0x80](fra): Audio: ac3
+	pattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]\(([a-z]{3})\):`)
+	matches := pattern.FindAllStringSubmatch(outputStr, -1)
+	
+	for _, match := range matches {
+		if len(match) >= 3 {
+			streamIdx, err := strconv.Atoi(match[1])
+			if err == nil {
+				lang := match[2]
+				if lang != "" {
+					languages[streamIdx] = lang
+				}
+			}
+		}
+	}
+
+	return languages
 }
 
 // extractAudioTracksFromFFmpeg extrait les pistes audio depuis ffmpeg
