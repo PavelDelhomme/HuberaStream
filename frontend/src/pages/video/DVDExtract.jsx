@@ -29,6 +29,8 @@ const DVDExtract = () => {
   const [extracting, setExtracting] = useState(false)
   const [extractionProgress, setExtractionProgress] = useState(0)
   const [videoId, setVideoId] = useState(null)
+  const [analyzingProgress, setAnalyzingProgress] = useState(0)
+  const [analyzingStage, setAnalyzingStage] = useState('')
 
   useEffect(() => {
     if (!user) {
@@ -91,11 +93,49 @@ const DVDExtract = () => {
     }
   }
 
+  const [analyzingProgress, setAnalyzingProgress] = useState(0)
+  const [analyzingStage, setAnalyzingStage] = useState('')
+
   const handleGetDVDInfo = async () => {
     setLoading(true)
     setError('')
+    setAnalyzingProgress(0)
+    setAnalyzingStage('Initialisation de l\'analyse...')
+    
     try {
-      const response = await api.get(`/dvd/info?device=${encodeURIComponent(device)}`)
+      // Simuler une progression pendant l'analyse
+      const progressInterval = setInterval(() => {
+        setAnalyzingProgress(prev => {
+          if (prev >= 90) return prev
+          return prev + 5
+        })
+      }, 500)
+
+      const stageMessages = [
+        'Lecture du device DVD...',
+        'Analyse des pistes vidéo...',
+        'Détection des pistes audio...',
+        'Recherche des sous-titres...',
+        'Extraction des métadonnées...',
+        'Finalisation...'
+      ]
+      let stageIndex = 0
+      const stageInterval = setInterval(() => {
+        if (stageIndex < stageMessages.length - 1) {
+          stageIndex++
+          setAnalyzingStage(stageMessages[stageIndex])
+        }
+      }, 2000)
+
+      const response = await api.get(`/dvd/info?device=${encodeURIComponent(device)}`, {
+        timeout: 60000 // 60 secondes pour l'analyse
+      })
+      
+      clearInterval(progressInterval)
+      clearInterval(stageInterval)
+      setAnalyzingProgress(100)
+      setAnalyzingStage('Analyse terminée !')
+
       if (response.data) {
         // S'assurer que les tableaux existent et sont initialisés
         const dvdData = {
@@ -107,6 +147,12 @@ const DVDExtract = () => {
           duration: response.data.duration || 0,
           chapters: response.data.chapters || []
         }
+        
+        console.log('📀 Informations DVD récupérées:', dvdData)
+        console.log(`  - Titre: ${dvdData.title}`)
+        console.log(`  - Pistes vidéo: ${dvdData.video_tracks.length}`)
+        console.log(`  - Pistes audio: ${dvdData.audio_tracks.length}`)
+        console.log(`  - Sous-titres: ${dvdData.subtitle_tracks.length}`)
         
         setDvdInfo(dvdData)
         setTitle(dvdData.title)
@@ -123,8 +169,13 @@ const DVDExtract = () => {
                           'Erreur lors de la lecture du DVD. Vérifiez que le DVD est bien inséré et lisible.'
       setError(errorMessage)
       console.error('Erreur lecture DVD:', error)
+      if (error.response?.data) {
+        console.error('Détails:', error.response.data)
+      }
     } finally {
       setLoading(false)
+      setAnalyzingProgress(0)
+      setAnalyzingStage('')
     }
   }
 
