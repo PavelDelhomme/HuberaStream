@@ -282,6 +282,27 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	if info.Title == "" {
 		info.Title = "DVD Extraite"
 	}
+	
+	// Enrichir avec les informations de lsdvd si disponibles
+	if lsdvdInfo != nil {
+		if lsdvdInfo.Title != "" && info.Title == "DVD Extraite" {
+			info.Title = lsdvdInfo.Title
+		}
+		if len(lsdvdInfo.AudioTracks) > 0 && len(info.AudioTracks) == 0 {
+			// Si lsdvd a trouvé des pistes audio mais pas ffprobe, utiliser celles de lsdvd
+			info.AudioTracks = lsdvdInfo.AudioTracks
+		} else if len(lsdvdInfo.AudioTracks) > 0 {
+			// Fusionner les informations : lsdvd pour la structure, ffprobe pour les détails techniques
+			info.AudioTracks = e.mergeAudioTracks(lsdvdInfo.AudioTracks, info.AudioTracks)
+		}
+		if len(lsdvdInfo.SubtitleTracks) > 0 && len(info.SubtitleTracks) == 0 {
+			// Si lsdvd a trouvé des sous-titres mais pas ffprobe, utiliser ceux de lsdvd
+			info.SubtitleTracks = lsdvdInfo.SubtitleTracks
+		} else if len(lsdvdInfo.SubtitleTracks) > 0 {
+			// Fusionner les informations
+			info.SubtitleTracks = e.mergeSubtitleTracks(lsdvdInfo.SubtitleTracks, info.SubtitleTracks)
+		}
+	}
 
 	// Parser les streams depuis ffmpeg output pour obtenir les langues et détails
 	var streamLanguages map[int]string
