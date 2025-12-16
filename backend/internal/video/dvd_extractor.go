@@ -1051,7 +1051,16 @@ func (e *DVDExtractor) getLanguageName(code string) string {
 	return strings.ToUpper(code)
 }
 
+// DVDTitleInfo représente les informations d'un titre DVD
+type DVDTitleInfo struct {
+	TitleNumber int
+	Length      float64 // En secondes
+	AudioTracks []DVDTrack
+	SubtitleTracks []DVDTrack
+}
+
 // analyzeDVDWithLsdvd utilise lsdvd pour analyser la structure complète du DVD
+// Utilise la même logique que HandBrake : trouve le titre le plus long et extrait ses pistes
 func (e *DVDExtractor) analyzeDVDWithLsdvd(devicePath string) *DVDInfo {
 	// lsdvd peut analyser directement un device block
 	// Utiliser -x pour obtenir plus d'informations XML
@@ -1072,6 +1081,173 @@ func (e *DVDExtractor) analyzeDVDWithLsdvd(devicePath string) *DVDInfo {
 			return nil
 		}
 	}
+	
+	// Analyser tous les titres pour trouver le plus long (comme HandBrake)
+	titles := e.parseDVDTitles(outputStr)
+	if len(titles) == 0 {
+		// Pas de titres trouvés, utiliser l'ancienne méthode
+		return e.parseDVDInfoLegacy(outputStr)
+	}
+	
+	// Trouver le titre le plus long (généralement le film principal)
+	longestTitle := titles[0]
+	for _, title := range titles {
+		if title.Length > longestTitle.Length {
+			longestTitle = title
+		}
+	}
+	
+	// Retourner les informations du titre le plus long
+	info := &DVDInfo{
+		Title:          "",
+		AudioTracks:    longestTitle.AudioTracks,
+		SubtitleTracks: longestTitle.SubtitleTracks,
+		VideoTracks:    []DVDTrack{},
+	}
+	
+	return info
+}
+
+// parseDVDTitles parse tous les titres du DVD depuis la sortie de lsdvd
+func (e *DVDExtractor) parseDVDTitles(outputStr string) []DVDTitleInfo {
+	var titles []DVDTitleInfo
+	lines := strings.Split(outputStr, "\n")
+	
+	currentTitle := -1
+	var currentTitleInfo *DVDTitleInfo
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		
+		// Détecter un nouveau titre
+		// Format: Title: 01, Length: 01:23:45.000 (chapters: 20, cells: 20)
+		titleMatch := regexp.MustCompile(`Title:\s*(\d+),.*?Length:\s*(\d+):(\d+):(\d+)\.(\d+)`)
+		if matches := titleMatch.FindStringSubmatch(line); len(matches) >= 6 {
+			// Sauvegarder le titre précédent s'il existe
+			if currentTitleInfo != nil {
+				titles = append(titles, *currentTitleInfo)
+			}
+			
+			// Nouveau titre
+			titleNum, _ := strconv.Atoi(matches[1])
+			hours, _ := strconv.Atoi(matches[2])
+			minutes, _ := strconv.Atoi(matches[3])
+			seconds, _ := strconv.Atoi(matches[4])
+			ms, _ := strconv.Atoi(matches[5])
+			
+			length := float64(hours*3600 + minutes*60 + seconds) + float64(ms)/1000.0
+			
+			currentTitle = titleNum
+			currentTitleInfo = &DVDTitleInfo{
+				TitleNumber:   titleNum,
+				Length:       length,
+				AudioTracks:   []DVDTrack{},
+				SubtitleTracks: []DVDTrack{},
+			}
+			continue
+		}
+		
+		// Si on est dans un titre, parser les pistes audio
+		if currentTitleInfo != nil {
+			// Piste audio : Audio: 0, Language: fra, Format: ac3, Frequency: 48000, Channels: 2
+			if strings.HasPrefix(line, "Audio:") || strings.Contains(line, "Audio:") {
+				audioMatch := regexp.MustCompile(`Audio:\s*(\d+).*?Language:\s*([a-z]{2,3})`)
+				if matches := audioMatch.FindStringSubmatch(line); len(matches) >= 3 {
+					index, _ := strconv.Atoi(matches[1])
+					language := strings.ToLower(strings.TrimSpace(matches[2]))
+					
+					// Extraire le format/codec
+					codec := "ac3" // Par défaut
+					if formatMatch := regexp.MustCompile(`Format:\s*([^,]+)`).FindStringSubmatch(line); len(formatMatch) >= 2 {
+						codec = strings.TrimSpace(formatMatch[1])
+					}
+					
+					// Extraire la fréquence
+					sampleRate := "48000" // Par défaut
+					if freqMatch := regexp.MustCompile(`Frequency:\s*(\d+)`).FindStringSubmatch(line); len(freqMatch) >= 2 {
+						sampleRate = freqMatch[1]
+					}
+					
+					// Extraire les canaux
+					channels := 2 // Par défaut stéréo
+					if chMatch := regexp.MustCompile(`Channels:\s*(\d+)`).FindStringSubmatch(line); len(chMatch) >= 2 {
+						if ch, err := strconv.Atoi(chMatch[1]); err == nil {
+							channels = ch
+						}
+					}
+					
+					langName := e.getLanguageName(language)
+					if langName == "" {
+						langName = strings.ToUpper(language)
+					}
+					
+					title := fmt.Sprintf("%s - %s", langName, codec)
+					if channels > 0 {
+						if channels == 1 {
+							title += " (Mono)"
+						} else if channels == 2 {
+							title += " (Stéréo)"
+						} else if channels == 6 {
+							title += " (5.1)"
+						} else {
+							title += fmt.Sprintf(" (%d canaux)", channels)
+						}
+					}
+					if sampleRate != "" {
+						title += fmt.Sprintf(" %sHz", sampleRate)
+					}
+					
+					track := DVDTrack{
+						Index:      index,
+						Type:       "audio",
+						Codec:      codec,
+						Language:   language,
+						Title:      title,
+						Channels:   channels,
+						SampleRate: sampleRate,
+					}
+					currentTitleInfo.AudioTracks = append(currentTitleInfo.AudioTracks, track)
+				}
+			}
+			
+			// Piste sous-titre : Subtitle: 0, Language: fra
+			if strings.HasPrefix(line, "Subtitle:") || strings.Contains(line, "Subtitle:") {
+				subtitleMatch := regexp.MustCompile(`Subtitle:\s*(\d+).*?Language:\s*([a-z]{2,3})`)
+				if matches := subtitleMatch.FindStringSubmatch(line); len(matches) >= 3 {
+					index, _ := strconv.Atoi(matches[1])
+					language := strings.ToLower(strings.TrimSpace(matches[2]))
+					
+					langName := e.getLanguageName(language)
+					if langName == "" {
+						langName = strings.ToUpper(language)
+					}
+					
+					track := DVDTrack{
+						Index:    index,
+						Type:     "subtitle",
+						Codec:    "dvd_subtitle",
+						Language: language,
+						Title:    fmt.Sprintf("%s - dvd_subtitle", langName),
+					}
+					currentTitleInfo.SubtitleTracks = append(currentTitleInfo.SubtitleTracks, track)
+				}
+			}
+		}
+	}
+	
+	// Ajouter le dernier titre
+	if currentTitleInfo != nil {
+		titles = append(titles, *currentTitleInfo)
+	}
+	
+	return titles
+}
+
+// parseDVDInfoLegacy parse les informations DVD avec l'ancienne méthode (sans titres)
+func (e *DVDExtractor) parseDVDInfoLegacy(outputStr string) *DVDInfo {
 	
 	info := &DVDInfo{
 		AudioTracks:    []DVDTrack{},
