@@ -874,7 +874,7 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 	}
 	
 	for i, match := range matches {
-		streamIdx := i
+		audioIndex := i // Index pour la piste audio (0, 1, 2...)
 		language := ""
 		codec := ""
 		sampleRate := ""
@@ -883,7 +883,6 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 		if len(match) >= 4 {
 			// Avec langue
 			if len(match) >= 6 {
-				streamIdx, _ = strconv.Atoi(match[1])
 				language = match[2]
 				codec = strings.TrimSpace(match[3])
 				sampleRate = match[4]
@@ -927,7 +926,7 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 			}
 			
 			track := DVDTrack{
-				Index:      audioIndex, // Utiliser audioIndex au lieu de streamIdx
+				Index:      audioIndex, // Utiliser audioIndex
 				Type:       "audio",
 				Codec:      codec,
 				Language:   language,
