@@ -807,7 +807,7 @@ func (e *DVDExtractor) extractAudioFromVideoStream(devicePath string, streams []
 	
 	for i, match := range matches {
 		if len(match) >= 4 {
-			streamIdx, _ := strconv.Atoi(match[1])
+			// streamIdx n'est pas utilisé, on utilise i comme index
 			language := strings.ToLower(strings.TrimSpace(match[2]))
 			codec := strings.TrimSpace(match[3])
 			
@@ -899,11 +899,6 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 				} else {
 					channels = 2 // Par défaut stereo
 				}
-			} else {
-				// Sans langue
-				codec = strings.TrimSpace(match[2])
-				sampleRate = match[3]
-				channels = 2 // Par défaut
 			}
 			
 			langName := e.getLanguageName(language)
