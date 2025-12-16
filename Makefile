@@ -475,12 +475,17 @@ check-backend:
 
 format-backend:
 	@echo "${GREEN}🔧 Formatage du code backend avec gofmt...${NC}"
-	@if command -v go >/dev/null 2>&1; then \
+	@if docker ps --format "{{.Names}}" | grep -q "^streammake-backend$$"; then \
+		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
+		docker exec streammake-backend sh -c "cd /app && gofmt -w ." && \
+		echo "${GREEN}✅ Code backend formaté (conteneur)${NC}"; \
+		echo "${YELLOW}💡 Les modifications sont dans le conteneur. Pour les synchroniser avec l'hôte, utilisez un volume monté.${NC}"; \
+	elif command -v go >/dev/null 2>&1; then \
 		cd backend && \
 		gofmt -w . && \
 		echo "${GREEN}✅ Code backend formaté${NC}"; \
 	else \
-		echo "${RED}❌ Go n'est pas installé${NC}"; \
+		echo "${RED}❌ Go n'est pas installé et conteneur non disponible${NC}"; \
 		exit 1; \
 	fi
 
