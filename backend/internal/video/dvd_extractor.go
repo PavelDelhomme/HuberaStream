@@ -711,7 +711,7 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 		"-f", "null",
 		"-",
 	)
-	output, err := cmd.CombinedOutput()
+	output, _ := cmd.CombinedOutput() // Ignorer les erreurs (AC3 errors sont normales)
 	outputStr := string(output)
 	
 	// Même si ffmpeg retourne une erreur (AC3 errors sont normales), parser la sortie
