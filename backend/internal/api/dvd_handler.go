@@ -1,6 +1,10 @@
 package api
 
 import (
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,15 +25,17 @@ type DVDHandler struct {
 	extractor       *video.DVDExtractor
 	processor       *video.Processor
 	metadataService *metadata.WebScraperService
+	uploadHandler   *UploadHandler // Référence pour processVideo
 }
 
-func NewDVDHandler(db *gorm.DB, cfg *config.Config) *DVDHandler {
+func NewDVDHandler(db *gorm.DB, cfg *config.Config, uploadHandler *UploadHandler) *DVDHandler {
 	return &DVDHandler{
 		db:              db,
 		cfg:             cfg,
 		extractor:       video.NewDVDExtractor(),
 		processor:       video.NewProcessor(cfg.VideoStoragePath, cfg.ThumbnailStoragePath),
 		metadataService: metadata.NewWebScraperService(),
+		uploadHandler:   uploadHandler,
 	}
 }
 
@@ -215,7 +221,7 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		return
 	}
 
-	// Extraire le DVD (pour l'instant, on extrait juste en MP4, HLS sera ajouté plus tard)
+	// Extraire le DVD en MP4 brut
 	outputPath := filepath.Join(outputDir, "video.mp4")
 	_, err := h.extractor.ExtractDVD(
 		req.DevicePath,
@@ -230,19 +236,60 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		return
 	}
 
-	// Générer la miniature depuis le premier segment
-	firstSegment := filepath.Join(outputDir, "hls", videoID.String(), "1080p", "segment_000.ts")
-	if thumbnailPath, err := h.processor.GenerateThumbnail(firstSegment, videoID); err == nil {
-		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("thumbnail_path", thumbnailPath)
+	// Vérifier que le fichier extrait existe
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
+		return
 	}
 
-	// Récupérer la durée
-	if duration, err := h.processor.GetVideoDuration(firstSegment); err == nil {
-		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("duration", duration)
+	// Calculer le checksum du fichier extrait
+	checksum, err := h.calculateFileChecksum(outputPath)
+	if err == nil && checksum != "" {
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("checksum", checksum)
 	}
 
-	// Mettre à jour le statut
-	h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
+	// Lancer le traitement vidéo complet (compression optimale + transcodage) automatiquement
+	// C'est le même traitement que pour les uploads : compression H.265/HEVC + transcodage multi-qualités
+	if h.uploadHandler != nil {
+		ctx, cancel := context.WithCancel(context.Background())
+		h.uploadHandler.processingMutex.Lock()
+		h.uploadHandler.processingVideos[videoID] = cancel
+		h.uploadHandler.processingMutex.Unlock()
+		
+		// Utiliser le même processVideo que pour les uploads
+		// Cela va automatiquement :
+		// 1. Compresser la vidéo avec H.265/HEVC (réduction ~50%)
+		// 2. Générer les miniatures
+		// 3. Transcoder en plusieurs qualités (360p, 480p, 720p, 1080p)
+		// 4. Générer les formats HLS pour streaming adaptatif
+		go h.uploadHandler.processVideo(ctx, videoID, outputPath)
+	} else {
+		// Fallback si uploadHandler n'est pas disponible
+		// Générer au moins la miniature et la durée
+		if thumbnailPath, err := h.processor.GenerateThumbnail(outputPath, videoID); err == nil {
+			h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("thumbnail_path", thumbnailPath)
+		}
+		if duration, err := h.processor.GetVideoDuration(outputPath); err == nil {
+			h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("duration", duration)
+		}
+		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusReady)
+	}
+}
+
+// calculateFileChecksum calcule le checksum SHA256 d'un fichier
+func (h *DVDHandler) calculateFileChecksum(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", hash.Sum(nil)), nil
 }
 
 // GetExtractionStatus récupère le statut de l'extraction

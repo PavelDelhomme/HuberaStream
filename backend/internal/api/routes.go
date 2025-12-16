@@ -50,7 +50,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	categoryHandler := NewCategoryHandler(db)
 	torrentHandler := NewTorrentHandler(db, cfg)
 	scraperHandler := NewScraperHandler(db, cfg)
-	dvdHandler := NewDVDHandler(db, cfg)
+	dvdHandler := NewDVDHandler(db, cfg, uploadHandler) // Passer uploadHandler pour traitement automatique
 	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
 	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
 	favoriteHandler := NewFavoriteHandler(db, cfg)
