@@ -477,6 +477,29 @@
   color: #4ade80;
 }
 
+.extraction-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+}
+
+.btn-cancel {
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.3);
+  border-color: #ff5252;
+  transform: translateY(-2px);
+}
+
+.btn-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Indicateur de progression pour l'analyse */
 .analyzing-progress-container {
   width: 100%;

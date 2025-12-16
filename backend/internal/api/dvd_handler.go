@@ -302,10 +302,82 @@ func (h *DVDHandler) GetExtractionStatus(c *gin.Context) {
 		return
 	}
 
+	// Compter les formats créés pour calculer la progression
+	var formatCount int64
+	h.db.Model(&models.VideoFormat{}).Where("video_id = ?", videoID).Count(&formatCount)
+	
+	// Calculer la progression basée sur les formats créés
+	// 0-30%: Extraction, 30-50%: Compression, 50-90%: Transcodage (4 qualités), 90-100%: Finalisation
+	progress := 0
+	if video.Status == models.VideoStatusProcessing {
+		// Si on a des formats, on est au moins à 30% (compression terminée)
+		if formatCount > 0 {
+			// 30% base + (formatCount / 4 qualités) * 60%
+			progress = 30 + int(float64(formatCount)/4.0*60)
+			if progress > 90 {
+				progress = 90
+			}
+		} else {
+			// Pas encore de formats, on est dans l'extraction (0-30%)
+			progress = 5 // Minimum pour montrer qu'on a commencé
+		}
+	} else if video.Status == models.VideoStatusReady {
+		progress = 100
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"video_id": video.ID,
 		"status":   video.Status,
 		"title":    video.Title,
+		"progress": progress,
+		"formats":  formatCount,
+	})
+}
+
+// CancelExtraction annule l'extraction d'un DVD en cours
+func (h *DVDHandler) CancelExtraction(c *gin.Context) {
+	videoIDParam := c.Param("id")
+	videoID, err := uuid.Parse(videoIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
+
+	// Vérifier que la vidéo existe
+	var video models.Video
+	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Vidéo non trouvée"})
+		return
+	}
+
+	// Vérifier que c'est bien en cours de traitement
+	if video.Status != models.VideoStatusProcessing {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "L'extraction n'est pas en cours"})
+		return
+	}
+
+	// Annuler le traitement si disponible
+	if h.uploadHandler != nil {
+		h.uploadHandler.processingMutex.Lock()
+		if cancel, exists := h.uploadHandler.processingVideos[videoID]; exists {
+			cancel() // Annuler le contexte
+			delete(h.uploadHandler.processingVideos, videoID)
+		}
+		h.uploadHandler.processingMutex.Unlock()
+	}
+
+	// Mettre à jour le statut
+	h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusCancelled)
+
+	// Nettoyer les formats partiels
+	if h.uploadHandler != nil {
+		h.uploadHandler.cleanupPartialFormats(videoID)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "Extraction annulée avec succès",
+		"video_id": videoID,
+		"status":   "cancelled",
 	})
 }
 
