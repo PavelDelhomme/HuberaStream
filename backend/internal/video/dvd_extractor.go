@@ -1084,46 +1084,6 @@ func (e *DVDExtractor) analyzeDVDWithLsdvd(devicePath string) *DVDInfo {
 			}
 			continue
 		}
-				index, _ := strconv.Atoi(matches[1])
-				language := strings.ToLower(matches[2])
-				codec := strings.TrimSpace(matches[3])
-				sampleRate := matches[4]
-				channels, _ := strconv.Atoi(matches[5])
-				
-				langName := e.getLanguageName(language)
-				if langName == "" {
-					langName = strings.ToUpper(language)
-				}
-				
-				title := fmt.Sprintf("%s - %s", langName, codec)
-				if channels > 0 {
-					if channels == 1 {
-						title += " (Mono)"
-					} else if channels == 2 {
-						title += " (Stéréo)"
-					} else if channels == 6 {
-						title += " (5.1)"
-					} else {
-						title += fmt.Sprintf(" (%d canaux)", channels)
-					}
-				}
-				if sampleRate != "" {
-					title += fmt.Sprintf(" %sHz", sampleRate)
-				}
-				
-				track := DVDTrack{
-					Index:      index,
-					Type:       "audio",
-					Codec:      codec,
-					Language:   language,
-					Title:      title,
-					Channels:   channels,
-					SampleRate: sampleRate,
-				}
-				info.AudioTracks = append(info.AudioTracks, track)
-			}
-			continue
-		}
 		
 		// Parser les sous-titres
 		if strings.HasPrefix(line, "Subtitle:") {
