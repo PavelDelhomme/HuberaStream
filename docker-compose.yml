@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: streammake-postgres
+    labels:
+      - "com.streammake.project=streammake"
     environment:
       POSTGRES_USER: streammake
       POSTGRES_PASSWORD: streammake_password
@@ -22,6 +24,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: streammake-redis
+    labels:
+      - "com.streammake.project=streammake"
     ports:
       - "3303:6379"
     volumes:
@@ -35,18 +39,26 @@ services:
       retries: 5
 
   backend:
+    image: streammake-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: streammake-backend
-    # Accès au lecteur DVD/CD
+    labels:
+      - "com.streammake.project=streammake"
+    command: sh -c "if [ -f /app/bin/main ]; then /app/bin/main; else /app/main; fi"
+    # Accès au lecteur DVD/CD (USB et interne)
     devices:
       - /dev/dvd:/dev/dvd:rw
       - /dev/cdrom:/dev/cdrom:rw
       - /dev/sr0:/dev/sr0:rw
       - /dev/sr1:/dev/sr1:rw
       - /dev/sr2:/dev/sr2:rw
+      - /dev/sr3:/dev/sr3:rw
     privileged: true # Nécessaire pour accéder aux devices
+    # Permettre l'accès à tous les devices block (pour les lecteurs USB)
+    device_cgroup_rules:
+      - 'c 11:* rmw' # Permettre l'accès aux devices block (major 11 = sr*)
     volumes:
       - video_storage:/app/storage/videos
       - thumbnail_storage:/app/storage/thumbnails
@@ -55,6 +67,8 @@ services:
       - /media/cdrom:/media/cdrom:ro
       # Partager le volume de config qBittorrent pour configuration automatique
       - qbittorrent_config:/config/qbittorrent:ro
+      # MODE DÉVELOPPEMENT: Monter le binaire compilé localement (si disponible)
+      - ./.backend-bin:/app/bin:ro
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -95,10 +109,13 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: streammake-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: streammake-frontend
+    labels:
+      - "com.streammake.project=streammake"
     environment:
       # Utiliser Nginx comme reverse proxy (port 3300)
       # Le problème 403 Forbidden a été résolu en configurant SetTrustedProxies dans Gin
@@ -118,6 +135,8 @@ services:
   nginx:
     image: nginx:alpine
     container_name: streammake-nginx
+    labels:
+      - "com.streammake.project=streammake"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
       - video_storage:/usr/share/nginx/html/videos:ro
@@ -135,6 +154,8 @@ services:
   transmission:
     image: linuxserver/transmission:latest
     container_name: streammake-transmission
+    labels:
+      - "com.streammake.project=streammake"
     environment:
       - PUID=1000
       - PGID=1000
@@ -158,6 +179,8 @@ services:
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: streammake-qbittorrent
+    labels:
+      - "com.streammake.project=streammake"
     environment:
       - PUID=1000
       - PGID=1000
@@ -182,6 +205,8 @@ services:
   deluge:
     image: lscr.io/linuxserver/deluge:latest
     container_name: streammake-deluge
+    labels:
+      - "com.streammake.project=streammake"
     environment:
       - PUID=1000
       - PGID=1000
@@ -201,6 +226,8 @@ services:
     # Image mise à jour : l'ancienne image linuxserver/rutorrent est dépréciée
     image: crazymax/rtorrent-rutorrent:latest
     container_name: streammake-rtorrent
+    labels:
+      - "com.streammake.project=streammake"
     environment:
       - PUID=1000
       - PGID=1000

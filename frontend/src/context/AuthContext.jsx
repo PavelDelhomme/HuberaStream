@@ -35,10 +35,30 @@ export const AuthProvider = ({ children }) => {
     const initAuth = async () => {
       const storedToken = localStorage.getItem('token')
       
-      if (storedToken) {
+      // Si pas de token ou token vide, ne rien faire (utilisateur non connecté)
+      if (!storedToken || storedToken.trim() === '' || storedToken === 'null' || storedToken === 'undefined') {
+        setLoading(false)
+        setUser(null)
+        setToken(null)
+        return
+      }
+      
+      // Vérifier que le token a l'air valide (format JWT basique)
+      const trimmedToken = storedToken.trim()
+      if (trimmedToken.length < 20 || !trimmedToken.includes('.')) {
+        // Token invalide, nettoyer silencieusement
+        localStorage.removeItem('token')
+        setLoading(false)
+        setUser(null)
+        setToken(null)
+        return
+      }
+      
+      // Si on arrive ici, il y a un token qui semble valide
+      if (trimmedToken) {
         try {
           // Configurer l'API avec le token
-          api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`
+          api.defaults.headers.common['Authorization'] = `Bearer ${trimmedToken}`
           
           // Vérifier que le token est valide en récupérant l'utilisateur
           // Utiliser un timeout plus long et plusieurs tentatives
@@ -56,11 +76,31 @@ export const AuthProvider = ({ children }) => {
               if (response.status === 200 && response.data) {
                 break // Succès, sortir de la boucle
               }
+              // Si on obtient un 404, cela signifie que la route n'existe pas encore
+              // Attendre un peu et réessayer (le backend est peut-être en train de démarrer)
+              // Ne pas logger d'avertissement - c'est peut-être temporaire
+              if (response.status === 404) {
+                if (attempt < 2) {
+                  await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)))
+                  continue
+                }
+                // Si après 3 tentatives on obtient toujours 404, considérer comme erreur réseau
+                throw new Error('Route non trouvée (404) - le backend est peut-être en cours de démarrage')
+              }
             } catch (err) {
               lastError = err
               // Si c'est une erreur d'authentification (401/403), arrêter immédiatement
               if (err.response?.status === 401 || err.response?.status === 403) {
                 throw err
+              }
+              // Si c'est un 404, traiter comme une erreur réseau (backend peut être en cours de démarrage)
+              // Ne pas logger d'avertissement - c'est peut-être temporaire
+              if (err.response?.status === 404) {
+                if (attempt < 2) {
+                  await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)))
+                  continue
+                }
+                throw new Error('Route non trouvée (404) - le backend est peut-être en cours de démarrage')
               }
               // Sinon, attendre un peu avant de réessayer
               if (attempt < 2) {
@@ -71,7 +111,13 @@ export const AuthProvider = ({ children }) => {
           
           if (response && response.status === 200 && response.data) {
             setUser(response.data)
-            setToken(storedToken)
+            setToken(trimmedToken)
+            // Mettre à jour le token dans localStorage au cas où il aurait été modifié
+            try {
+              localStorage.setItem('token', trimmedToken)
+            } catch (e) {
+              // Ignorer les erreurs de stockage
+            }
           } else {
             // Token invalide ou expiré
             throw new Error('Token invalide')
@@ -79,16 +125,28 @@ export const AuthProvider = ({ children }) => {
         } catch (error) {
           // Seulement nettoyer le token si c'est vraiment une erreur d'authentification
           if (error.response?.status === 401 || error.response?.status === 403) {
-            console.error('Token invalide ou expiré:', error)
-            localStorage.removeItem('token')
-            delete api.defaults.headers.common['Authorization']
-            setToken(null)
-            setUser(null)
+            // Vérifier si c'est vraiment une erreur d'authentification ou juste le backend qui démarre
+            // Ne nettoyer le token que si on est sûr que c'est invalide
+            const errorMessage = error.response?.data?.error || ''
+            if (errorMessage.includes('Token invalide') || errorMessage.includes('expiré') || errorMessage.includes('expired')) {
+              // Token vraiment invalide ou expiré - nettoyer
+              localStorage.removeItem('token')
+              delete api.defaults.headers.common['Authorization']
+              setToken(null)
+              setUser(null)
+            } else {
+              // Peut-être juste le backend qui démarre - garder le token
+              setToken(storedToken)
+            }
+          } else if (error.response?.status === 404) {
+            // Si on obtient un 404, le backend est peut-être en cours de démarrage
+            // Ne pas nettoyer le token, mais ne pas définir l'utilisateur non plus
+            // Ne pas logger d'erreur - c'est peut-être temporaire
+            setToken(storedToken)
+            // Ne pas définir user pour l'instant
           } else {
-            // Pour les autres erreurs (réseau, timeout), garder le token ET définir un utilisateur temporaire
-            // Cela évite les redirections intempestives
-            console.warn('Erreur réseau lors de la vérification du token, conservation du token:', error)
-            // Garder le token - l'utilisateur sera vérifié lors de la prochaine requête
+            // Pour les autres erreurs (réseau, timeout), garder le token
+            // Ne pas logger d'erreur - c'est peut-être temporaire
             setToken(storedToken)
             // Ne pas définir user pour l'instant, mais ne pas non plus nettoyer le token
             // Cela permettra aux requêtes suivantes de fonctionner si le serveur est disponible
@@ -118,8 +176,22 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/login', { email, password })
       const { token: newToken, user: userData } = response.data
       
-      // Sauvegarder le token
-      localStorage.setItem('token', newToken)
+      // Sauvegarder le token de manière persistante
+      // Utiliser try-catch pour s'assurer que le stockage fonctionne
+      try {
+        localStorage.setItem('token', newToken)
+        // Stocker aussi la date de connexion pour debug et persistance
+        localStorage.setItem('token_created', new Date().toISOString())
+        if (userData?.role === 'admin') {
+          localStorage.setItem('is_admin', 'true')
+        } else {
+          localStorage.removeItem('is_admin')
+        }
+      } catch (storageError) {
+        console.error('Erreur lors du stockage du token:', storageError)
+        // Continuer quand même, le token est dans la mémoire
+      }
+      
       api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`
       
       // Mettre à jour l'état
@@ -152,7 +224,10 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setToken(null)
     setUser(null)
+    // Nettoyer tous les éléments liés à l'authentification
     localStorage.removeItem('token')
+    localStorage.removeItem('token_created')
+    localStorage.removeItem('is_admin')
     delete api.defaults.headers.common['Authorization']
   }
 

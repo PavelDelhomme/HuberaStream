@@ -260,10 +260,10 @@ const Navigation = () => {
         {user && (user.role === 'admin' || isAdmin()) && (
           <Link 
             to="/upload" 
-            className="nav-link nav-link-upload"
+            className="nav-link nav-link-upload search-toggle-button"
             title="Uploader une vidéo"
           >
-            ⬆️ Upload
+            ⬆️
           </Link>
         )}
 

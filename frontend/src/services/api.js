@@ -52,8 +52,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Ne pas supprimer le token automatiquement
+    // Ne pas supprimer le token automatiquement sauf si c'est vraiment une erreur d'authentification
     // L'AuthContext gère la vérification et le nettoyage du token
+    // Pour les erreurs 401/403, on laisse AuthContext gérer
+    // Pour les autres erreurs (réseau, timeout), on garde le token
     // Cet intercepteur ne fait que propager l'erreur
     // Exception : ne pas supprimer le token si c'est la requête de vérification initiale (/users/me)
     if (error.response?.status === 401) {

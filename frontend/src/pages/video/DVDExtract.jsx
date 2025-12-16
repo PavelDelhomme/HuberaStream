@@ -9,6 +9,8 @@ const DVDExtract = () => {
   const navigate = useNavigate()
   const [step, setStep] = useState(1) // 1: Détection, 2: Info, 3: Configuration, 4: Extraction
   const [device, setDevice] = useState(null)
+  const [availableDevices, setAvailableDevices] = useState([])
+  const [manualDevice, setManualDevice] = useState('')
   const [dvdInfo, setDvdInfo] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -56,9 +58,14 @@ const DVDExtract = () => {
         setStep(2)
       } else {
         // La détection a échoué mais la requête a réussi (200)
+        // Afficher les devices disponibles pour sélection manuelle
+        if (response.data.available_devices && response.data.available_devices.length > 0) {
+          setAvailableDevices(response.data.available_devices)
+          setManualDevice(response.data.available_devices[0])
+        }
         const errorMessage = response.data.message || 
                             response.data.error || 
-                            'Aucun lecteur DVD détecté.'
+                            'Aucun lecteur DVD détecté automatiquement.'
         setError(errorMessage)
       }
     } catch (error) {
@@ -72,6 +79,15 @@ const DVDExtract = () => {
       console.error('Erreur détection DVD:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleManualDeviceSelect = () => {
+    if (manualDevice) {
+      setDevice(manualDevice)
+      setStep(2)
+    } else {
+      setError('Veuillez sélectionner un lecteur DVD')
     }
   }
 
@@ -219,16 +235,47 @@ const DVDExtract = () => {
         {step === 1 && (
           <div className="step-container">
             <div className="step-header">
-              <h2>Étape 1: Détection du lecteur DVD</h2>
-              <p>Insérez votre DVD dans le lecteur, puis cliquez sur "Détecter"</p>
+              <h2>📀 Étape 1: Détection du lecteur DVD</h2>
+              <p className="step-description">
+                Insérez votre DVD dans le lecteur (USB ou interne), puis cliquez sur "Détecter automatiquement"
+              </p>
             </div>
-            <button 
-              onClick={handleDetectDVD} 
-              disabled={loading}
-              className="btn-primary btn-large"
-            >
-              {loading ? '⏳ Détection en cours...' : '🔍 Détecter le lecteur DVD'}
-            </button>
+            
+            <div className="detection-section">
+              <button 
+                onClick={handleDetectDVD} 
+                disabled={loading}
+                className="btn-primary btn-large"
+              >
+                {loading ? '⏳ Détection en cours...' : '🔍 Détecter automatiquement'}
+              </button>
+              
+              {availableDevices.length > 0 && (
+                <div className="manual-device-selection">
+                  <h3>📋 Ou sélectionnez manuellement un lecteur :</h3>
+                  <div className="device-selector">
+                    <select
+                      value={manualDevice}
+                      onChange={(e) => setManualDevice(e.target.value)}
+                      className="device-select"
+                    >
+                      {availableDevices.map((dev) => (
+                        <option key={dev} value={dev}>{dev}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={handleManualDeviceSelect}
+                      className="btn-secondary"
+                    >
+                      Utiliser ce lecteur
+                    </button>
+                  </div>
+                  <p className="device-hint">
+                    💡 Si votre lecteur n'apparaît pas, vérifiez qu'il est bien connecté et qu'un DVD est inséré.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

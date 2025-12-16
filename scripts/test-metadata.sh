@@ -3,7 +3,8 @@
 # Script de test pour la recherche de métadonnées
 # Usage: make test-metadata
 
-set -e
+# Ne pas utiliser set -e pour permettre la gestion d'erreurs personnalisée
+# set -e
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -24,11 +25,46 @@ fi
 echo -e "${GREEN}📁 Fichier trouvé: $VIDEO_FILE${NC}"
 echo ""
 
-# Vérifier que le backend est démarré
-if ! docker-compose ps | grep -q "streammake-backend.*Up"; then
+# Vérifier que le backend est démarré (même s'il redémarre)
+BACKEND_EXISTS=$(docker compose ps 2>/dev/null | grep -c "streammake-backend" || docker-compose ps 2>/dev/null | grep -c "streammake-backend" || echo "0")
+if [ "$BACKEND_EXISTS" = "0" ] || (! docker compose ps 2>/dev/null | grep -q "streammake-backend.*Up\|streammake-backend.*Restarting" && ! docker-compose ps 2>/dev/null | grep -q "streammake-backend.*Up\|streammake-backend.*Restarting"); then
     echo -e "${YELLOW}⚠️  Le backend n'est pas démarré. Démarrage...${NC}"
-    docker-compose up -d backend
-    sleep 5
+    echo -e "${YELLOW}💡 Utilisation de 'make up' pour construire et démarrer les services...${NC}"
+    
+    # Utiliser make up qui gère mieux le build
+    cd "$(dirname "$0")/.." || exit 1
+    if make up 2>&1; then
+        echo -e "${GREEN}✅ Services démarrés${NC}"
+    else
+        echo -e "${RED}❌ Impossible de démarrer les services${NC}"
+        echo -e "${YELLOW}💡 Vérifiez les erreurs ci-dessus et essayez: make up${NC}"
+        exit 1
+    fi
+    cd - > /dev/null || exit 1
+    
+    echo -e "${YELLOW}⏳ Attente du démarrage des services (20 secondes)...${NC}"
+    sleep 20
+    
+    # Vérifier que le backend répond
+    MAX_RETRIES=10
+    RETRY_COUNT=0
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if curl -s http://localhost:3300/api/categories &> /dev/null || curl -s http://localhost:3301/health &> /dev/null; then
+            echo -e "${GREEN}✅ Services démarrés${NC}"
+            break
+        fi
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo -e "${YELLOW}⏳ Attente... ($RETRY_COUNT/$MAX_RETRIES)${NC}"
+            sleep 2
+        fi
+    done
+    
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo -e "${RED}❌ Impossible de démarrer les services${NC}"
+        echo -e "${YELLOW}💡 Démarrez manuellement avec: make up${NC}"
+        exit 1
+    fi
 fi
 
 # Obtenir le token d'authentification (admin)
@@ -91,17 +127,31 @@ if [ "$RESULT_COUNT" -gt 0 ]; then
         
         # Réalisateur
         DIRECTOR=$(echo "$RESULT" | jq -r '.director // ""' 2>/dev/null)
-        if [ -n "$DIRECTOR" ] && [ "$DIRECTOR" != "" ]; then
-            echo -e "${YELLOW}🎭 Réalisateur:${NC} $DIRECTOR"
+        if [ -n "$DIRECTOR" ] && [ "$DIRECTOR" != "" ] && [ "$DIRECTOR" != "null" ]; then
+            echo -e "${GREEN}🎭 Réalisateur:${NC} $DIRECTOR"
+        else
+            echo -e "${RED}⚠️  Réalisateur: NON TROUVÉ${NC}"
         fi
         
-        # Acteurs
+        # Scénaristes
+        WRITER=$(echo "$RESULT" | jq -r '.writer // ""' 2>/dev/null)
+        if [ -n "$WRITER" ] && [ "$WRITER" != "" ] && [ "$WRITER" != "null" ]; then
+            echo -e "${GREEN}✍️  Scénaristes:${NC} $WRITER"
+        else
+            echo -e "${RED}⚠️  Scénaristes: NON TROUVÉ${NC}"
+        fi
+        
+        # Acteurs / Casting
         ACTORS=$(echo "$RESULT" | jq -r '.actors // []' 2>/dev/null)
         if [ "$ACTORS" != "[]" ] && [ "$ACTORS" != "null" ] && [ -n "$ACTORS" ]; then
             ACTORS_STR=$(echo "$ACTORS" | jq -r 'join(", ")' 2>/dev/null || echo "$ACTORS")
             if [ -n "$ACTORS_STR" ] && [ "$ACTORS_STR" != "" ]; then
-                echo -e "${YELLOW}👥 Acteurs:${NC} $ACTORS_STR"
+                echo -e "${GREEN}👥 Casting / Acteurs:${NC} $ACTORS_STR"
+            else
+                echo -e "${RED}⚠️  Casting: NON TROUVÉ${NC}"
             fi
+        else
+            echo -e "${RED}⚠️  Casting: NON TROUVÉ${NC}"
         fi
         echo ""
         
@@ -177,10 +227,28 @@ if [ "$RESULT_COUNT" -gt 0 ]; then
         # Poster
         POSTER_URL=$(echo "$RESULT" | jq -r '.poster_url // ""' 2>/dev/null)
         if [ -n "$POSTER_URL" ] && [ "$POSTER_URL" != "" ] && [ "$POSTER_URL" != "null" ]; then
-            echo -e "${YELLOW}🖼️  Affiche:${NC} $POSTER_URL"
-            echo ""
+            echo -e "${GREEN}🖼️  Affiche:${NC} $POSTER_URL"
+        else
+            echo -e "${RED}⚠️  Affiche: NON TROUVÉ${NC}"
         fi
+        echo ""
         
+        # Résumé des données manquantes
+        MISSING_COUNT=0
+        [ -z "$DIRECTOR" ] || [ "$DIRECTOR" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        [ -z "$WRITER" ] || [ "$WRITER" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        [ "$ACTORS" == "[]" ] || [ "$ACTORS" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        [ -z "$SYNOPSIS" ] || [ "$SYNOPSIS" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        [ -z "$POSTER_URL" ] || [ "$POSTER_URL" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        [ "$YEAR" == "0" ] || [ "$YEAR" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        [ "$RUNTIME" == "0" ] || [ "$RUNTIME" == "null" ] && MISSING_COUNT=$((MISSING_COUNT + 1))
+        
+        if [ "$MISSING_COUNT" -gt 0 ]; then
+            echo -e "${RED}⚠️  $MISSING_COUNT information(s) manquante(s) - Le code backend doit être recompilé!${NC}"
+            echo -e "${YELLOW}💡 Utilisez: make rebuild-backend-force${NC}"
+        else
+            echo -e "${GREEN}✅ Toutes les informations sont présentes!${NC}"
+        fi
         echo ""
     done
     

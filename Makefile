@@ -1,155 +1,404 @@
-.PHONY: help build up down restart logs clean dev-backend dev-frontend debug-backend test install-deps status shell-backend shell-db test-api test-all test-upload test-comprehensive install-torrents clean-test-videos
+.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api test-metadata test-all install-deps status shell-backend shell-db install-torrents setup-images
 
 # Variables
 PROJECT_NAME := streammake
 DOCKER_COMPOSE_FILE := docker-compose.yml
+STREAMMAKE_CONTAINERS := streammake-postgres streammake-redis streammake-backend streammake-frontend streammake-nginx streammake-transmission streammake-qbittorrent streammake-deluge streammake-rtorrent
 GREEN := \033[0;32m
 YELLOW := \033[0;33m
 RED := \033[0;31m
 NC := \033[0m
 
 help:
-	@echo "${GREEN}Commandes disponibles:${NC}"
-	@echo "${YELLOW}  build${NC}          Construire les images Docker"
-	@echo "${YELLOW}  up${NC}             Démarrer tous les services en mode détaché"
-	@echo "${YELLOW}  down${NC}           Arrêter et supprimer tous les services"
-	@echo "${YELLOW}  restart${NC}        Redémarrer tous les services"
-	@echo "${YELLOW}  logs${NC}           Afficher les logs de tous les services"
-	@echo "${YELLOW}  logs-<service>${NC} Afficher les logs d'un service spécifique (ex: logs-backend)"
-	@echo "${YELLOW}  clean${NC}          Nettoyer les conteneurs, volumes et réseaux arrêtés"
-	@echo "${YELLOW}  dev-backend${NC}    Lancer le backend en mode développement (hors Docker)"
-	@echo "${YELLOW}  dev-frontend${NC}  Lancer le frontend en mode développement (hors Docker)"
-	@echo "${YELLOW}  debug-backend${NC}  Lancer le backend avec le debugger Delve"
-	@echo "${YELLOW}  test${NC}           Exécuter les tests backend"
-	@echo "${YELLOW}  test-api${NC}      Tester l'API (CORS, login, etc.)"
-	@echo "${YELLOW}  test-all${NC}      Exécuter tous les tests complets de l'application"
-	@echo "${YELLOW}  test-upload${NC}   Tester l'upload de vidéos"
-	@echo "${YELLOW}  test-comprehensive${NC} Tests complets backend + frontend (toutes fonctionnalités)"
-	@echo "${YELLOW}  clean-test-videos${NC} Nettoyer les vidéos de test (titre 'Test Video')"
-	@echo "${YELLOW}  install-deps${NC}  Installer les dépendances backend Go"
-	@echo "${YELLOW}  status${NC}        Afficher le statut des services Docker"
-	@echo "${YELLOW}  shell-backend${NC}  Accéder au shell du conteneur backend"
-	@echo "${YELLOW}  shell-db${NC}       Accéder au shell PostgreSQL"
-	@echo "${YELLOW}  install-torrents${NC} Installer et démarrer les clients torrent"
+	@echo "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+	@echo "${GREEN}  STREAMMAKE - Commandes Make${NC}"
+	@echo "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+	@echo ""
+	@echo "${YELLOW}📦 CONSTRUCTION:${NC}"
+	@echo "  ${GREEN}build${NC}              Construire les images Docker"
+	@echo "  ${GREEN}rebuild${NC}            Reconstruire toutes les images"
+	@echo "  ${GREEN}rebuild-backend${NC}    Reconstruire uniquement le backend"
+	@echo "  ${GREEN}rebuild-backend-local${NC} Compiler le backend localement et le monter"
+	@echo ""
+	@echo "${YELLOW}🚀 DÉMARRAGE / ARRÊT:${NC}"
+	@echo "  ${GREEN}up / start / run${NC}   Démarrer tous les services"
+	@echo "  ${GREEN}down / stop${NC}        Arrêter tous les services"
+	@echo "  ${GREEN}down-force / stop-force${NC} Arrêter FORCÉMENT (kill)"
+	@echo "  ${GREEN}restart${NC}            Redémarrer tous les services"
+	@echo "  ${GREEN}restart-backend${NC}    Redémarrer uniquement le backend"
+	@echo ""
+	@echo "${YELLOW}🧹 NETTOYAGE:${NC}"
+	@echo "  ${GREEN}clean${NC}              Nettoyer conteneurs, volumes, réseaux"
+	@echo "  ${GREEN}clean-all${NC}          Nettoyer TOUT (⚠️  destructif, demande confirmation)"
+	@echo ""
+	@echo "${YELLOW}📋 LOGS:${NC}"
+	@echo "  ${GREEN}logs${NC}               Afficher les logs (scrollable, recommandé)"
+	@echo "  ${GREEN}logs-follow${NC}        Suivre les logs en temps réel"
+	@echo "  ${GREEN}logs-<service>${NC}     Logs d'un service (ex: logs-backend)"
+	@echo ""
+	@echo "${YELLOW}💻 DÉVELOPPEMENT:${NC}"
+	@echo "  ${GREEN}dev${NC}                Mode développement avec hot reload"
+	@echo "  ${GREEN}dev-backend${NC}        Backend hors Docker (go run)"
+	@echo "  ${GREEN}dev-frontend${NC}       Frontend hors Docker (npm run dev)"
+	@echo "  ${GREEN}debug-backend${NC}      Backend avec debugger Delve"
+	@echo ""
+	@echo "${YELLOW}🧪 TESTS:${NC}"
+	@echo "  ${GREEN}check${NC}             Vérification complète avant démarrage (recommandé)"
+	@echo "  ${GREEN}test${NC}               Tests backend Go"
+	@echo "  ${GREEN}test-api${NC}           Tests API"
+	@echo "  ${GREEN}test-metadata${NC}       Test recherche métadonnées"
+	@echo "  ${GREEN}test-all${NC}           Tests complets (API + fonctionnalités)"
+	@echo ""
+	@echo "${YELLOW}🔧 UTILITAIRES:${NC}"
+	@echo "  ${GREEN}status${NC}             Statut des services"
+	@echo "  ${GREEN}shell-backend${NC}      Shell du conteneur backend"
+	@echo "  ${GREEN}shell-db${NC}           Shell PostgreSQL"
+	@echo "  ${GREEN}install-deps${NC}       Installer dépendances Go"
+	@echo "  ${GREEN}install-torrents${NC}  Démarrer les clients torrent"
+	@echo "  ${GREEN}setup-images${NC}       Créer les images Docker (si buildx échoue)"
+	@echo ""
+
+# ============================================================================
+# CONSTRUCTION
+# ============================================================================
 
 build:
-	@echo "${GREEN}Construction des images Docker...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build
+	@echo "${GREEN}📦 Construction des images Docker...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build
+
+rebuild: build
+	@echo "${GREEN}✅ Images reconstruites${NC}"
+
+rebuild-backend:
+	@echo "${GREEN}🔨 Reconstruction du backend...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build backend
+	@echo "${GREEN}✅ Backend reconstruit${NC}"
+
+rebuild-backend-local:
+	@echo "${GREEN}🔨 Compilation locale du backend...${NC}"
+	@./scripts/rebuild-backend-local.sh
+
+rebuild-backend-force:
+	@echo "${YELLOW}⚠️  Reconstruction FORCÉE du backend...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build --no-cache backend
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart backend
+	@echo "${GREEN}✅ Backend reconstruit et redémarré${NC}"
+
+# ============================================================================
+# DÉMARRAGE / ARRÊT
+# ============================================================================
 
 up:
-	@echo "${GREEN}Démarrage de tous les services...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d
-	@echo "${GREEN}Attente du démarrage des services...${NC}"
+	@echo "${GREEN}🚀 Démarrage/Redémarrage de tous les services...${NC}"
+	@echo "${YELLOW}💡 Vérification des images Docker...${NC}"
+	@if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "streammake-backend:latest" 2>/dev/null; then \
+		echo "${YELLOW}⚠️  Image backend manquante. Utilisation de la compilation locale...${NC}"; \
+		make rebuild-backend-local || { \
+			echo "${YELLOW}⚠️  Compilation locale échouée. Création d'une image minimale...${NC}"; \
+			mkdir -p .backend-bin && \
+			if [ ! -f .backend-bin/main ]; then \
+				cd backend && CGO_ENABLED=0 GOOS=linux go build -a -ldflags='-s -w' -o ../.backend-bin/main ./cmd/server && cd ..; \
+			fi && \
+			if [ -f .backend-bin/main ]; then \
+				echo "FROM alpine:latest" > .backend-bin/Dockerfile && \
+				echo "RUN apk add --no-cache ca-certificates tzdata" >> .backend-bin/Dockerfile && \
+				echo "COPY main /app/main" >> .backend-bin/Dockerfile && \
+				echo "RUN chmod +x /app/main" >> .backend-bin/Dockerfile && \
+				echo "WORKDIR /app" >> .backend-bin/Dockerfile && \
+				echo "CMD [\"/app/main\"]" >> .backend-bin/Dockerfile && \
+				cd .backend-bin && docker build -t streammake-backend:latest . && cd .. && \
+				echo "${GREEN}✅ Image backend minimale créée${NC}"; \
+			else \
+				echo "${RED}❌ Impossible de créer l'image backend${NC}"; \
+				echo "${YELLOW}💡 Construisez manuellement avec: make rebuild-backend-local${NC}"; \
+				exit 1; \
+			fi; \
+		}; \
+	fi
+	@if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "streammake-frontend:latest" 2>/dev/null; then \
+		echo "${YELLOW}⚠️  Image frontend manquante.${NC}"; \
+		echo "${YELLOW}💡 Utilisez 'make setup-images' pour créer toutes les images${NC}"; \
+		echo "${YELLOW}⚠️  Continuons sans image frontend personnalisée (utilisera node:20-alpine)${NC}"; \
+	fi
+	@echo "${GREEN}✅ Images vérifiées${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build || { \
+			echo "${RED}❌ Erreur lors du démarrage des services${NC}"; \
+			echo "${YELLOW}💡 Vérifiez les logs avec: make logs${NC}"; \
+			exit 1; \
+		}; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build || { \
+			echo "${RED}❌ Erreur lors du démarrage des services${NC}"; \
+			echo "${YELLOW}💡 Vérifiez les logs avec: make logs${NC}"; \
+			exit 1; \
+		}; \
+	fi
 	@sleep 5
-	@echo "${GREEN}Exécution des tests API...${NC}"
+	@echo "${GREEN}✅ Services démarrés/redémarrés${NC}"
+	@echo "${YELLOW}🔍 Vérification de santé des services...${NC}"
+	@echo "${YELLOW}   Attente que le backend soit prêt...${NC}"
+	@MAX_RETRIES=30; RETRY=0; \
+	while [ $$RETRY -lt $$MAX_RETRIES ]; do \
+		if curl -s -f http://localhost:3300/api/categories > /dev/null 2>&1 || curl -s -f http://localhost:3301/api/categories > /dev/null 2>&1; then \
+			echo "${GREEN}   ✅ Backend accessible${NC}"; \
+			break; \
+		fi; \
+		RETRY=$$((RETRY + 1)); \
+		if [ $$RETRY -lt $$MAX_RETRIES ]; then \
+			sleep 1; \
+		fi; \
+	done; \
+	if [ $$RETRY -eq $$MAX_RETRIES ]; then \
+		echo "${RED}   ❌ Backend non accessible après $$MAX_RETRIES tentatives${NC}"; \
+		echo "${YELLOW}   💡 Vérifiez les logs avec: make logs backend${NC}"; \
+	fi
+	@echo "${YELLOW}   Test de la route /api/users/me (doit retourner 401, pas 404)...${NC}"
+	@STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3300/api/users/me -H "Authorization: Bearer invalid" 2>/dev/null || echo "000"); \
+	if [ "$$STATUS" = "401" ] || [ "$$STATUS" = "403" ]; then \
+		echo "${GREEN}   ✅ Route /api/users/me accessible ($$STATUS - normal avec token invalide)${NC}"; \
+	elif [ "$$STATUS" = "404" ]; then \
+		echo "${RED}   ❌ Route /api/users/me non trouvée (404)${NC}"; \
+		echo "${YELLOW}   💡 Le backend doit être redémarré ou recompilé${NC}"; \
+		echo "${YELLOW}   💡 Essayez: make restart-backend${NC}"; \
+	else \
+		echo "${YELLOW}   ⚠️  Route /api/users/me retourne $$STATUS (attendu: 401/403)${NC}"; \
+	fi
+	@echo "${YELLOW}Test API complet...${NC}"
 	@./scripts/test-api.sh || true
 
 down:
-	@echo "${YELLOW}Arrêt de tous les services...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down
+	@echo "${YELLOW}🛑 Arrêt de tous les services...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true; \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --remove-orphans || true; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true; \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --remove-orphans || true; \
+	fi
+	@echo "${GREEN}✅ Services arrêtés${NC}"
+
+down-force:
+	@echo "${RED}⚠️  Arrêt FORCÉ de tous les services...${NC}"
+	@for container in $(STREAMMAKE_CONTAINERS); do \
+		docker kill $$container 2>/dev/null || true; \
+	done
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) kill || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --remove-orphans || true
+	@echo "${GREEN}✅ Services arrêtés (forcé)${NC}"
+
+start: up
+run: up
+stop: down
+stop-force: down-force
 
 restart:
-	@echo "${GREEN}Redémarrage de tous les services...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart
-	@echo "${GREEN}Attente du redémarrage des services...${NC}"
+	@echo "${GREEN}🔄 Redémarrage de tous les services...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart || { \
+			echo "${YELLOW}⚠️  Redémarrage échoué, tentative de stop/start...${NC}"; \
+			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true; \
+			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build; \
+		}; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart || { \
+			echo "${YELLOW}⚠️  Redémarrage échoué, tentative de stop/start...${NC}"; \
+			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true; \
+			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build; \
+		}; \
+	fi
 	@sleep 5
-	@echo "${GREEN}✅ Tous les services ont été redémarrés${NC}"
+	@echo "${GREEN}✅ Services redémarrés${NC}"
 
-logs:
-	@echo "${GREEN}Affichage des logs de tous les services (sans suivi automatique)...${NC}"
-	@echo "${YELLOW}Astuce: Utilisez 'make logs-follow' pour suivre en temps réel${NC}"
-	@echo "${YELLOW}Astuce: Utilisez 'make logs-backend' pour voir uniquement les logs backend${NC}"
-	@echo "${YELLOW}Astuce: Utilisez 'make logs-history' pour voir l'historique complet${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=200 | less -R
+restart-backend:
+	@echo "${GREEN}🔄 Redémarrage du backend...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart backend || { \
+			echo "${YELLOW}⚠️  Redémarrage échoué, tentative de stop/start...${NC}"; \
+			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop backend || true; \
+			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build backend; \
+		}; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart backend || { \
+			echo "${YELLOW}⚠️  Redémarrage échoué, tentative de stop/start...${NC}"; \
+			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop backend || true; \
+			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build backend; \
+		}; \
+	fi
+	@sleep 5
+	@echo "${GREEN}✅ Backend redémarré${NC}"
+	@echo "${YELLOW}🔍 Vérification de santé du backend...${NC}"
+	@MAX_RETRIES=30; RETRY=0; \
+	while [ $$RETRY -lt $$MAX_RETRIES ]; do \
+		if curl -s -f http://localhost:3300/api/categories > /dev/null 2>&1 || curl -s -f http://localhost:3301/api/categories > /dev/null 2>&1; then \
+			echo "${GREEN}   ✅ Backend accessible${NC}"; \
+			break; \
+		fi; \
+		RETRY=$$((RETRY + 1)); \
+		if [ $$RETRY -lt $$MAX_RETRIES ]; then \
+			sleep 1; \
+		fi; \
+	done; \
+	if [ $$RETRY -eq $$MAX_RETRIES ]; then \
+		echo "${RED}   ❌ Backend non accessible après $$MAX_RETRIES tentatives${NC}"; \
+		echo "${YELLOW}   💡 Vérifiez les logs avec: make logs backend${NC}"; \
+	fi
+	@echo "${YELLOW}   Test de la route /api/users/me (doit retourner 401, pas 404)...${NC}"
+	@STATUS=$$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3300/api/users/me -H "Authorization: Bearer invalid" 2>/dev/null || echo "000"); \
+	if [ "$$STATUS" = "401" ] || [ "$$STATUS" = "403" ]; then \
+		echo "${GREEN}   ✅ Route /api/users/me accessible ($$STATUS - normal avec token invalide)${NC}"; \
+	elif [ "$$STATUS" = "404" ]; then \
+		echo "${RED}   ❌ Route /api/users/me non trouvée (404)${NC}"; \
+		echo "${YELLOW}   💡 Le backend doit être recompilé${NC}"; \
+		echo "${YELLOW}   💡 Essayez: make rebuild-backend-local${NC}"; \
+	else \
+		echo "${YELLOW}   ⚠️  Route /api/users/me retourne $$STATUS (attendu: 401/403)${NC}"; \
+	fi
 
-logs-follow:
-	@echo "${GREEN}Affichage des logs en temps réel (Ctrl+C pour quitter)...${NC}"
-	@echo "${YELLOW}Astuce: Utilisez 'make logs' pour voir les logs sans suivi (scrollable)${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f
-
-logs-scroll:
-	@echo "${GREEN}Affichage des logs avec possibilité de scroller (Ctrl+C pour quitter)...${NC}"
-	@echo "${YELLOW}Utilisez 'q' pour quitter, 'F' pour suivre en temps réel${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 | less -R +F
-
-logs-history:
-	@echo "${GREEN}Affichage de l'historique complet des logs (sans suivi en temps réel)...${NC}"
-	@echo "${YELLOW}Utilisez 'q' pour quitter, '↑' et '↓' pour naviguer${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=1000 | less -R
-
-logs-%:
-	@echo "${GREEN}Affichage des logs du service $* (Ctrl+C pour quitter)...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=200 -f $*
+# ============================================================================
+# NETTOYAGE
+# ============================================================================
 
 clean:
-	@echo "${YELLOW}Nettoyage des conteneurs, volumes et réseaux...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --volumes --rmi all --remove-orphans
+	@echo "${YELLOW}🧹 Nettoyage des conteneurs, volumes et réseaux...${NC}"
+	@for container in $(STREAMMAKE_CONTAINERS); do \
+		docker kill $$container 2>/dev/null || true; \
+	done
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) kill || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --volumes --remove-orphans || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --rmi local || true
+	@echo "${GREEN}✅ Nettoyage terminé${NC}"
+
+clean-all:
+	@echo "${RED}⚠️  NETTOYAGE COMPLET - Suppression de TOUT${NC}"
+	@echo "${YELLOW}Cette commande va supprimer même les images utilisées ailleurs !${NC}"
+	@read -p "Êtes-vous sûr ? (oui/non): " confirm && [ "$$confirm" = "oui" ] || exit 1
+	@for container in $(STREAMMAKE_CONTAINERS); do \
+		docker kill $$container 2>/dev/null || true; \
+	done
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) kill || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --volumes --remove-orphans || true
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) down --rmi all --remove-orphans || true
+	@echo "${GREEN}✅ Nettoyage complet terminé${NC}"
+
+# ============================================================================
+# LOGS
+# ============================================================================
+
+logs:
+	@echo "${GREEN}📋 Logs StreamMake (scrollable, appuyez 'F' pour suivre, 'q' pour quitter)...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | grep -E "(streammake|backend|frontend|nginx|postgres|redis)" | less -R +F || \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | less -R +F; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | grep -E "(streammake|backend|frontend|nginx|postgres|redis)" | less -R +F || \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | less -R +F; \
+	fi
+
+logs-follow:
+	@echo "${GREEN}📺 Logs en temps réel StreamMake (Ctrl+C pour quitter)...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f 2>&1 | grep -E "(streammake|backend|frontend|nginx|postgres|redis)" || \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f 2>&1 | grep -E "(streammake|backend|frontend|nginx|postgres|redis)" || \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=100 -f; \
+	fi
+
+logs-%:
+	@echo "${GREEN}📋 Logs du service $* (Ctrl+C pour quitter)...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=200 -f $*; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=200 -f $*; \
+	fi
+
+# ============================================================================
+# DÉVELOPPEMENT
+# ============================================================================
+
+dev:
+	@echo "${GREEN}🚀 Mode développement avec hot reload...${NC}"
+	@echo "${YELLOW}Frontend: http://localhost:3304${NC}"
+	@echo "${YELLOW}Backend: http://localhost:3301${NC}"
+	@echo "${YELLOW}Appuyez sur Ctrl+C pour arrêter${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up --build
 
 dev-backend:
-	@echo "${GREEN}Démarrage du backend en mode développement...${NC}"
-	cd backend && go run ./cmd/server
+	@echo "${GREEN}💻 Backend en mode développement (hors Docker)...${NC}"
+	@cd backend && go run ./cmd/server
 
 dev-frontend:
-	@echo "${GREEN}Démarrage du frontend en mode développement...${NC}"
-	cd frontend && npm run dev
+	@echo "${GREEN}💻 Frontend en mode développement (hors Docker)...${NC}"
+	@cd frontend && npm run dev
 
 debug-backend:
-	@echo "${GREEN}Démarrage du backend en mode debug avec Delve...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d backend
-	docker exec -it $(PROJECT_NAME)-backend /usr/bin/dlv debug --headless --listen=:2345 --api-version=2 --accept-multiclient ./cmd/server
+	@echo "${GREEN}🐛 Backend avec debugger Delve...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d backend
+	@docker exec -it $(PROJECT_NAME)-backend /usr/bin/dlv debug --headless --listen=:2345 --api-version=2 --accept-multiclient ./cmd/server
+
+# ============================================================================
+# TESTS
+# ============================================================================
+
+check:
+	@echo "${GREEN}🔍 Vérification complète de StreamMake...${NC}"
+	@./scripts/check-all.sh
 
 test:
-	@echo "${GREEN}Exécution des tests backend...${NC}"
-	cd backend && go test ./...
+	@echo "${GREEN}🧪 Tests backend...${NC}"
+	@cd backend && go test ./...
 
 test-api:
-	@echo "${GREEN}Test de l'API...${NC}"
-	@./scripts/test-api.sh
-
-test-all:
-	@echo "${GREEN}Tests complets de l'application...${NC}"
-	@./scripts/test-all.sh
-
-test-upload:
-	@echo "${GREEN}Test de l'upload de vidéos...${NC}"
-	@./scripts/test-upload.sh
-
-test-comprehensive:
-	@echo "${GREEN}Tests complets backend + frontend...${NC}"
-	@./scripts/test-comprehensive.sh
+	@echo "${GREEN}🧪 Tests API...${NC}"
+	@echo "${YELLOW}💡 Les services seront démarrés automatiquement si nécessaire${NC}"
+	@./scripts/test-api.sh || exit 1
 
 test-metadata:
-	@echo "${GREEN}Test de recherche de métadonnées pour RED_ONE.webm...${NC}"
-	@./scripts/test-metadata.sh
+	@echo "${GREEN}🧪 Test recherche métadonnées...${NC}"
+	@echo "${YELLOW}💡 Les services seront démarrés automatiquement si nécessaire${NC}"
+	@./scripts/test-metadata.sh || exit 1
 
-install-deps:
-	@echo "${GREEN}Installation des dépendances Go...${NC}"
-	cd backend && go mod tidy
+test-all:
+	@echo "${GREEN}🧪 Tests complets...${NC}"
+	@echo "${YELLOW}💡 Les services seront démarrés automatiquement si nécessaire${NC}"
+	@./scripts/test-all.sh || exit 1
+
+# ============================================================================
+# UTILITAIRES
+# ============================================================================
 
 status:
-	@echo "${GREEN}Statut des services Docker:${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) ps
+	@echo "${GREEN}📊 Statut des services:${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) ps
 	@echo ""
-	@echo "${GREEN}Test rapide de l'API:${NC}"
+	@echo "${GREEN}Test API:${NC}"
 	@./scripts/test-api.sh || true
 
 shell-backend:
-	@echo "${GREEN}Accès au shell du conteneur backend...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec backend sh
+	@echo "${GREEN}🐚 Shell du conteneur backend...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec backend sh
 
 shell-db:
-	@echo "${GREEN}Accès au shell du conteneur PostgreSQL...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec postgres psql -U streammake streammake_db
+	@echo "${GREEN}🐚 Shell PostgreSQL...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) exec postgres psql -U streammake streammake_db
+
+install-deps:
+	@echo "${GREEN}📦 Installation des dépendances Go...${NC}"
+	@cd backend && go mod tidy
 
 install-torrents:
-	@echo "${GREEN}Installation et démarrage des clients torrent...${NC}"
-	docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d transmission qbittorrent deluge rtorrent
+	@echo "${GREEN}📥 Démarrage des clients torrent...${NC}"
+	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d transmission qbittorrent deluge rtorrent
 	@echo "${GREEN}✅ Clients torrent démarrés:${NC}"
 	@echo "${YELLOW}  - Transmission: http://localhost:3305${NC}"
 	@echo "${YELLOW}  - qBittorrent: http://localhost:3306${NC}"
 	@echo "${YELLOW}  - Deluge: http://localhost:3307${NC}"
 	@echo "${YELLOW}  - ruTorrent: http://localhost:3308${NC}"
 
-clean-test-videos:
-	@echo "${GREEN}Nettoyage des vidéos de test...${NC}"
-	@./scripts/clean-test-videos.sh
+setup-images:
+	@echo "${GREEN}🔨 Création des images Docker...${NC}"
+	@./scripts/setup-images.sh

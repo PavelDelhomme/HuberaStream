@@ -1,10 +1,87 @@
 .admin-categories {
   min-height: calc(100vh - 60px);
-  background-color: #0f0f0f;
+  background: linear-gradient(180deg, #000000 0%, #0f0f0f 100%);
   padding: 30px;
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   color: #ffffff;
+}
+
+.admin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.admin-header-content {
+  flex: 1;
+}
+
+.admin-header h1 {
+  font-size: 32px;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.subtitle {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 16px;
+  margin: 0;
+}
+
+.admin-header-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.stat-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  min-width: 80px;
+}
+
+.stat-badge-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.stat-badge-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.add-button {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #6c5ce7 0%, #5a4fcf 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s;
+  box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);
+}
+
+.add-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(108, 92, 231, 0.4);
 }
 
 .add-category-form {

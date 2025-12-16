@@ -128,9 +128,42 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 if [ "$API_ACCESSIBLE" = false ]; then
-    echo -e "${RED}✗${NC} L'API n'est pas accessible à $API_URL après $MAX_RETRIES tentatives"
-    echo "   Assurez-vous que les services Docker sont démarrés (make up)"
-    exit 1
+    echo -e "${YELLOW}⚠${NC} L'API n'est pas accessible. Tentative de démarrage des services..."
+    echo -e "${YELLOW}💡 Utilisation de 'make up' pour construire et démarrer les services...${NC}"
+    
+    # Utiliser make up qui gère mieux le build
+    SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+    cd "$SCRIPT_DIR" || exit 1
+    if make up 2>&1; then
+        echo -e "${GREEN}✓${NC} Services démarrés"
+    else
+        echo -e "${RED}✗${NC} Impossible de démarrer les services"
+        echo "   Démarrez manuellement avec: make up"
+        exit 1
+    fi
+    cd - > /dev/null || exit 1
+    
+    echo -e "${YELLOW}⏳ Attente du démarrage des services (20 secondes)...${NC}"
+    sleep 20
+    
+    # Réessayer
+    RETRY_COUNT=0
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if curl -s "$API_URL/categories" > /dev/null 2>&1; then
+            API_ACCESSIBLE=true
+            break
+        fi
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            sleep 2
+        fi
+    done
+    
+    if [ "$API_ACCESSIBLE" = false ]; then
+        echo -e "${RED}✗${NC} L'API n'est pas accessible à $API_URL après $MAX_RETRIES tentatives"
+        echo "   Assurez-vous que les services Docker sont démarrés (make up)"
+        exit 1
+    fi
 fi
 
 echo -e "${GREEN}✓${NC} API accessible"

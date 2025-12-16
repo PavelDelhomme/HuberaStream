@@ -628,7 +628,7 @@ func (h *ChunkUploadHandler) cleanupChunks(sessionID uuid.UUID, tempPath string)
 	h.db.Where("session_id = ?", sessionID).Delete(&models.UploadChunk{})
 }
 
-// CancelUpload annule un upload
+// CancelUpload annule un upload et supprime la vidéo partielle si elle existe
 func (h *ChunkUploadHandler) CancelUpload(c *gin.Context) {
 	sessionIDParam := c.Param("session_id")
 	sessionID, err := uuid.Parse(sessionIDParam)
@@ -652,14 +652,84 @@ func (h *ChunkUploadHandler) CancelUpload(c *gin.Context) {
 		return
 	}
 
+	// Si une vidéo a été créée (même partielle), la supprimer
+	if session.VideoID != nil {
+		var video models.Video
+		if err := h.db.Where("id = ?", *session.VideoID).First(&video).Error; err == nil {
+			log.Printf("[CancelUpload] Suppression de la vidéo partielle: %s (session: %s)", *session.VideoID, sessionID)
+			
+			// Récupérer les formats vidéo pour supprimer les fichiers
+			var formats []models.VideoFormat
+			h.db.Where("video_id = ?", *session.VideoID).Find(&formats)
+			
+			// Supprimer tous les fichiers vidéo associés
+			for _, format := range formats {
+				if format.FilePath != "" {
+					if err := os.Remove(format.FilePath); err != nil && !os.IsNotExist(err) {
+						log.Printf("[CancelUpload] Erreur lors de la suppression du fichier vidéo %s: %v", format.FilePath, err)
+					}
+				}
+				if format.ManifestPath != "" {
+					if err := os.Remove(format.ManifestPath); err != nil && !os.IsNotExist(err) {
+						log.Printf("[CancelUpload] Erreur lors de la suppression du manifest %s: %v", format.ManifestPath, err)
+					}
+				}
+			}
+			
+			// Supprimer la miniature s'il y en a une
+			if video.ThumbnailPath != "" {
+				if err := os.Remove(video.ThumbnailPath); err != nil && !os.IsNotExist(err) {
+					log.Printf("[CancelUpload] Erreur lors de la suppression de la miniature %s: %v", video.ThumbnailPath, err)
+				}
+			}
+			
+			// Supprimer les sous-titres associés
+			var subtitles []models.Subtitle
+			h.db.Where("video_id = ?", *session.VideoID).Find(&subtitles)
+			for _, subtitle := range subtitles {
+				if subtitle.FilePath != "" {
+					if err := os.Remove(subtitle.FilePath); err != nil && !os.IsNotExist(err) {
+						log.Printf("[CancelUpload] Erreur lors de la suppression du sous-titre %s: %v", subtitle.FilePath, err)
+					}
+				}
+			}
+			
+			// Supprimer les formats et sous-titres de la base de données
+			h.db.Where("video_id = ?", *session.VideoID).Delete(&models.VideoFormat{})
+			h.db.Where("video_id = ?", *session.VideoID).Delete(&models.Subtitle{})
+			
+			// Supprimer la vidéo de la base de données
+			if err := h.db.Delete(&video).Error; err != nil {
+				log.Printf("[CancelUpload] Erreur lors de la suppression de la vidéo de la base: %v", err)
+			} else {
+				log.Printf("[CancelUpload] ✅ Vidéo partielle supprimée: %s", *session.VideoID)
+			}
+			
+			// Annuler le traitement vidéo en cours si actif
+			if h.uploadHandler != nil {
+				h.uploadHandler.processingMutex.Lock()
+				if cancel, exists := h.uploadHandler.processingVideos[*session.VideoID]; exists {
+					cancel()
+					delete(h.uploadHandler.processingVideos, *session.VideoID)
+					log.Printf("[CancelUpload] Traitement vidéo annulé: %s", *session.VideoID)
+				}
+				h.uploadHandler.processingMutex.Unlock()
+			}
+		}
+	}
+
+	// Marquer la session comme annulée
 	session.Status = models.UploadStatusCancelled
+	session.VideoID = nil // Retirer la référence à la vidéo
 	h.db.Save(&session)
 
 	// Nettoyer les chunks
 	go h.cleanupChunks(sessionID, session.TempPath)
 
+	log.Printf("[CancelUpload] ✅ Upload annulé et nettoyé: session %s", sessionID)
+
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Upload annulé",
+		"message": "Upload annulé et vidéo partielle supprimée",
 		"status":  "cancelled",
 	})
 }

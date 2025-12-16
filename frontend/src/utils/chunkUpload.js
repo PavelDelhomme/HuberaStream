@@ -76,8 +76,9 @@ async function uploadChunk(sessionId, chunk, api) {
 
 /**
  * Upload tous les chunks en parallèle avec limite de concurrence
+ * Supporte la pause et l'annulation
  */
-export async function uploadChunksParallel(sessionId, chunks, api, onProgress) {
+export async function uploadChunksParallel(sessionId, chunks, api, onProgress, control = {}) {
   const results = []
   const uploadedChunks = new Set()
   let uploadedBytes = 0
@@ -85,6 +86,20 @@ export async function uploadChunksParallel(sessionId, chunks, api, onProgress) {
   
   // Fonction pour uploader un chunk
   const uploadNext = async () => {
+    // Vérifier si l'upload est annulé
+    if (control.cancelled) {
+      throw new Error('Upload annulé par l\'utilisateur')
+    }
+    
+    // Attendre si l'upload est en pause
+    while (control.paused && !control.cancelled) {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    
+    if (control.cancelled) {
+      throw new Error('Upload annulé par l\'utilisateur')
+    }
+    
     // Trouver le prochain chunk non uploadé
     const chunkIndex = chunks.findIndex(
       (chunk, idx) => !uploadedChunks.has(idx) && !chunks[idx].uploading
@@ -127,6 +142,9 @@ export async function uploadChunksParallel(sessionId, chunks, api, onProgress) {
       }
     } catch (error) {
       chunk.uploading = false
+      if (error.message === 'Upload annulé par l\'utilisateur') {
+        throw error
+      }
       return { success: false, chunkIndex, error }
     }
   }
@@ -137,11 +155,18 @@ export async function uploadChunksParallel(sessionId, chunks, api, onProgress) {
     uploadPromises.push(
       (async () => {
         const results = []
-        while (uploadedChunks.size < chunks.length) {
-          const result = await uploadNext()
-          if (result) {
-            results.push(result)
-          } else {
+        while (uploadedChunks.size < chunks.length && !control.cancelled) {
+          try {
+            const result = await uploadNext()
+            if (result) {
+              results.push(result)
+            } else {
+              break
+            }
+          } catch (error) {
+            if (error.message === 'Upload annulé par l\'utilisateur') {
+              throw error
+            }
             break
           }
         }
@@ -150,7 +175,14 @@ export async function uploadChunksParallel(sessionId, chunks, api, onProgress) {
     )
   }
   
-  const allResults = await Promise.all(uploadPromises)
-  return allResults.flat()
+  try {
+    const allResults = await Promise.all(uploadPromises)
+    return allResults.flat()
+  } catch (error) {
+    if (error.message === 'Upload annulé par l\'utilisateur') {
+      throw error
+    }
+    return []
+  }
 }
 

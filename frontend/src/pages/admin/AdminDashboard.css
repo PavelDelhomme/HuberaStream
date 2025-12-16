@@ -109,12 +109,19 @@
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
 .stat-card:hover {
   transform: translateY(-5px);
   border-color: #6c5ce7;
   box-shadow: 0 8px 25px rgba(108, 92, 231, 0.3);
+  background: linear-gradient(135deg, #1f1f1f 0%, #141414 100%);
+}
+
+.stat-card:active {
+  transform: translateY(-2px);
 }
 
 .stat-icon {

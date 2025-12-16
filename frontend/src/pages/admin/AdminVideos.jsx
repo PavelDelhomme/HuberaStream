@@ -67,10 +67,10 @@ const AdminVideos = () => {
         return true
       })
       
-      // Filtrer par statut si nécessaire
-      let filteredVideos = validVideos
+      // Filtrer par statut si nécessaire et exclure les vidéos annulées
+      let filteredVideos = validVideos.filter(v => v.status !== 'cancelled')
       if (filterStatus !== 'all') {
-        filteredVideos = validVideos.filter(v => v.status === filterStatus)
+        filteredVideos = filteredVideos.filter(v => v.status === filterStatus)
       }
       
       setVideos(filteredVideos)
@@ -338,7 +338,9 @@ const AdminVideos = () => {
                         alt={video.title}
                         className="video-thumbnail-small"
                         onError={(e) => {
-                          e.target.src = 'https://via.placeholder.com/80x45?text=No+Thumb'
+                          // Utiliser un data URI SVG au lieu d'une URL externe
+                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODAiIGhlaWdodD0iNDUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAwIiB5PSI1MDAiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7wn5KlPC90ZXh0Pjwvc3ZnPg=='
+                          e.target.onerror = null // Empêcher les boucles infinies
                         }}
                       />
                     ) : (

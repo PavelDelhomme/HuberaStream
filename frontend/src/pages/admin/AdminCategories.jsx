@@ -67,10 +67,19 @@ const AdminCategories = () => {
   return (
     <div className="admin-categories">
       <div className="admin-header">
-        <h1>Gestion des catégories</h1>
-        <button onClick={() => setShowAddForm(!showAddForm)} className="add-button">
-          {showAddForm ? 'Annuler' : '+ Ajouter une catégorie'}
-        </button>
+        <div className="admin-header-content">
+          <h1>📂 Gestion des Catégories</h1>
+          <p className="subtitle">Organisez vos contenus avec des catégories et sous-catégories</p>
+        </div>
+        <div className="admin-header-actions">
+          <div className="stat-badge">
+            <span className="stat-badge-label">Total</span>
+            <span className="stat-badge-value">{categories.length}</span>
+          </div>
+          <button onClick={() => setShowAddForm(!showAddForm)} className="add-button">
+            {showAddForm ? '❌ Annuler' : '➕ Ajouter une catégorie'}
+          </button>
+        </div>
       </div>
 
       {showAddForm && (

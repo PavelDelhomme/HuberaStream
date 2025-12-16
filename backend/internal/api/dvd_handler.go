@@ -36,11 +36,23 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 	if err != nil {
 		// Retourner 200 avec un message d'erreur plutôt que 404
 		// pour que le frontend puisse gérer l'erreur correctement
+		// Inclure aussi une liste de devices à essayer manuellement
+		possibleDevices := []string{"/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/dvd", "/dev/cdrom"}
+		var availableDevices []string
+		for _, d := range possibleDevices {
+			if info, statErr := os.Stat(d); statErr == nil && !info.IsDir() {
+				if info.Mode()&os.ModeDevice != 0 {
+					availableDevices = append(availableDevices, d)
+				}
+			}
+		}
+		
 		c.JSON(http.StatusOK, gin.H{
 			"device": "",
-			"error": "Aucun lecteur DVD détecté",
+			"error": "Aucun lecteur DVD détecté automatiquement",
 			"message": err.Error(),
 			"success": false,
+			"available_devices": availableDevices,
 		})
 		return
 	}

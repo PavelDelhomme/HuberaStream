@@ -12,6 +12,59 @@ echo "Test de l'API StreamMake"
 echo "=========================================="
 echo ""
 
+# Vérifier et démarrer les services si nécessaire
+# Vérifier si le backend existe (même s'il redémarre)
+BACKEND_EXISTS=$(docker compose ps 2>/dev/null | grep -c "streammake-backend" || docker-compose ps 2>/dev/null | grep -c "streammake-backend" || echo "0")
+if [ "$BACKEND_EXISTS" = "0" ] || (! docker compose ps 2>/dev/null | grep -q "streammake-backend.*Up\|streammake-backend.*Restarting" && ! docker-compose ps 2>/dev/null | grep -q "streammake-backend.*Up\|streammake-backend.*Restarting"); then
+    echo -e "${YELLOW}⚠️  Les services Docker ne sont pas démarrés. Démarrage...${NC}"
+    echo -e "${YELLOW}💡 Utilisation de 'make up' pour construire et démarrer les services...${NC}"
+    
+    # Utiliser make up qui gère mieux le build
+    cd "$(dirname "$0")/.." || exit 1
+    if make up 2>&1; then
+        echo -e "${GREEN}✅ Services démarrés${NC}"
+    else
+        echo -e "${RED}❌ Impossible de démarrer les services automatiquement${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${YELLOW}💡 SOLUTION:${NC}"
+        echo -e "${YELLOW}   1. Construisez le backend localement:${NC}"
+        echo -e "${GREEN}      make rebuild-backend-local${NC}"
+        echo -e "${YELLOW}   2. Créez une image Docker minimale:${NC}"
+        echo -e "${GREEN}      cd .backend-bin && docker build -t streammake-backend:latest . && cd ..${NC}"
+        echo -e "${YELLOW}   3. Démarrez les services:${NC}"
+        echo -e "${GREEN}      docker compose up -d --no-build${NC}"
+        echo -e "${YELLOW}   4. Relancez les tests:${NC}"
+        echo -e "${GREEN}      make test-api${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        exit 1
+    fi
+    cd - > /dev/null || exit 1
+    
+    echo -e "${YELLOW}⏳ Attente du démarrage des services (20 secondes)...${NC}"
+    sleep 20
+    
+    # Vérifier que l'API répond
+    MAX_RETRIES=10
+    RETRY_COUNT=0
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if curl -s http://localhost:3300/api/categories &> /dev/null || curl -s http://localhost:3301/health &> /dev/null; then
+            echo -e "${GREEN}✅ Services démarrés${NC}"
+            echo ""
+            break
+        fi
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            sleep 2
+        fi
+    done
+    
+    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+        echo -e "${RED}❌ Impossible de démarrer les services${NC}"
+        echo -e "${YELLOW}💡 Démarrez manuellement avec: make up${NC}"
+        exit 1
+    fi
+fi
+
 # Test 1: OPTIONS preflight
 echo -e "${YELLOW}Test 1: Requête OPTIONS (preflight CORS)...${NC}"
 OPTIONS_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS http://localhost:3300/api/auth/login \

@@ -108,14 +108,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-		// Générer le token JWT avec une expiration de 7 jours pour une meilleure UX
-		// Les tokens peuvent être révoqués côté serveur si nécessaire
+		// Générer le token JWT avec une expiration adaptée selon le rôle
+		// Admin : 30 jours pour une meilleure persistance en localhost
+		// User : 7 jours
+		var expiration time.Duration
+		if user.Role == models.RoleAdmin {
+			expiration = time.Hour * 24 * 30 // 30 jours pour les admins
+		} else {
+			expiration = time.Hour * 24 * 7 // 7 jours pour les utilisateurs
+		}
+		
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":  user.ID.String(),
 			"username": user.Username,
 			"role":     string(user.Role),
-			"exp":      time.Now().Add(time.Hour * 24 * 7).Unix(), // 7 jours au lieu de 24 heures
-			"iat":      time.Now().Unix(),                          // Issued at
+			"exp":      time.Now().Add(expiration).Unix(),
+			"iat":      time.Now().Unix(), // Issued at
 		})
 
 	tokenString, err := token.SignedString([]byte(h.cfg.JWTSecret))
@@ -145,7 +153,9 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 
 	var user models.User
 	if err := h.db.Where("id = ?", userID).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Utilisateur non trouvé"})
+		// Si l'utilisateur n'existe pas, retourner 401 (non autorisé) plutôt que 404
+		// car cela indique un problème d'authentification (token invalide ou utilisateur supprimé)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Utilisateur non trouvé ou token invalide"})
 		return
 	}
 

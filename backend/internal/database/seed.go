@@ -26,12 +26,14 @@ func SeedDatabase(db *gorm.DB, cfg *config.Config) error {
 	var adminUser models.User
 	result := db.Where("email = ?", adminEmail).First(&adminUser)
 
-	if result.Error == gorm.ErrRecordNotFound {
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
-		if err != nil {
-			return err
-		}
+	// Hasher le mot de passe
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(adminPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
 
+	if result.Error == gorm.ErrRecordNotFound {
+		// Créer l'utilisateur admin
 		adminUser = models.User{
 			ID:       uuid.New(),
 			Username: "admin",
@@ -47,7 +49,18 @@ func SeedDatabase(db *gorm.DB, cfg *config.Config) error {
 
 		log.Printf("Utilisateur admin créé: %s", adminEmail)
 	} else {
-		log.Printf("Utilisateur admin existe déjà: %s", adminEmail)
+		// Mettre à jour le mot de passe et s'assurer que le rôle et l'état sont corrects
+		adminUser.Password = string(hashedPassword)
+		adminUser.Role = models.RoleAdmin
+		adminUser.IsActive = true
+		adminUser.Username = "admin" // S'assurer que le username est correct
+
+		if err := db.Save(&adminUser).Error; err != nil {
+			log.Printf("Erreur lors de la mise à jour de l'utilisateur admin: %v", err)
+			return err
+		}
+
+		log.Printf("Utilisateur admin mis à jour (mot de passe réinitialisé): %s", adminEmail)
 	}
 
 	// Créer les catégories par défaut

@@ -90,8 +90,22 @@ const AdminUsers = () => {
   return (
     <div className="admin-users">
       <div className="admin-header">
-        <h1>👥 Gestion des Utilisateurs</h1>
-        <p className="subtitle">Validez les demandes d'inscription et gérez les comptes</p>
+        <div className="admin-header-content">
+          <h1>👥 Gestion des Utilisateurs</h1>
+          <p className="subtitle">Validez les demandes d'inscription et gérez les comptes</p>
+        </div>
+        <div className="admin-header-stats">
+          <div className="stat-badge">
+            <span className="stat-badge-label">Total</span>
+            <span className="stat-badge-value">{total}</span>
+          </div>
+          {pendingCount > 0 && (
+            <div className="stat-badge pending">
+              <span className="stat-badge-label">En attente</span>
+              <span className="stat-badge-value">{pendingCount}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filtres et recherche */}
