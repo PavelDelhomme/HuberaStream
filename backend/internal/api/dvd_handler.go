@@ -170,9 +170,8 @@ func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 	if len(req.Qualities) == 0 {
 		req.Qualities = []string{"1080p", "720p", "480p"}
 	}
-	if len(req.AudioTrackIndices) == 0 {
-		req.AudioTrackIndices = []int{0} // Première piste audio par défaut
-	}
+	// Si aucune piste audio n'est sélectionnée, on peut extraire sans audio (vidéo muette)
+	// Ne pas forcer la première piste audio par défaut
 
 	// Créer l'ID de la vidéo
 	videoID := uuid.New()

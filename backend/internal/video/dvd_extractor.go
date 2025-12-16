@@ -149,7 +149,10 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 // GetDVDInfo récupère les informations du DVD (pistes audio/vidéo/sous-titres)
 // Utilise lsdvd pour une analyse complète de la structure, puis ffprobe/ffmpeg pour les détails
 func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
-	// D'abord, essayer d'utiliser lsdvd pour obtenir la structure complète du DVD
+	// D'abord, essayer d'obtenir le label du volume depuis le système de fichiers
+	volumeLabel := e.getVolumeLabel(devicePath)
+	
+	// Ensuite, essayer d'utiliser lsdvd pour obtenir la structure complète du DVD
 	lsdvdInfo := e.analyzeDVDWithLsdvd(devicePath)
 	
 	// Utiliser directement le device avec ffprobe (plus fiable que dvd://)
@@ -1216,6 +1219,88 @@ func (e *DVDExtractor) mergeSubtitleTracks(lsdvdTracks, ffprobeTracks []DVDTrack
 	return merged
 }
 
+// getVolumeLabel récupère le label du volume depuis le système de fichiers
+func (e *DVDExtractor) getVolumeLabel(devicePath string) string {
+	// Méthode 1: Utiliser blkid pour obtenir le label
+	cmd := exec.Command("blkid", "-s", "LABEL", "-o", "value", devicePath)
+	output, err := cmd.Output()
+	if err == nil {
+		label := strings.TrimSpace(string(output))
+		if label != "" && label != "unknown" && label != "Unknown" {
+			return label
+		}
+	}
+	
+	// Méthode 2: Utiliser lsblk pour obtenir le label
+	cmd = exec.Command("lsblk", "-n", "-o", "LABEL", devicePath)
+	output, err = cmd.Output()
+	if err == nil {
+		label := strings.TrimSpace(string(output))
+		if label != "" && label != "unknown" && label != "Unknown" {
+			return label
+		}
+	}
+	
+	// Méthode 3: Essayer de monter le DVD et lire le label
+	// Chercher les points de montage possibles
+	possibleMountPoints := []string{
+		"/mnt/cdrom",
+		"/media/cdrom",
+		"/media/cdrom0",
+		"/media/cdrom1",
+		"/run/media",
+	}
+	
+	for _, mountPoint := range possibleMountPoints {
+		if info, err := os.Stat(mountPoint); err == nil && info.IsDir() {
+			// Vérifier si c'est un point de montage actif
+			cmd = exec.Command("findmnt", "-n", "-o", "SOURCE", mountPoint)
+			output, err = cmd.Output()
+			if err == nil {
+				source := strings.TrimSpace(string(output))
+				if strings.Contains(source, devicePath) || strings.Contains(devicePath, source) {
+					// C'est bien monté, essayer de lire le label depuis le système de fichiers
+					// Utiliser udevadm ou directement depuis /proc/mounts
+					cmd = exec.Command("udevadm", "info", "-q", "name", "-n", devicePath)
+					output, err = cmd.Output()
+					if err == nil {
+						// Essayer de lire le label depuis le système de fichiers monté
+						labelFile := filepath.Join(mountPoint, ".discinfo")
+						if data, err := os.ReadFile(labelFile); err == nil {
+							lines := strings.Split(string(data), "\n")
+							if len(lines) > 0 && lines[0] != "" {
+								return strings.TrimSpace(lines[0])
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	// Méthode 4: Essayer de lire depuis /dev/disk/by-label
+	cmd = exec.Command("ls", "-la", "/dev/disk/by-label/")
+	output, err = cmd.Output()
+	if err == nil {
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, devicePath) {
+				// Extraire le label depuis le lien symbolique
+				parts := strings.Fields(line)
+				if len(parts) >= 9 {
+					// Le label est le nom du fichier
+					label := filepath.Base(parts[8])
+					if label != "" && label != "unknown" && label != "Unknown" {
+						return label
+					}
+				}
+			}
+		}
+	}
+	
+	return ""
+}
+
 // ExtractDVD extrait le DVD avec les pistes sélectionnées
 func (e *DVDExtractor) ExtractDVD(
 	devicePath string,
@@ -1246,10 +1331,16 @@ func (e *DVDExtractor) ExtractDVD(
 
 	// Ajouter les pistes audio (les indices audio commencent après la vidéo)
 	// Il faut trouver le bon index dans les streams
-	for _, audioIdx := range audioTrackIndices {
-		// Les streams audio sont généralement après la vidéo et les sous-titres
-		// On doit mapper selon l'index réel dans les streams
-		args = append(args, "-map", fmt.Sprintf("0:a:%d", audioIdx))
+	// Si aucune piste audio n'est sélectionnée, on crée une vidéo muette
+	if len(audioTrackIndices) > 0 {
+		for _, audioIdx := range audioTrackIndices {
+			// Les streams audio sont généralement après la vidéo et les sous-titres
+			// On doit mapper selon l'index réel dans les streams
+			args = append(args, "-map", fmt.Sprintf("0:a:%d", audioIdx))
+		}
+	} else {
+		// Aucune piste audio sélectionnée : créer une vidéo muette
+		// Ne pas mapper de piste audio
 	}
 
 	// Ajouter les sous-titres
@@ -1262,9 +1353,15 @@ func (e *DVDExtractor) ExtractDVD(
 		"-c:v", "libx264",
 		"-preset", "medium",
 		"-crf", "23",
-		"-c:a", "aac",
-		"-b:a", "192k",
 	)
+	
+	// Ajouter l'audio seulement si des pistes audio sont sélectionnées
+	if len(audioTrackIndices) > 0 {
+		args = append(args, "-c:a", "aac", "-b:a", "192k")
+	} else {
+		// Vidéo muette : ne pas encoder d'audio
+		args = append(args, "-an") // -an = no audio
+	}
 	
 	// Ajouter les sous-titres si présents
 	if len(subtitleTrackIndices) > 0 {
