@@ -27,6 +27,7 @@ const DVDExtract = () => {
   const [qualities, setQualities] = useState(['1080p', '720p', '480p'])
   const [suggestedQualities, setSuggestedQualities] = useState(['1080p', '720p', '480p'])
   const [categories, setCategories] = useState([])
+  const [subCategories, setSubCategories] = useState([])
   const [extracting, setExtracting] = useState(false)
   const [extractionProgress, setExtractionProgress] = useState(0)
   const [extractionStage, setExtractionStage] = useState('')
