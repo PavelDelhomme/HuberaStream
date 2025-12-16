@@ -392,6 +392,89 @@
 .progress-info {
   color: rgba(255, 255, 255, 0.7);
   font-size: 14px;
+  margin-top: 10px;
+}
+
+.progress-warning {
+  color: rgba(255, 193, 7, 0.9);
+  font-size: 14px;
+  margin-top: 20px;
+  padding: 12px;
+  background: rgba(255, 193, 7, 0.1);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.extraction-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 40px;
+  margin-bottom: 20px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.extraction-step {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s;
+}
+
+.extraction-step.active {
+  border-color: #ff0000;
+  background: rgba(255, 0, 0, 0.1);
+}
+
+.extraction-step.completed {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.extraction-step.completed .step-number {
+  background: #4ade80;
+}
+
+.step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s;
+}
+
+.extraction-step.active .step-number {
+  background: #ff0000;
+  transform: scale(1.1);
+}
+
+.step-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.extraction-step.active .step-label {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.extraction-step.completed .step-label {
+  color: #4ade80;
 }
 
 /* Indicateur de progression pour l'analyse */

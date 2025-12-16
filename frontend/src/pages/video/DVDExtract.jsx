@@ -28,6 +28,8 @@ const DVDExtract = () => {
   const [categories, setCategories] = useState([])
   const [extracting, setExtracting] = useState(false)
   const [extractionProgress, setExtractionProgress] = useState(0)
+  const [extractionStage, setExtractionStage] = useState('')
+  const [extractionDetails, setExtractionDetails] = useState('')
   const [videoId, setVideoId] = useState(null)
   const [analyzingProgress, setAnalyzingProgress] = useState(0)
   const [analyzingStage, setAnalyzingStage] = useState('')
@@ -217,6 +219,9 @@ const DVDExtract = () => {
     setLoading(true)
     setError('')
     setExtracting(true)
+    setExtractionProgress(0)
+    setExtractionStage('Initialisation de l\'extraction...')
+    setExtractionDetails('Préparation du processus d\'extraction')
     setStep(4)
 
     try {
@@ -234,33 +239,101 @@ const DVDExtract = () => {
       })
 
       setVideoId(response.data.video_id)
+      setExtractionProgress(5)
+      setExtractionStage('Extraction du DVD en cours...')
+      setExtractionDetails('Lecture des données du DVD')
       
-      // Poller le statut
+      // Poller le statut avec progression détaillée
+      let lastProgress = 0
       const pollStatus = setInterval(async () => {
         try {
-          const statusResponse = await api.get(`/dvd/extract/${response.data.video_id}/status`)
-          if (statusResponse.data.status === 'ready') {
+          // Récupérer le statut de la vidéo pour avoir la progression
+          const videoResponse = await api.get(`/videos/${response.data.video_id}/status`)
+          const videoStatus = videoResponse.data.status
+          const videoProgress = videoResponse.data.progress || 0
+          
+          // Mapper le statut aux étapes d'extraction
+          if (videoStatus === 'processing') {
+            // Calculer la progression basée sur le statut
+            // Extraction: 0-30%, Compression: 30-50%, Transcodage: 50-90%, Finalisation: 90-100%
+            if (videoProgress < 30) {
+              setExtractionStage('Extraction du DVD...')
+              setExtractionDetails(`Lecture des pistes sélectionnées (${Math.round(videoProgress)}%)`)
+            } else if (videoProgress < 50) {
+              setExtractionStage('Compression optimale...')
+              setExtractionDetails(`Compression H.265/HEVC en cours (${Math.round(videoProgress)}%)`)
+            } else if (videoProgress < 90) {
+              setExtractionStage('Transcodage multi-qualités...')
+              setExtractionDetails(`Génération des formats ${qualities.join(', ')} (${Math.round(videoProgress)}%)`)
+            } else {
+              setExtractionStage('Finalisation...')
+              setExtractionDetails(`Génération des miniatures et métadonnées (${Math.round(videoProgress)}%)`)
+            }
+            
+            setExtractionProgress(videoProgress)
+            lastProgress = videoProgress
+          } else if (videoStatus === 'ready') {
             clearInterval(pollStatus)
             setExtractionProgress(100)
+            setExtractionStage('Extraction terminée !')
+            setExtractionDetails('Votre vidéo est prête. Redirection en cours...')
             setTimeout(() => {
               navigate(`/video/${response.data.video_id}`)
             }, 2000)
-          } else if (statusResponse.data.status === 'error') {
+          } else if (videoStatus === 'error') {
             clearInterval(pollStatus)
-            setError('Erreur lors de l\'extraction')
+            setError('Erreur lors de l\'extraction. Vérifiez les logs pour plus de détails.')
             setExtracting(false)
+            setStep(3)
           }
         } catch (err) {
-          console.error('Erreur lors de la vérification du statut:', err)
+          // Si l'API de statut n'est pas disponible, utiliser l'ancienne méthode
+          try {
+            const statusResponse = await api.get(`/dvd/extract/${response.data.video_id}/status`)
+            if (statusResponse.data.status === 'ready') {
+              clearInterval(pollStatus)
+              setExtractionProgress(100)
+              setExtractionStage('Extraction terminée !')
+              setExtractionDetails('Votre vidéo est prête. Redirection en cours...')
+              setTimeout(() => {
+                navigate(`/video/${response.data.video_id}`)
+              }, 2000)
+            } else if (statusResponse.data.status === 'error') {
+              clearInterval(pollStatus)
+              setError('Erreur lors de l\'extraction')
+              setExtracting(false)
+              setStep(3)
+            } else if (statusResponse.data.status === 'processing') {
+              // Incrémenter progressivement si pas de progression disponible
+              if (lastProgress < 95) {
+                lastProgress += 2
+                setExtractionProgress(lastProgress)
+                if (lastProgress < 30) {
+                  setExtractionStage('Extraction du DVD...')
+                } else if (lastProgress < 50) {
+                  setExtractionStage('Compression optimale...')
+                } else if (lastProgress < 90) {
+                  setExtractionStage('Transcodage multi-qualités...')
+                } else {
+                  setExtractionStage('Finalisation...')
+                }
+              }
+            }
+          } catch (statusErr) {
+            console.error('Erreur lors de la vérification du statut:', statusErr)
+          }
         }
-      }, 2000)
+      }, 3000) // Poller toutes les 3 secondes
 
-      // Nettoyer après 10 minutes
-      setTimeout(() => clearInterval(pollStatus), 600000)
+      // Nettoyer après 30 minutes (extraction peut prendre du temps)
+      setTimeout(() => clearInterval(pollStatus), 1800000)
     } catch (error) {
       setError(error.response?.data?.error || 'Erreur lors du démarrage de l\'extraction')
       setExtracting(false)
       setStep(3)
+      setExtractionProgress(0)
+      setExtractionStage('')
+      setExtractionDetails('')
     } finally {
       setLoading(false)
     }
@@ -331,20 +404,44 @@ const DVDExtract = () => {
         {step === 2 && (
           <div className="step-container">
             <div className="step-header">
-              <h2>Étape 2: Lecture des informations du DVD</h2>
-              <p>Analyse du contenu du DVD...</p>
+              <h2>📖 Étape 2: Lecture des informations du DVD</h2>
+              <p className="step-description">
+                Cliquez sur le bouton ci-dessous pour analyser le contenu du DVD et détecter toutes les pistes disponibles.
+              </p>
             </div>
             <div className="device-info">
-              <p><strong>Lecteur détecté:</strong> {device}</p>
+              <p><strong>📀 Lecteur détecté:</strong> <code>{device}</code></p>
             </div>
-            <button 
-              onClick={handleGetDVDInfo} 
-              disabled={loading}
-              className="btn-primary btn-large"
-            >
-              {loading ? '⏳ Analyse en cours...' : '📖 Lire les informations du DVD'}
-            </button>
-            <button onClick={() => setStep(1)} className="btn-secondary">
+            
+            {/* Affichage de la progression de l'analyse */}
+            {loading && (analyzingProgress > 0 || analyzingStage) && (
+              <div className="analyzing-progress-container">
+                <div className="analyzing-stage">{analyzingStage || 'Analyse en cours...'}</div>
+                <div className="analyzing-progress-bar">
+                  <div 
+                    className="analyzing-progress-fill" 
+                    style={{ width: `${analyzingProgress}%` }}
+                  ></div>
+                </div>
+                <div className="analyzing-percentage">{analyzingProgress}%</div>
+              </div>
+            )}
+            
+            {!loading && (
+              <button 
+                onClick={handleGetDVDInfo} 
+                disabled={loading}
+                className="btn-primary btn-large"
+              >
+                📖 Lire les informations du DVD
+              </button>
+            )}
+            
+            <button onClick={() => {
+              setStep(1)
+              setAnalyzingProgress(0)
+              setAnalyzingStage('')
+            }} className="btn-secondary">
               ← Retour
             </button>
           </div>
@@ -509,13 +606,34 @@ const DVDExtract = () => {
         {step === 4 && extracting && (
           <div className="step-container">
             <div className="extraction-progress">
-              <h2>⏳ Extraction en cours...</h2>
+              <h2>⏳ {extractionStage || 'Extraction en cours...'}</h2>
               <div className="progress-bar-container">
                 <div className="progress-bar" style={{ width: `${extractionProgress}%` }}></div>
               </div>
-              <p className="progress-text">{extractionProgress}%</p>
-              <p className="progress-info">
-                L'extraction peut prendre plusieurs minutes selon la taille du DVD...
+              <p className="progress-text">{Math.round(extractionProgress)}%</p>
+              {extractionDetails && (
+                <p className="progress-info">{extractionDetails}</p>
+              )}
+              <div className="extraction-steps">
+                <div className={`extraction-step ${extractionProgress >= 5 ? 'active' : ''} ${extractionProgress >= 30 ? 'completed' : ''}`}>
+                  <span className="step-number">1</span>
+                  <span className="step-label">Extraction DVD</span>
+                </div>
+                <div className={`extraction-step ${extractionProgress >= 30 ? 'active' : ''} ${extractionProgress >= 50 ? 'completed' : ''}`}>
+                  <span className="step-number">2</span>
+                  <span className="step-label">Compression</span>
+                </div>
+                <div className={`extraction-step ${extractionProgress >= 50 ? 'active' : ''} ${extractionProgress >= 90 ? 'completed' : ''}`}>
+                  <span className="step-number">3</span>
+                  <span className="step-label">Transcodage</span>
+                </div>
+                <div className={`extraction-step ${extractionProgress >= 90 ? 'active' : ''} ${extractionProgress >= 100 ? 'completed' : ''}`}>
+                  <span className="step-number">4</span>
+                  <span className="step-label">Finalisation</span>
+                </div>
+              </div>
+              <p className="progress-warning">
+                ⚠️ Cette opération peut prendre plusieurs minutes selon la taille du DVD. Ne fermez pas cette page.
               </p>
             </div>
           </div>
