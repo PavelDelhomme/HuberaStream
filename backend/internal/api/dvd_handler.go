@@ -154,28 +154,37 @@ type ExtractDVDRequest struct {
 
 // ExtractDVD extrait le DVD et crée une vidéo
 func (h *DVDHandler) ExtractDVD(c *gin.Context) {
+	log.Printf("[DVD Extraction] Requête d'extraction reçue")
+	
 	userID, _ := c.Get("user_id")
 	userIDStr := userID.(string)
 	userUUID, _ := uuid.Parse(userIDStr)
 
 	var req ExtractDVDRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("[DVD Extraction] ERREUR parsing JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("[DVD Extraction] Paramètres reçus: device=%s, video_track=%d, audio_tracks=%v, subtitle_tracks=%v, qualities=%v",
+		req.DevicePath, req.VideoTrackIndex, req.AudioTrackIndices, req.SubtitleTrackIndices, req.Qualities)
+
 	// Valider les paramètres
 	if req.DevicePath == "" {
 		req.DevicePath = "/dev/dvd"
+		log.Printf("[DVD Extraction] Device path vide, utilisation par défaut: %s", req.DevicePath)
 	}
 	if len(req.Qualities) == 0 {
 		req.Qualities = []string{"1080p", "720p", "480p"}
+		log.Printf("[DVD Extraction] Aucune qualité spécifiée, utilisation par défaut: %v", req.Qualities)
 	}
 	// Si aucune piste audio n'est sélectionnée, on peut extraire sans audio (vidéo muette)
 	// Ne pas forcer la première piste audio par défaut
 
 	// Créer l'ID de la vidéo
 	videoID := uuid.New()
+	log.Printf("[DVD Extraction] ID vidéo créé: %s", videoID)
 
 	// Créer l'entrée en base
 	videoModel := models.Video{
@@ -199,10 +208,12 @@ func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&videoModel).Error; err != nil {
+		log.Printf("[DVD Extraction] ERREUR création vidéo en base: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la création de la vidéo"})
 		return
 	}
 
+	log.Printf("[DVD Extraction] Vidéo créée en base, démarrage extraction en arrière-plan")
 	// Extraire le DVD en arrière-plan
 	go h.processDVDExtraction(videoID, req)
 

@@ -1,4 +1,4 @@
-.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api test-metadata test-all install-deps status shell-backend shell-db install-torrents setup-images
+.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api test-metadata test-all install-deps status shell-backend shell-db install-torrents setup-images install-dependencies
 
 # Variables
 PROJECT_NAME := streammake

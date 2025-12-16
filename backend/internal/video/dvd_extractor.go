@@ -1650,10 +1650,14 @@ func (e *DVDExtractor) ExtractDVD(
 	}
 
 	// Trouver le titre le plus long (comme HandBrake)
+	log.Printf("[DVD Extraction] Recherche du titre le plus long...")
 	longestTitle, err := e.findLongestDVDTitle(devicePath)
 	if err != nil {
+		log.Printf("[DVD Extraction] Erreur lors de la recherche du titre le plus long: %v, utilisation du titre 1 par défaut", err)
 		// En cas d'erreur, utiliser le titre 1 par défaut
 		longestTitle = 1
+	} else {
+		log.Printf("[DVD Extraction] Titre le plus long trouvé: %d", longestTitle)
 	}
 
 	// Construire la commande ffmpeg
