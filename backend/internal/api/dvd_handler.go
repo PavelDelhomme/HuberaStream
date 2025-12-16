@@ -213,16 +213,24 @@ func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 }
 
 func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDRequest) {
+	log.Printf("[DVD Extraction] Démarrage extraction pour vidéo %s", videoID)
+	
 	// Créer le dossier de sortie
 	outputDir := filepath.Join(h.cfg.VideoStoragePath, "dvd", videoID.String())
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		log.Printf("[DVD Extraction] ERREUR: Impossible de créer le dossier de sortie: %v", err)
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 		return
 	}
+	log.Printf("[DVD Extraction] Dossier de sortie créé: %s", outputDir)
 
 	// Extraire le DVD en MP4 brut
 	outputPath := filepath.Join(outputDir, "video.mp4")
-	_, err := h.extractor.ExtractDVD(
+	log.Printf("[DVD Extraction] Démarrage extraction DVD depuis %s vers %s", req.DevicePath, outputPath)
+	log.Printf("[DVD Extraction] Paramètres: video_track=%d, audio_tracks=%v, subtitle_tracks=%v, qualities=%v", 
+		req.VideoTrackIndex, req.AudioTrackIndices, req.SubtitleTrackIndices, req.Qualities)
+	
+	extractedPath, err := h.extractor.ExtractDVD(
 		req.DevicePath,
 		outputPath,
 		req.VideoTrackIndex,
@@ -231,14 +239,28 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		req.Qualities,
 	)
 	if err != nil {
+		log.Printf("[DVD Extraction] ERREUR lors de l'extraction: %v", err)
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 		return
 	}
+	
+	log.Printf("[DVD Extraction] Extraction terminée, fichier: %s", extractedPath)
 
 	// Vérifier que le fichier extrait existe
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+	if _, err := os.Stat(extractedPath); os.IsNotExist(err) {
+		log.Printf("[DVD Extraction] ERREUR: Le fichier extrait n'existe pas: %s", extractedPath)
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 		return
+	}
+	
+	// Vérifier la taille du fichier
+	if fileInfo, err := os.Stat(extractedPath); err == nil {
+		log.Printf("[DVD Extraction] Fichier extrait: %s, taille: %d bytes", extractedPath, fileInfo.Size())
+		if fileInfo.Size() == 0 {
+			log.Printf("[DVD Extraction] ERREUR: Le fichier extrait est vide")
+			h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
+			return
+		}
 	}
 
 	// Calculer le checksum du fichier extrait
@@ -247,6 +269,14 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("checksum", checksum)
 	}
 
+	// Utiliser le chemin extrait au lieu de outputPath
+	videoPathToProcess := extractedPath
+	if videoPathToProcess == "" {
+		videoPathToProcess = outputPath
+	}
+	
+	log.Printf("[DVD Extraction] Démarrage traitement vidéo: %s", videoPathToProcess)
+	
 	// Lancer le traitement vidéo complet (compression optimale + transcodage) automatiquement
 	// C'est le même traitement que pour les uploads : compression H.265/HEVC + transcodage multi-qualités
 	if h.uploadHandler != nil {
@@ -261,7 +291,8 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 		// 2. Générer les miniatures
 		// 3. Transcoder en plusieurs qualités (360p, 480p, 720p, 1080p)
 		// 4. Générer les formats HLS pour streaming adaptatif
-		go h.uploadHandler.processVideo(ctx, videoID, outputPath)
+		log.Printf("[DVD Extraction] Lancement processVideo pour vidéo %s", videoID)
+		go h.uploadHandler.processVideo(ctx, videoID, videoPathToProcess)
 	} else {
 		// Fallback si uploadHandler n'est pas disponible
 		// Générer au moins la miniature et la durée
