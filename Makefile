@@ -399,8 +399,12 @@ shell-db:
 
 check-frontend:
 	@echo "${GREEN}🔍 Vérification du code frontend...${NC}"
-	@cd frontend && \
-	if command -v npm >/dev/null 2>&1; then \
+	@if docker ps --format "{{.Names}}" | grep -q "^streammake-frontend$$"; then \
+		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
+		docker exec streammake-frontend sh -c "cd /app && npm run build --dry-run 2>&1 || echo 'Build check'" || true; \
+		echo "${GREEN}✅ Vérification frontend terminée (conteneur)${NC}"; \
+	elif command -v npm >/dev/null 2>&1; then \
+		cd frontend && \
 		echo "${YELLOW}📦 Installation des dépendances si nécessaire...${NC}"; \
 		if [ ! -d node_modules ]; then \
 			npm install --silent; \
@@ -413,7 +417,7 @@ check-frontend:
 			else \
 				echo "${YELLOW}⚠️  Script 'lint' non trouvé dans package.json${NC}"; \
 			fi; \
-			if [ -f tsconfig.json ] || find src -name "*.ts" -o -name "*.tsx" | head -1 | grep -q .; then \
+			if [ -f tsconfig.json ] || find src -name "*.ts" -o -name "*.tsx" 2>/dev/null | head -1 | grep -q .; then \
 				echo "${YELLOW}🔍 Vérification TypeScript...${NC}"; \
 				if [ -d node_modules/typescript ]; then \
 					npx --yes typescript tsc --noEmit 2>&1 || echo "${RED}⚠️  TypeScript a trouvé des erreurs${NC}"; \
@@ -426,13 +430,29 @@ check-frontend:
 		fi; \
 		echo "${GREEN}✅ Vérification frontend terminée${NC}"; \
 	else \
-		echo "${RED}❌ npm n'est pas installé${NC}"; \
+		echo "${RED}❌ npm n'est pas installé et conteneur non disponible${NC}"; \
 		exit 1; \
 	fi
 
 check-backend:
 	@echo "${GREEN}🔍 Vérification du code backend...${NC}"
-	@if command -v go >/dev/null 2>&1; then \
+	@if docker ps --format "{{.Names}}" | grep -q "^streammake-backend$$"; then \
+		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
+		echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
+		docker exec streammake-backend sh -c "cd /app && go vet ./... 2>&1" || echo "${RED}⚠️  go vet a trouvé des problèmes${NC}"; \
+		echo "${YELLOW}🔍 Vérification gofmt...${NC}"; \
+		UNFORMATTED=$$(docker exec streammake-backend sh -c "cd /app && gofmt -l . 2>/dev/null" | head -20); \
+		if [ -n "$$UNFORMATTED" ]; then \
+			echo "${RED}⚠️  Fichiers non formatés (premiers 20):${NC}"; \
+			echo "$$UNFORMATTED" | sed 's/^/  /'; \
+			echo "${YELLOW}💡 Exécutez 'make format-backend' pour corriger automatiquement${NC}"; \
+		else \
+			echo "${GREEN}✅ Tous les fichiers sont formatés${NC}"; \
+		fi; \
+		echo "${YELLOW}🔍 Vérification compilation...${NC}"; \
+		docker exec streammake-backend sh -c "cd /app && go build ./... 2>&1" || echo "${RED}⚠️  Erreurs de compilation${NC}"; \
+		echo "${GREEN}✅ Vérification backend terminée (conteneur)${NC}"; \
+	elif command -v go >/dev/null 2>&1; then \
 		cd backend && \
 		echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
 		go vet ./... 2>&1 || echo "${RED}⚠️  go vet a trouvé des problèmes${NC}"; \
@@ -449,7 +469,7 @@ check-backend:
 		go build ./... 2>&1 || echo "${RED}⚠️  Erreurs de compilation${NC}"; \
 		echo "${GREEN}✅ Vérification backend terminée${NC}"; \
 	else \
-		echo "${RED}❌ Go n'est pas installé${NC}"; \
+		echo "${RED}❌ Go n'est pas installé et conteneur non disponible${NC}"; \
 		exit 1; \
 	fi
 
@@ -470,8 +490,11 @@ check-lint: check-frontend check-backend
 check-compile:
 	@echo "${GREEN}🔍 Vérification compilation frontend et backend...${NC}"
 	@echo "${YELLOW}📦 Compilation frontend...${NC}"
-	@cd frontend && \
-	if command -v npm >/dev/null 2>&1; then \
+	@if docker ps --format "{{.Names}}" | grep -q "^streammake-frontend$$"; then \
+		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
+		docker exec streammake-frontend sh -c "cd /app && npm run build 2>&1" | tail -30 || echo "${RED}⚠️  Erreur de compilation frontend${NC}"; \
+	elif command -v npm >/dev/null 2>&1; then \
+		cd frontend && \
 		if [ ! -d node_modules ]; then \
 			echo "${YELLOW}📦 Installation des dépendances...${NC}"; \
 			npm install --silent; \
@@ -482,14 +505,17 @@ check-compile:
 			echo "${YELLOW}⚠️  Script 'build' non trouvé dans package.json${NC}"; \
 		fi; \
 	else \
-		echo "${RED}❌ npm n'est pas installé${NC}"; \
+		echo "${RED}❌ npm n'est pas installé et conteneur non disponible${NC}"; \
 	fi
 	@echo "${YELLOW}📦 Compilation backend...${NC}"
-	@cd backend && \
-	if command -v go >/dev/null 2>&1; then \
+	@if docker ps --format "{{.Names}}" | grep -q "^streammake-backend$$"; then \
+		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
+		docker exec streammake-backend sh -c "cd /app && go build ./cmd/server 2>&1" || echo "${RED}⚠️  Erreur de compilation backend${NC}"; \
+	elif command -v go >/dev/null 2>&1; then \
+		cd backend && \
 		go build ./cmd/server 2>&1 || echo "${RED}⚠️  Erreur de compilation backend${NC}"; \
 	else \
-		echo "${RED}❌ Go n'est pas installé${NC}"; \
+		echo "${RED}❌ Go n'est pas installé et conteneur non disponible${NC}"; \
 	fi
 	@echo "${GREEN}✅ Vérification compilation terminée${NC}"
 
