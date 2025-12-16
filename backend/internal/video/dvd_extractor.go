@@ -593,6 +593,58 @@ func (e *DVDExtractor) parseStreamLanguagesFromFFmpeg(outputStr string) map[int]
 	return languages
 }
 
+// parseStreamDetailsFromFFmpeg parse les détails complets des streams depuis ffmpeg
+func (e *DVDExtractor) parseStreamDetailsFromFFmpeg(outputStr string) map[int]map[string]string {
+	details := make(map[int]map[string]string)
+	
+	// Pattern pour Stream #0:X: Video/Audio/Subtitle avec tous les détails
+	// Exemple: Stream #0:3[0x80]: Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s
+	videoPattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]:\s*Video:\s*([^,]+),.*?(\d+)x(\d+)`)
+	audioPattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]:\s*Audio:\s*([^,]+),.*?(\d+)\s*Hz,.*?(\w+),`)
+	subtitlePattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]:\s*Subtitle:\s*([^,]+)`)
+	
+	// Parser les pistes vidéo
+	for _, match := range videoPattern.FindAllStringSubmatch(outputStr, -1) {
+		if len(match) >= 5 {
+			streamIdx, _ := strconv.Atoi(match[1])
+			details[streamIdx] = map[string]string{
+				"codec":   match[2],
+				"width":   match[3],
+				"height":  match[4],
+				"type":    "video",
+			}
+		}
+	}
+	
+	// Parser les pistes audio
+	for _, match := range audioPattern.FindAllStringSubmatch(outputStr, -1) {
+		if len(match) >= 5 {
+			streamIdx, _ := strconv.Atoi(match[1])
+			if details[streamIdx] == nil {
+				details[streamIdx] = make(map[string]string)
+			}
+			details[streamIdx]["codec"] = match[2]
+			details[streamIdx]["sample_rate"] = match[3]
+			details[streamIdx]["channels"] = match[4]
+			details[streamIdx]["type"] = "audio"
+		}
+	}
+	
+	// Parser les sous-titres
+	for _, match := range subtitlePattern.FindAllStringSubmatch(outputStr, -1) {
+		if len(match) >= 3 {
+			streamIdx, _ := strconv.Atoi(match[1])
+			if details[streamIdx] == nil {
+				details[streamIdx] = make(map[string]string)
+			}
+			details[streamIdx]["codec"] = match[2]
+			details[streamIdx]["type"] = "subtitle"
+		}
+	}
+
+	return details
+}
+
 // extractAudioTracksFromFFmpeg extrait les pistes audio depuis ffmpeg
 func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrack {
 	dvdInput := "dvd://1"
