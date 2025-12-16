@@ -75,7 +75,13 @@ const DVDExtract = () => {
         setStep(4)
         setExtractionProgress(5)
         setExtractionStage('Extraction en cours...')
-        setExtractionDetails('Reprise du suivi de l\'extraction')
+        setExtractionDetails(`Reprise du suivi de l'extraction - ${latestVideo.title || 'DVD'}`)
+        
+        // Afficher un message informatif
+        setMessage({
+          type: 'info',
+          text: `📀 Une extraction DVD est en cours. Reprise du suivi...`
+        })
         
         // Démarrer le polling
         startPolling(latestVideo.id)
