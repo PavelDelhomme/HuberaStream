@@ -247,16 +247,18 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	}
 
 	// Si pas de titre, essayer d'extraire depuis ffmpeg output
-	if info.Title == "" && err == nil {
-		// Utiliser ffmpeg pour obtenir plus d'informations
-		title := e.extractTitleFromFFmpegOutput(ffmpegOutputStr)
-		if title != "" {
-			info.Title = title
-		}
-	}
-
-	// Extraire le réalisateur depuis ffmpeg output
+	var ffmpegOutputStr string
 	if err == nil {
+		ffmpegOutputStr = string(ffmpegOutput)
+		if info.Title == "" {
+			// Utiliser ffmpeg pour obtenir plus d'informations
+			title := e.extractTitleFromFFmpegOutput(ffmpegOutputStr)
+			if title != "" {
+				info.Title = title
+			}
+		}
+
+		// Extraire le réalisateur depuis ffmpeg output
 		director := e.extractDirectorFromFFmpegOutput(ffmpegOutputStr)
 		if director != "" {
 			info.Director = director
