@@ -492,11 +492,13 @@ const Upload = () => {
       setUploadSessionId(sessionId)
       setProgress(5)
 
-      // Étape 2: Diviser le fichier en chunks
+      // Étape 2: Diviser le fichier en chunks (taille adaptative)
       setUploadStage('Préparation du fichier...')
-      setUploadDetails('Division en chunks')
+      const fileSizeMB = (videoFile.size / (1024 * 1024)).toFixed(1)
+      setUploadDetails(`Division en chunks adaptatifs (${fileSizeMB} MB)`)
       const chunks = splitFileIntoChunks(videoFile)
-      console.log(`📦 Fichier divisé en ${chunks.length} chunks`)
+      const chunkSizeMB = chunks.length > 0 ? (chunks[0].size / (1024 * 1024)).toFixed(1) : '0'
+      console.log(`📦 Fichier divisé en ${chunks.length} chunks de ${chunkSizeMB} MB chacun (taille adaptative)`)
       setProgress(7)
 
       // Étape 3: Calculer les hash de tous les chunks
@@ -566,21 +568,21 @@ const Upload = () => {
           if (shouldLog) {
             const uploadedMBStr = uploadedMB.toFixed(1)
             const totalMBStr = totalMB.toFixed(1)
-          const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(2) : '0.00'
-          console.log(`📤 Upload: ${roundedProgress}% (${progressData.uploadedChunks}/${progressData.totalChunks} chunks, ${uploadedMBStr}/${totalMBStr} MB, ${speedStr} MB/s, ${timeRemainingStr} restant)`)
-          lastLoggedProgress = roundedProgress
-        }
+            const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(2) : '0.00'
+            console.log(`📤 Upload: ${roundedProgress}% (${progressData.uploadedChunks}/${progressData.totalChunks} chunks, ${uploadedMBStr}/${totalMBStr} MB, ${speedStr} MB/s, ${timeRemainingStr} restant)`)
+            lastLoggedProgress = roundedProgress
+          }
 
-        // Mettre à jour les détails avec estimation du temps
-        const uploadedMBStr = uploadedMB.toFixed(1)
-        const totalMBStr = totalMB.toFixed(1)
-        const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(2) : '0.00'
-        let detailsStr = `${progressData.uploadedChunks}/${progressData.totalChunks} chunks • ${uploadedMBStr}/${totalMBStr} MB`
-        if (timeRemainingStr) {
-          detailsStr += ` • ${speedStr} MB/s • ~${timeRemainingStr} restant`
+          // Mettre à jour les détails avec estimation du temps
+          const uploadedMBStr = uploadedMB.toFixed(1)
+          const totalMBStr = totalMB.toFixed(1)
+          const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(2) : '0.00'
+          let detailsStr = `${progressData.uploadedChunks}/${progressData.totalChunks} chunks • ${uploadedMBStr}/${totalMBStr} MB`
+          if (timeRemainingStr) {
+            detailsStr += ` • ${speedStr} MB/s • ~${timeRemainingStr} restant`
+          }
+          setUploadDetails(detailsStr)
         }
-        setUploadDetails(detailsStr)
-      }
 
         // Mettre à jour le contrôle avec les valeurs actuelles
         uploadControlRef.current.paused = uploadPaused
