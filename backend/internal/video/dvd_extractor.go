@@ -258,7 +258,7 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		"-f", "null",
 		"-",
 	)
-	ffmpegOutput, ffmpegErr := ffmpegCmd.CombinedOutput()
+	ffmpegOutput, _ := ffmpegCmd.CombinedOutput() // Ignorer les erreurs (AC3 errors sont normales)
 	ffmpegOutputStr = string(ffmpegOutput)
 	
 	// Toujours parser la sortie ffmpeg même s'il y a des erreurs (les erreurs AC3 sont normales)
