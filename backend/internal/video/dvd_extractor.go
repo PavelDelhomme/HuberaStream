@@ -285,6 +285,17 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		}
 	}
 
+	// Enrichir avec les informations de lsdvd et le label du volume
+	// Priorité : label du volume > lsdvd > ffprobe > défaut
+	if volumeLabel != "" && volumeLabel != "unknown" && volumeLabel != "Unknown" {
+		info.Title = volumeLabel
+	} else if lsdvdInfo != nil && lsdvdInfo.Title != "" {
+		// Titre : priorité à lsdvd si ffprobe n'a rien trouvé
+		if info.Title == "" || info.Title == "DVD Extraite" {
+			info.Title = lsdvdInfo.Title
+		}
+	}
+	
 	// Si pas de titre, utiliser un titre par défaut
 	if info.Title == "" {
 		info.Title = "DVD Extraite"
@@ -292,9 +303,6 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	
 	// Enrichir avec les informations de lsdvd si disponibles
 	if lsdvdInfo != nil {
-		if lsdvdInfo.Title != "" && info.Title == "DVD Extraite" {
-			info.Title = lsdvdInfo.Title
-		}
 		if len(lsdvdInfo.AudioTracks) > 0 && len(info.AudioTracks) == 0 {
 			// Si lsdvd a trouvé des pistes audio mais pas ffprobe, utiliser celles de lsdvd
 			info.AudioTracks = lsdvdInfo.AudioTracks
