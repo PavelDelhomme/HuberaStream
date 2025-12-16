@@ -509,13 +509,44 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		info.Tracks = append(info.Tracks, track)
 	}
 
-	// Si pas de pistes audio détectées, essayer de les trouver avec ffmpeg
+	// Si pas de pistes audio détectées, essayer plusieurs méthodes
 	if len(info.AudioTracks) == 0 {
+		// Méthode 1: Extraire depuis ffmpeg directement
 		audioTracks := e.extractAudioTracksFromFFmpeg(devicePath)
 		if len(audioTracks) > 0 {
 			info.AudioTracks = audioTracks
 			for _, track := range audioTracks {
 				info.Tracks = append(info.Tracks, track)
+			}
+		} else {
+			// Méthode 2: Vérifier si l'audio est intégré dans la piste vidéo
+			// Certains DVDs ont l'audio dans le même stream que la vidéo
+			audioTracksFromVideo := e.extractAudioFromVideoStream(devicePath, probeData.Streams)
+			if len(audioTracksFromVideo) > 0 {
+				info.AudioTracks = audioTracksFromVideo
+				for _, track := range audioTracksFromVideo {
+					info.Tracks = append(info.Tracks, track)
+				}
+			} else {
+				// Méthode 3: Créer une piste audio par défaut si la vidéo a des canaux audio
+				// Vérifier si la piste vidéo a des informations audio
+				for _, stream := range probeData.Streams {
+					if stream.CodecType == "video" && (stream.Channels > 0 || stream.SampleRate != "") {
+						// La piste vidéo contient probablement de l'audio intégré
+						track := DVDTrack{
+							Index:      len(info.AudioTracks),
+							Type:       "audio",
+							Codec:      "ac3", // Par défaut pour DVD
+							Language:   "fra", // Français présumé
+							Title:      "Audio intégré (Français présumé - ac3)",
+							Channels:   2,    // Stéréo par défaut
+							SampleRate: "48000",
+						}
+						info.AudioTracks = append(info.AudioTracks, track)
+						info.Tracks = append(info.Tracks, track)
+						break
+					}
+				}
 			}
 		}
 	}
@@ -870,7 +901,6 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 				}
 			} else {
 				// Sans langue
-				streamIdx, _ = strconv.Atoi(match[1])
 				codec = strings.TrimSpace(match[2])
 				sampleRate = match[3]
 				channels = 2 // Par défaut
@@ -880,7 +910,8 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 			if langName == "" && language != "" {
 				langName = strings.ToUpper(language)
 			} else if langName == "" {
-				langName = "Inconnu"
+				langName = "Français présumé"
+				language = "fra"
 			}
 			
 			// Créer un titre descriptif
@@ -901,7 +932,7 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 			}
 			
 			track := DVDTrack{
-				Index:      streamIdx,
+				Index:      audioIndex, // Utiliser audioIndex au lieu de streamIdx
 				Type:       "audio",
 				Codec:      codec,
 				Language:   language,
