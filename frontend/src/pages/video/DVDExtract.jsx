@@ -42,7 +42,200 @@ const DVDExtract = () => {
       return
     }
     fetchCategories()
+    checkForActiveExtraction()
   }, [user, navigate])
+
+  // Vérifier s'il y a une extraction en cours
+  const checkForActiveExtraction = async () => {
+    try {
+      // Récupérer les vidéos en cours de traitement de l'utilisateur
+      const response = await api.get('/videos?status=processing')
+      const processingVideos = response.data.videos || []
+      
+      // Filtrer pour trouver les vidéos DVD en cours (celles qui ont été créées récemment et sont en processing)
+      // On peut aussi vérifier si le titre contient "DVD" ou si c'est dans le dossier dvd
+      const dvdVideos = processingVideos.filter(video => {
+        // Vérifier si c'est une vidéo DVD récente (créée dans les dernières 2 heures)
+        const createdAt = new Date(video.created_at)
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+        return createdAt > twoHoursAgo && video.status === 'processing'
+      })
+      
+      if (dvdVideos.length > 0) {
+        // Prendre la plus récente
+        const latestVideo = dvdVideos.sort((a, b) => 
+          new Date(b.created_at) - new Date(a.created_at)
+        )[0]
+        
+        console.log('📀 Extraction DVD en cours détectée:', latestVideo.id)
+        
+        // Reprendre le suivi de l'extraction
+        setVideoId(latestVideo.id)
+        setExtracting(true)
+        setStep(4)
+        setExtractionProgress(5)
+        setExtractionStage('Extraction en cours...')
+        setExtractionDetails('Reprise du suivi de l\'extraction')
+        
+        // Démarrer le polling
+        startPolling(latestVideo.id)
+      }
+    } catch (error) {
+      console.error('Erreur lors de la vérification des extractions en cours:', error)
+    }
+  }
+
+  // Fonction pour démarrer le polling
+  const startPolling = (videoIdToPoll) => {
+    // Arrêter le polling existant si présent
+    if (pollInterval) {
+      clearInterval(pollInterval)
+    }
+    
+    let lastProgress = 5
+    let noProgressCount = 0
+    
+    const pollStatus = setInterval(async () => {
+      try {
+        // Essayer d'abord l'API de statut vidéo (plus détaillée)
+        try {
+          const videoResponse = await api.get(`/videos/${videoIdToPoll}/status`, {
+            timeout: 5000
+          })
+          const videoStatus = videoResponse.data.status
+          const videoProgress = videoResponse.data.progress || 0
+          
+          // Si la progression a changé, réinitialiser le compteur
+          if (videoProgress > lastProgress) {
+            noProgressCount = 0
+            lastProgress = videoProgress
+          } else {
+            noProgressCount++
+          }
+          
+          // Mapper le statut aux étapes d'extraction
+          if (videoStatus === 'processing') {
+            // Calculer la progression basée sur le statut
+            if (videoProgress < 30) {
+              setExtractionStage('Extraction du DVD...')
+              setExtractionDetails(`Lecture des pistes sélectionnées (${Math.round(videoProgress)}%)`)
+            } else if (videoProgress < 50) {
+              setExtractionStage('Compression optimale...')
+              setExtractionDetails(`Compression H.265/HEVC en cours (${Math.round(videoProgress)}%)`)
+            } else if (videoProgress < 90) {
+              setExtractionStage('Transcodage multi-qualités...')
+              setExtractionDetails(`Génération des formats (${Math.round(videoProgress)}%)`)
+            } else {
+              setExtractionStage('Finalisation...')
+              setExtractionDetails(`Génération des miniatures et métadonnées (${Math.round(videoProgress)}%)`)
+            }
+            
+            setExtractionProgress(videoProgress)
+            
+            // Si pas de progression depuis 30 secondes (10 polls), afficher un avertissement
+            if (noProgressCount > 10 && videoProgress < 30) {
+              setExtractionDetails(`Extraction en cours... (${Math.round(videoProgress)}%) - Cela peut prendre du temps pour les gros DVDs`)
+            }
+          } else if (videoStatus === 'ready') {
+            clearInterval(pollStatus)
+            setPollInterval(null)
+            setExtractionProgress(100)
+            setExtractionStage('Extraction terminée !')
+            setExtractionDetails('Votre vidéo est prête. Redirection en cours...')
+            setTimeout(() => {
+              navigate(`/video/${videoIdToPoll}`)
+            }, 2000)
+          } else if (videoStatus === 'error') {
+            clearInterval(pollStatus)
+            setPollInterval(null)
+            setError('Erreur lors de l\'extraction. Vérifiez les logs pour plus de détails.')
+            setExtracting(false)
+            setStep(3)
+          } else if (videoStatus === 'cancelled') {
+            clearInterval(pollStatus)
+            setPollInterval(null)
+            setError('Extraction annulée')
+            setExtracting(false)
+            setStep(3)
+          }
+        } catch (videoErr) {
+          // Fallback sur l'API DVD si l'API vidéo échoue
+          try {
+            const statusResponse = await api.get(`/dvd/extract/${videoIdToPoll}/status`, {
+              timeout: 5000
+            })
+            const dvdStatus = statusResponse.data.status
+            const dvdProgress = statusResponse.data.progress || 0
+            
+            if (dvdStatus === 'ready') {
+              clearInterval(pollStatus)
+              setPollInterval(null)
+              setExtractionProgress(100)
+              setExtractionStage('Extraction terminée !')
+              setExtractionDetails('Votre vidéo est prête. Redirection en cours...')
+              setTimeout(() => {
+                navigate(`/video/${videoIdToPoll}`)
+              }, 2000)
+            } else if (dvdStatus === 'error') {
+              clearInterval(pollStatus)
+              setPollInterval(null)
+              setError('Erreur lors de l\'extraction')
+              setExtracting(false)
+              setStep(3)
+            } else if (dvdStatus === 'processing') {
+              // Utiliser la progression de l'API DVD si disponible
+              if (dvdProgress > 0) {
+                setExtractionProgress(dvdProgress)
+                lastProgress = dvdProgress
+                noProgressCount = 0
+              } else {
+                // Incrémenter progressivement si pas de progression disponible
+                if (lastProgress < 95) {
+                  lastProgress = Math.min(lastProgress + 1, 95)
+                  setExtractionProgress(lastProgress)
+                }
+              }
+              
+              // Mapper la progression aux étapes
+              if (lastProgress < 30) {
+                setExtractionStage('Extraction du DVD...')
+                setExtractionDetails(`Lecture des pistes (${Math.round(lastProgress)}%)`)
+              } else if (lastProgress < 50) {
+                setExtractionStage('Compression optimale...')
+                setExtractionDetails(`Compression H.265/HEVC (${Math.round(lastProgress)}%)`)
+              } else if (lastProgress < 90) {
+                setExtractionStage('Transcodage multi-qualités...')
+                setExtractionDetails(`Génération des formats (${Math.round(lastProgress)}%)`)
+              } else {
+                setExtractionStage('Finalisation...')
+                setExtractionDetails(`Finalisation (${Math.round(lastProgress)}%)`)
+              }
+            }
+          } catch (statusErr) {
+            console.error('Erreur lors de la vérification du statut:', statusErr)
+            // Si les deux APIs échouent, incrémenter progressivement
+            if (lastProgress < 95) {
+              lastProgress = Math.min(lastProgress + 0.5, 95)
+              setExtractionProgress(lastProgress)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Erreur lors du polling:', err)
+        // Continuer à poller même en cas d'erreur temporaire
+      }
+    }, 2000) // Poller toutes les 2 secondes
+    
+    setPollInterval(pollStatus)
+    
+    // Nettoyer après 30 minutes
+    setTimeout(() => {
+      if (pollStatus) {
+        clearInterval(pollStatus)
+        setPollInterval(null)
+      }
+    }, 1800000)
+  }
 
   const fetchCategories = async () => {
     try {
@@ -285,150 +478,8 @@ const DVDExtract = () => {
       setExtractionStage('Extraction du DVD en cours...')
       setExtractionDetails('Initialisation de l\'extraction...')
       
-      // Poller le statut avec progression détaillée
-      let lastProgress = 5
-      let noProgressCount = 0
-      const pollStatus = setInterval(async () => {
-        try {
-          // Essayer d'abord l'API de statut vidéo (plus détaillée)
-          try {
-            const videoResponse = await api.get(`/videos/${response.data.video_id}/status`, {
-              timeout: 5000
-            })
-            const videoStatus = videoResponse.data.status
-            const videoProgress = videoResponse.data.progress || 0
-            
-            // Si la progression a changé, réinitialiser le compteur
-            if (videoProgress > lastProgress) {
-              noProgressCount = 0
-              lastProgress = videoProgress
-            } else {
-              noProgressCount++
-            }
-            
-            // Mapper le statut aux étapes d'extraction
-            if (videoStatus === 'processing') {
-              // Calculer la progression basée sur le statut
-              // Extraction: 0-30%, Compression: 30-50%, Transcodage: 50-90%, Finalisation: 90-100%
-              if (videoProgress < 30) {
-                setExtractionStage('Extraction du DVD...')
-                setExtractionDetails(`Lecture des pistes sélectionnées (${Math.round(videoProgress)}%)`)
-              } else if (videoProgress < 50) {
-                setExtractionStage('Compression optimale...')
-                setExtractionDetails(`Compression H.265/HEVC en cours (${Math.round(videoProgress)}%)`)
-              } else if (videoProgress < 90) {
-                setExtractionStage('Transcodage multi-qualités...')
-                setExtractionDetails(`Génération des formats ${qualities.join(', ')} (${Math.round(videoProgress)}%)`)
-              } else {
-                setExtractionStage('Finalisation...')
-                setExtractionDetails(`Génération des miniatures et métadonnées (${Math.round(videoProgress)}%)`)
-              }
-              
-              setExtractionProgress(videoProgress)
-              
-              // Si pas de progression depuis 30 secondes (10 polls), afficher un avertissement
-              if (noProgressCount > 10 && videoProgress < 30) {
-                setExtractionDetails(`Extraction en cours... (${Math.round(videoProgress)}%) - Cela peut prendre du temps pour les gros DVDs`)
-              }
-            } else if (videoStatus === 'ready') {
-              clearInterval(pollStatus)
-              setPollInterval(null)
-              setExtractionProgress(100)
-              setExtractionStage('Extraction terminée !')
-              setExtractionDetails('Votre vidéo est prête. Redirection en cours...')
-              setTimeout(() => {
-                navigate(`/video/${response.data.video_id}`)
-              }, 2000)
-            } else if (videoStatus === 'error') {
-              clearInterval(pollStatus)
-              setPollInterval(null)
-              setError('Erreur lors de l\'extraction. Vérifiez les logs pour plus de détails.')
-              setExtracting(false)
-              setStep(3)
-            } else if (videoStatus === 'cancelled') {
-              clearInterval(pollStatus)
-              setPollInterval(null)
-              setError('Extraction annulée')
-              setExtracting(false)
-              setStep(3)
-            }
-          } catch (videoErr) {
-            // Fallback sur l'API DVD si l'API vidéo échoue
-            try {
-              const statusResponse = await api.get(`/dvd/extract/${response.data.video_id}/status`, {
-                timeout: 5000
-              })
-              const dvdStatus = statusResponse.data.status
-              const dvdProgress = statusResponse.data.progress || 0
-              
-              if (dvdStatus === 'ready') {
-                clearInterval(pollStatus)
-                setPollInterval(null)
-                setExtractionProgress(100)
-                setExtractionStage('Extraction terminée !')
-                setExtractionDetails('Votre vidéo est prête. Redirection en cours...')
-                setTimeout(() => {
-                  navigate(`/video/${response.data.video_id}`)
-                }, 2000)
-              } else if (dvdStatus === 'error') {
-                clearInterval(pollStatus)
-                setPollInterval(null)
-                setError('Erreur lors de l\'extraction')
-                setExtracting(false)
-                setStep(3)
-              } else if (dvdStatus === 'processing') {
-                // Utiliser la progression de l'API DVD si disponible
-                if (dvdProgress > 0) {
-                  setExtractionProgress(dvdProgress)
-                  lastProgress = dvdProgress
-                  noProgressCount = 0
-                } else {
-                  // Incrémenter progressivement si pas de progression disponible
-                  if (lastProgress < 95) {
-                    lastProgress = Math.min(lastProgress + 1, 95)
-                    setExtractionProgress(lastProgress)
-                  }
-                }
-                
-                // Mapper la progression aux étapes
-                if (lastProgress < 30) {
-                  setExtractionStage('Extraction du DVD...')
-                  setExtractionDetails(`Lecture des pistes (${Math.round(lastProgress)}%)`)
-                } else if (lastProgress < 50) {
-                  setExtractionStage('Compression optimale...')
-                  setExtractionDetails(`Compression H.265/HEVC (${Math.round(lastProgress)}%)`)
-                } else if (lastProgress < 90) {
-                  setExtractionStage('Transcodage multi-qualités...')
-                  setExtractionDetails(`Génération des formats (${Math.round(lastProgress)}%)`)
-                } else {
-                  setExtractionStage('Finalisation...')
-                  setExtractionDetails(`Finalisation (${Math.round(lastProgress)}%)`)
-                }
-              }
-            } catch (statusErr) {
-              console.error('Erreur lors de la vérification du statut:', statusErr)
-              // Si les deux APIs échouent, incrémenter progressivement
-              if (lastProgress < 95) {
-                lastProgress = Math.min(lastProgress + 0.5, 95)
-                setExtractionProgress(lastProgress)
-              }
-            }
-          }
-        } catch (err) {
-          console.error('Erreur lors du polling:', err)
-          // Continuer à poller même en cas d'erreur temporaire
-        }
-      }, 2000) // Poller toutes les 2 secondes pour une meilleure réactivité
-      
-      setPollInterval(pollStatus)
-
-      // Nettoyer après 30 minutes (extraction peut prendre du temps)
-      setTimeout(() => {
-        if (pollStatus) {
-          clearInterval(pollStatus)
-          setPollInterval(null)
-        }
-      }, 1800000)
+      // Démarrer le polling avec la fonction réutilisable
+      startPolling(response.data.video_id)
     } catch (error) {
       setError(error.response?.data?.error || 'Erreur lors du démarrage de l\'extraction')
       setExtracting(false)
