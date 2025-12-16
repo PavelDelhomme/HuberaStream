@@ -561,18 +561,41 @@ func (e *DVDExtractor) extractDirectorFromFFmpegOutput(outputStr string) string 
 func (e *DVDExtractor) parseStreamLanguagesFromFFmpeg(outputStr string) map[int]string {
 	languages := make(map[int]string)
 	
-	// Pattern pour Stream #0:X(Y): Audio/Subtitle: ... (Y est souvent la langue)
-	// Exemple: Stream #0:3[0x80](fra): Audio: ac3
-	pattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]\(([a-z]{3})\):`)
+	// Pattern amélioré pour Stream #0:X[ID](lang): Type: ...
+	// Exemples:
+	// Stream #0:3[0x80](fra): Audio: ac3
+	// Stream #0:2[0x20](eng): Subtitle: dvd_subtitle
+	// Pattern principal avec langue entre parenthèses
+	pattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]\(([a-z]{2,3})\):`)
 	matches := pattern.FindAllStringSubmatch(outputStr, -1)
 	
 	for _, match := range matches {
 		if len(match) >= 3 {
 			streamIdx, err := strconv.Atoi(match[1])
 			if err == nil {
-				lang := match[2]
-				if lang != "" {
+				lang := strings.ToLower(strings.TrimSpace(match[2]))
+				if lang != "" && len(lang) >= 2 {
 					languages[streamIdx] = lang
+				}
+			}
+		}
+	}
+	
+	// Pattern alternatif : chercher "language:" dans les métadonnées
+	// Exemple: Metadata: language: fra
+	langMetadataPattern := regexp.MustCompile(`Stream\s+#\d+:(\d+).*?language:\s*([a-z]{2,3})`)
+	langMatches := langMetadataPattern.FindAllStringSubmatch(outputStr, -1)
+	
+	for _, match := range langMatches {
+		if len(match) >= 3 {
+			streamIdx, err := strconv.Atoi(match[1])
+			if err == nil {
+				lang := strings.ToLower(strings.TrimSpace(match[2]))
+				if lang != "" && len(lang) >= 2 {
+					// Ne pas écraser si déjà trouvé
+					if _, exists := languages[streamIdx]; !exists {
+						languages[streamIdx] = lang
+					}
 				}
 			}
 		}
@@ -671,42 +694,108 @@ func (e *DVDExtractor) parseStreamDetailsFromFFmpeg(outputStr string) map[int]ma
 
 // extractAudioTracksFromFFmpeg extrait les pistes audio depuis ffmpeg
 func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrack {
-	dvdInput := "dvd://1"
+	// Utiliser directement le device path au lieu de dvd://1
+	var ffmpegInput string
 	if strings.HasPrefix(devicePath, "/dev/") {
-		dvdInput = fmt.Sprintf("dvd://1 -dvd_device %s", devicePath)
+		ffmpegInput = devicePath
+	} else if strings.Contains(devicePath, "VIDEO_TS") {
+		ffmpegInput = devicePath
+	} else {
+		ffmpegInput = devicePath
 	}
 
 	cmd := exec.Command(
 		e.ffmpegPath,
-		"-i", dvdInput,
-		"-t", "0.1",
+		"-i", ffmpegInput,
+		"-t", "0.5", // Augmenter pour plus d'infos
 		"-f", "null",
 		"-",
 	)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return []DVDTrack{}
-	}
-
-	var tracks []DVDTrack
 	outputStr := string(output)
 	
-	// Parser les pistes audio depuis la sortie
-	audioPattern := regexp.MustCompile(`Stream #(\d+):(\d+)\(([^)]+)\): Audio: ([^,]+)`)
+	// Même si ffmpeg retourne une erreur (AC3 errors sont normales), parser la sortie
+	var tracks []DVDTrack
+	
+	// Pattern amélioré pour capturer les pistes audio avec langue
+	// Exemples:
+	// Stream #0:3[0x80](fra): Audio: ac3, 48000 Hz, stereo, fltp, 192 kb/s
+	// Stream #0:4[0x81](eng): Audio: ac3, 48000 Hz, 5.1(side), fltp, 448 kb/s
+	audioPattern := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]\(([a-z]{3})\):\s*Audio:\s*([^,]+),.*?(\d+)\s*Hz,.*?(stereo|mono|5\.1|6ch|2ch|1ch|fltp|s16|surround|quad|hexagonal|octagonal)?`)
 	matches := audioPattern.FindAllStringSubmatch(outputStr, -1)
 	
+	// Si pas de match avec langue, essayer sans langue
+	if len(matches) == 0 {
+		audioPatternNoLang := regexp.MustCompile(`Stream\s+#\d+:(\d+)\[.*?\]:\s*Audio:\s*([^,]+),.*?(\d+)\s*Hz`)
+		matches = audioPatternNoLang.FindAllStringSubmatch(outputStr, -1)
+	}
+	
 	for i, match := range matches {
-		if len(match) >= 5 {
-			language := match[3]
-			codec := match[4]
+		streamIdx := i
+		language := ""
+		codec := ""
+		sampleRate := ""
+		channels := 0
+		
+		if len(match) >= 4 {
+			// Avec langue
+			if len(match) >= 6 {
+				streamIdx, _ = strconv.Atoi(match[1])
+				language = match[2]
+				codec = strings.TrimSpace(match[3])
+				sampleRate = match[4]
+				channelStr := match[5]
+				
+				// Convertir channel string en nombre
+				if channelStr == "stereo" || channelStr == "2ch" {
+					channels = 2
+				} else if channelStr == "mono" || channelStr == "1ch" {
+					channels = 1
+				} else if channelStr == "5.1" || channelStr == "6ch" {
+					channels = 6
+				} else {
+					channels = 2 // Par défaut stereo
+				}
+			} else {
+				// Sans langue
+				streamIdx, _ = strconv.Atoi(match[1])
+				codec = strings.TrimSpace(match[2])
+				sampleRate = match[3]
+				channels = 2 // Par défaut
+			}
+			
 			langName := e.getLanguageName(language)
+			if langName == "" && language != "" {
+				langName = strings.ToUpper(language)
+			} else if langName == "" {
+				langName = "Inconnu"
+			}
+			
+			// Créer un titre descriptif
+			title := fmt.Sprintf("%s - %s", langName, codec)
+			if channels > 0 {
+				if channels == 1 {
+					title += " (Mono)"
+				} else if channels == 2 {
+					title += " (Stéréo)"
+				} else if channels == 6 {
+					title += " (5.1)"
+				} else {
+					title += fmt.Sprintf(" (%d canaux)", channels)
+				}
+			}
+			if sampleRate != "" {
+				title += fmt.Sprintf(" %sHz", sampleRate)
+			}
 			
 			track := DVDTrack{
-				Index:    i,
-				Type:     "audio",
-				Codec:    codec,
-				Language: language,
-				Title:    fmt.Sprintf("%s (%s)", langName, codec),
+				Index:      streamIdx,
+				Type:       "audio",
+				Codec:      codec,
+				Language:   language,
+				Title:      title,
+				Channels:   channels,
+				SampleRate: sampleRate,
 			}
 			tracks = append(tracks, track)
 		}

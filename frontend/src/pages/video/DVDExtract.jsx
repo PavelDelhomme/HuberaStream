@@ -25,6 +25,7 @@ const DVDExtract = () => {
   const [selectedAudioTracks, setSelectedAudioTracks] = useState([])
   const [selectedSubtitleTracks, setSelectedSubtitleTracks] = useState([])
   const [qualities, setQualities] = useState(['1080p', '720p', '480p'])
+  const [suggestedQualities, setSuggestedQualities] = useState(['1080p', '720p', '480p'])
   const [categories, setCategories] = useState([])
   const [extracting, setExtracting] = useState(false)
   const [extractionProgress, setExtractionProgress] = useState(0)
@@ -733,16 +734,25 @@ const DVDExtract = () => {
               <h3>🎥 Qualités de transcodage</h3>
               <p className="section-description">Sélectionnez les qualités à générer</p>
               <div className="qualities-grid">
-                {['1080p', '720p', '480p', '360p'].map(quality => (
-                  <label key={quality} className="quality-item">
-                    <input
-                      type="checkbox"
-                      checked={qualities.includes(quality)}
-                      onChange={() => toggleQuality(quality)}
-                    />
-                    <span>{quality}</span>
-                  </label>
-                ))}
+                {['1080p', '720p', '480p', '360p'].map(quality => {
+                  const isSuggested = suggestedQualities.includes(quality)
+                  const isAvailable = suggestedQualities.includes(quality)
+                  return (
+                    <label 
+                      key={quality} 
+                      className={`quality-item ${!isAvailable ? 'quality-disabled' : ''} ${isSuggested ? 'quality-suggested' : ''}`}
+                      title={!isAvailable ? 'Qualité supérieure à la résolution du DVD' : ''}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={qualities.includes(quality)}
+                        onChange={() => toggleQuality(quality)}
+                        disabled={!isAvailable}
+                      />
+                      <span>{quality} {isSuggested && !isAvailable ? '(non disponible)' : ''}</span>
+                    </label>
+                  )
+                })}
               </div>
             </div>
 
