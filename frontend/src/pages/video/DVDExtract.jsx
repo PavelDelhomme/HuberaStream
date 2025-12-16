@@ -253,6 +253,33 @@ const DVDExtract = () => {
     }
   }
 
+  const fetchSubCategories = async (categoryId) => {
+    if (!categoryId) {
+      setSubCategories([])
+      return
+    }
+    try {
+      const category = categories.find(cat => cat.id === categoryId)
+      if (category && category.sub_categories) {
+        setSubCategories(category.sub_categories)
+      } else {
+        setSubCategories([])
+      }
+    } catch (error) {
+      console.error('Erreur:', error)
+      setSubCategories([])
+    }
+  }
+
+  React.useEffect(() => {
+    if (categoryId) {
+      fetchSubCategories(categoryId)
+    } else {
+      setSubCategories([])
+      setSubCategoryId('')
+    }
+  }, [categoryId, categories])
+
   const handleDetectDVD = async () => {
     setLoading(true)
     setError('')
@@ -647,7 +674,10 @@ const DVDExtract = () => {
                   <label>Catégorie</label>
                   <select
                     value={categoryId}
-                    onChange={(e) => setCategoryId(e.target.value)}
+                    onChange={(e) => {
+                      setCategoryId(e.target.value)
+                      setSubCategoryId('')
+                    }}
                     className="form-select"
                   >
                     <option value="">Aucune</option>
@@ -656,6 +686,21 @@ const DVDExtract = () => {
                     ))}
                   </select>
                 </div>
+                {subCategories.length > 0 && (
+                  <div className="form-group">
+                    <label>Sous-catégorie</label>
+                    <select
+                      value={subCategoryId}
+                      onChange={(e) => setSubCategoryId(e.target.value)}
+                      className="form-select"
+                    >
+                      <option value="">Aucune</option>
+                      {subCategories.map(sub => (
+                        <option key={sub.id} value={sub.id}>{sub.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="form-group">
                   <label>
                     <input
