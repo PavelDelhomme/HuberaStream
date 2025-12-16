@@ -942,16 +942,23 @@ func (e *DVDExtractor) getLanguageName(code string) string {
 // analyzeDVDWithLsdvd utilise lsdvd pour analyser la structure complète du DVD
 func (e *DVDExtractor) analyzeDVDWithLsdvd(devicePath string) *DVDInfo {
 	// lsdvd peut analyser directement un device block
-	cmd := exec.Command("lsdvd", devicePath)
+	// Utiliser -x pour obtenir plus d'informations XML
+	cmd := exec.Command("lsdvd", "-x", devicePath)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// lsdvd peut échouer, ce n'est pas grave, on utilisera ffprobe
-		return nil
-	}
-	
 	outputStr := string(output)
-	if outputStr == "" {
-		return nil
+	
+	// Si lsdvd échoue, essayer sans -x
+	if err != nil || outputStr == "" {
+		cmd = exec.Command("lsdvd", devicePath)
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			// lsdvd peut échouer, ce n'est pas grave, on utilisera ffprobe
+			return nil
+		}
+		outputStr = string(output)
+		if outputStr == "" {
+			return nil
+		}
 	}
 	
 	info := &DVDInfo{
@@ -969,20 +976,114 @@ func (e *DVDExtractor) analyzeDVDWithLsdvd(devicePath string) *DVDInfo {
 			continue
 		}
 		
-		// Extraire le titre du DVD
+		// Extraire le titre du DVD - plusieurs formats possibles
 		if strings.HasPrefix(line, "Disc Title:") {
 			title := strings.TrimPrefix(line, "Disc Title:")
 			title = strings.TrimSpace(title)
-			if title != "" {
+			if title != "" && title != "unknown" && title != "Unknown" {
 				info.Title = title
 			}
 			continue
 		}
+		// Format alternatif
+		if strings.HasPrefix(line, "Title:") && !strings.Contains(line, "Length:") {
+			titleMatch := regexp.MustCompile(`Title:\s*(.+)`)
+			if matches := titleMatch.FindStringSubmatch(line); len(matches) >= 2 {
+				title := strings.TrimSpace(matches[1])
+				if title != "" && title != "unknown" && title != "Unknown" {
+					info.Title = title
+				}
+			}
+			continue
+		}
 		
-		// Parser les pistes audio
-		if strings.HasPrefix(line, "Audio:") {
-			audioMatch := regexp.MustCompile(`Audio:\s*(\d+).*?Language:\s*([a-z]{2,3}).*?Format:\s*([^,]+).*?Frequency:\s*(\d+).*?Channels:\s*(\d+)`)
-			if matches := audioMatch.FindStringSubmatch(line); len(matches) >= 6 {
+		// Parser les pistes audio - plusieurs formats possibles
+		// Format 1: Audio: 0, Language: fra, Format: ac3, Frequency: 48000, Quantization: 16bit, Channels: 2
+		// Format 2: Audio: 0, Language: fra, Format: ac3, Frequency: 48000, Channels: 2
+		// Format 3: Audio: 0, Language: fra, Format: ac3
+		if strings.HasPrefix(line, "Audio:") || strings.Contains(line, "Audio:") {
+			// Pattern plus flexible
+			audioMatch := regexp.MustCompile(`Audio:\s*(\d+).*?Language:\s*([a-z]{2,3})`)
+			if matches := audioMatch.FindStringSubmatch(line); len(matches) >= 3 {
+				index, _ := strconv.Atoi(matches[1])
+				language := strings.ToLower(matches[2])
+				
+				// Extraire le format/codec
+				codec := "ac3" // Par défaut
+				if formatMatch := regexp.MustCompile(`Format:\s*([^,]+)`).FindStringSubmatch(line); len(formatMatch) >= 2 {
+					codec = strings.TrimSpace(formatMatch[1])
+				}
+				
+				// Extraire la fréquence
+				sampleRate := "48000" // Par défaut
+				if freqMatch := regexp.MustCompile(`Frequency:\s*(\d+)`).FindStringSubmatch(line); len(freqMatch) >= 2 {
+					sampleRate = freqMatch[1]
+				}
+				
+				// Extraire les canaux
+				channels := 2 // Par défaut stéréo
+				if chMatch := regexp.MustCompile(`Channels:\s*(\d+)`).FindStringSubmatch(line); len(chMatch) >= 2 {
+					if ch, err := strconv.Atoi(chMatch[1]); err == nil {
+						channels = ch
+					}
+				}
+				
+				langName := e.getLanguageName(language)
+				if langName == "" {
+					langName = strings.ToUpper(language)
+				}
+				
+				title := fmt.Sprintf("%s - %s", langName, codec)
+				if channels > 0 {
+					if channels == 1 {
+						title += " (Mono)"
+					} else if channels == 2 {
+						title += " (Stéréo)"
+					} else if channels == 6 {
+						title += " (5.1)"
+					} else {
+						title += fmt.Sprintf(" (%d canaux)", channels)
+					}
+				}
+				if sampleRate != "" {
+					title += fmt.Sprintf(" %sHz", sampleRate)
+				}
+				
+				track := DVDTrack{
+					Index:      index,
+					Type:       "audio",
+					Codec:      codec,
+					Language:   language,
+					Title:      title,
+					Channels:   channels,
+					SampleRate: sampleRate,
+				}
+				info.AudioTracks = append(info.AudioTracks, track)
+			} else {
+				// Pattern alternatif sans langue explicite
+				audioMatchAlt := regexp.MustCompile(`Audio:\s*(\d+)`)
+				if matches := audioMatchAlt.FindStringSubmatch(line); len(matches) >= 2 {
+					index, _ := strconv.Atoi(matches[1])
+					codec := "ac3"
+					if formatMatch := regexp.MustCompile(`Format:\s*([^,]+)`).FindStringSubmatch(line); len(formatMatch) >= 2 {
+						codec = strings.TrimSpace(formatMatch[1])
+					}
+					
+					// Utiliser "Inconnu" si pas de langue
+					title := fmt.Sprintf("Piste %d - %s", index+1, codec)
+					track := DVDTrack{
+						Index:    index,
+						Type:     "audio",
+						Codec:    codec,
+						Language: "",
+						Title:    title,
+						Channels: 2,
+					}
+					info.AudioTracks = append(info.AudioTracks, track)
+				}
+			}
+			continue
+		}
 				index, _ := strconv.Atoi(matches[1])
 				language := strings.ToLower(matches[2])
 				codec := strings.TrimSpace(matches[3])

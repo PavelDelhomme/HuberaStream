@@ -115,16 +115,22 @@ func (p *Processor) TranscodeToHLS(videoPath string, videoID uuid.UUID, quality 
 	// Définir les paramètres selon la qualité
 	var resolution, bitrate string
 	switch quality {
-	case "1080p":
+	case "2160p": // 4K UHD
+		resolution = "3840:2160"
+		bitrate = "20000k"
+	case "1440p": // 2K QHD
+		resolution = "2560:1440"
+		bitrate = "12000k"
+	case "1080p": // Full HD
 		resolution = "1920:1080"
 		bitrate = "5000k"
-	case "720p":
+	case "720p": // HD
 		resolution = "1280:720"
 		bitrate = "2500k"
-	case "480p":
+	case "480p": // SD
 		resolution = "854:480"
 		bitrate = "1000k"
-	case "360p":
+	case "360p": // Basse qualité
 		resolution = "640:360"
 		bitrate = "500k"
 	default:
@@ -170,16 +176,22 @@ func (p *Processor) TranscodeToDASH(videoPath string, videoID uuid.UUID, quality
 	// Définir les paramètres selon la qualité
 	var resolution, bitrate string
 	switch quality {
-	case "1080p":
+	case "2160p": // 4K UHD
+		resolution = "3840:2160"
+		bitrate = "20000k"
+	case "1440p": // 2K QHD
+		resolution = "2560:1440"
+		bitrate = "12000k"
+	case "1080p": // Full HD
 		resolution = "1920:1080"
 		bitrate = "5000k"
-	case "720p":
+	case "720p": // HD
 		resolution = "1280:720"
 		bitrate = "2500k"
-	case "480p":
+	case "480p": // SD
 		resolution = "854:480"
 		bitrate = "1000k"
-	case "360p":
+	case "360p": // Basse qualité
 		resolution = "640:360"
 		bitrate = "500k"
 	default:
@@ -284,16 +296,22 @@ func (p *Processor) TranscodeToProgressive(videoPath string, videoID uuid.UUID, 
 	// Définir les paramètres selon la qualité
 	var resolution, bitrate string
 	switch quality {
-	case "1080p":
+	case "2160p": // 4K UHD
+		resolution = "3840:2160"
+		bitrate = "20000k"
+	case "1440p": // 2K QHD
+		resolution = "2560:1440"
+		bitrate = "12000k"
+	case "1080p": // Full HD
 		resolution = "1920:1080"
 		bitrate = "5000k"
-	case "720p":
+	case "720p": // HD
 		resolution = "1280:720"
 		bitrate = "2500k"
-	case "480p":
+	case "480p": // SD
 		resolution = "854:480"
 		bitrate = "1000k"
-	case "360p":
+	case "360p": // Basse qualité
 		resolution = "640:360"
 		bitrate = "500k"
 	default:

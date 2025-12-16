@@ -734,7 +734,7 @@ const DVDExtract = () => {
               <h3>🎥 Qualités de transcodage</h3>
               <p className="section-description">Sélectionnez les qualités à générer</p>
               <div className="qualities-grid">
-                {['1080p', '720p', '480p', '360p'].map(quality => {
+                {['2160p', '1440p', '1080p', '720p', '480p', '360p'].map(quality => {
                   const isSuggested = suggestedQualities.includes(quality)
                   const isAvailable = suggestedQualities.includes(quality)
                   return (
