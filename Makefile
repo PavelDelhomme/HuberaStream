@@ -443,21 +443,28 @@ check-frontend:
 check-backend:
 	@echo "${GREEN}🔍 Vérification du code backend...${NC}"
 	@if docker ps --format "{{.Names}}" | grep -q "^streammake-backend$$"; then \
-		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
-		echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
-		docker exec streammake-backend sh -c "cd /app && go vet ./... 2>&1" || echo "${RED}⚠️  go vet a trouvé des problèmes${NC}"; \
-		echo "${YELLOW}🔍 Vérification gofmt...${NC}"; \
-		UNFORMATTED=$$(docker exec streammake-backend sh -c "cd /app && gofmt -l . 2>/dev/null" | head -20); \
-		if [ -n "$$UNFORMATTED" ]; then \
-			echo "${RED}⚠️  Fichiers non formatés (premiers 20):${NC}"; \
-			echo "$$UNFORMATTED" | sed 's/^/  /'; \
-			echo "${YELLOW}💡 Exécutez 'make format-backend' pour corriger automatiquement${NC}"; \
+		echo "${YELLOW}🐳 Conteneur backend détecté, mais Go n'est pas installé dans l'image finale${NC}"; \
+		echo "${YELLOW}💡 Utilisation des outils locaux pour la vérification...${NC}"; \
+		if command -v go >/dev/null 2>&1; then \
+			cd backend && \
+			echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
+			go vet ./... 2>&1 || echo "${RED}⚠️  go vet a trouvé des problèmes${NC}"; \
+			echo "${YELLOW}🔍 Vérification gofmt...${NC}"; \
+			UNFORMATTED=$$(gofmt -l . 2>/dev/null | head -20); \
+			if [ -n "$$UNFORMATTED" ]; then \
+				echo "${RED}⚠️  Fichiers non formatés (premiers 20):${NC}"; \
+				echo "$$UNFORMATTED" | sed 's/^/  /'; \
+				echo "${YELLOW}💡 Exécutez 'make format-backend' pour corriger automatiquement${NC}"; \
+			else \
+				echo "${GREEN}✅ Tous les fichiers sont formatés${NC}"; \
+			fi; \
+			echo "${YELLOW}🔍 Vérification compilation...${NC}"; \
+			go build ./... 2>&1 || echo "${RED}⚠️  Erreurs de compilation${NC}"; \
+			echo "${GREEN}✅ Vérification backend terminée${NC}"; \
 		else \
-			echo "${GREEN}✅ Tous les fichiers sont formatés${NC}"; \
+			echo "${YELLOW}⚠️  Go n'est pas installé localement, vérification backend ignorée${NC}"; \
+			echo "${YELLOW}💡 Le backend est compilé dans l'image Docker, pas dans le conteneur${NC}"; \
 		fi; \
-		echo "${YELLOW}🔍 Vérification compilation...${NC}"; \
-		docker exec streammake-backend sh -c "cd /app && go build ./... 2>&1" || echo "${RED}⚠️  Erreurs de compilation${NC}"; \
-		echo "${GREEN}✅ Vérification backend terminée (conteneur)${NC}"; \
 	elif command -v go >/dev/null 2>&1; then \
 		cd backend && \
 		echo "${YELLOW}🔍 Vérification go vet...${NC}"; \
@@ -482,10 +489,16 @@ check-backend:
 format-backend:
 	@echo "${GREEN}🔧 Formatage du code backend avec gofmt...${NC}"
 	@if docker ps --format "{{.Names}}" | grep -q "^streammake-backend$$"; then \
-		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
-		docker exec streammake-backend sh -c "cd /app && gofmt -w ." && \
-		echo "${GREEN}✅ Code backend formaté (conteneur)${NC}"; \
-		echo "${YELLOW}💡 Les modifications sont dans le conteneur. Pour les synchroniser avec l'hôte, utilisez un volume monté.${NC}"; \
+		echo "${YELLOW}🐳 Conteneur backend détecté, mais gofmt n'est pas installé dans l'image finale${NC}"; \
+		echo "${YELLOW}💡 Utilisation des outils locaux pour le formatage...${NC}"; \
+		if command -v go >/dev/null 2>&1; then \
+			cd backend && \
+			gofmt -w . && \
+			echo "${GREEN}✅ Code backend formaté${NC}"; \
+		else \
+			echo "${RED}❌ Go n'est pas installé localement et gofmt n'est pas disponible dans le conteneur${NC}"; \
+			exit 1; \
+		fi; \
 	elif command -v go >/dev/null 2>&1; then \
 		cd backend && \
 		gofmt -w . && \
@@ -520,8 +533,15 @@ check-compile:
 	fi
 	@echo "${YELLOW}📦 Compilation backend...${NC}"
 	@if docker ps --format "{{.Names}}" | grep -q "^streammake-backend$$"; then \
-		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
-		docker exec streammake-backend sh -c "cd /app && go build ./cmd/server 2>&1" || echo "${RED}⚠️  Erreur de compilation backend${NC}"; \
+		echo "${YELLOW}🐳 Conteneur backend détecté, mais Go n'est pas installé dans l'image finale${NC}"; \
+		echo "${YELLOW}💡 Utilisation des outils locaux pour la compilation...${NC}"; \
+		if command -v go >/dev/null 2>&1; then \
+			cd backend && \
+			go build ./cmd/server 2>&1 || echo "${RED}⚠️  Erreur de compilation backend${NC}"; \
+		else \
+			echo "${YELLOW}⚠️  Go n'est pas installé localement, compilation backend ignorée${NC}"; \
+			echo "${YELLOW}💡 Le backend est déjà compilé dans l'image Docker${NC}"; \
+		fi; \
 	elif command -v go >/dev/null 2>&1; then \
 		cd backend && \
 		go build ./cmd/server 2>&1 || echo "${RED}⚠️  Erreur de compilation backend${NC}"; \

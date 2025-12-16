@@ -272,7 +272,7 @@ const DVDExtract = () => {
     }
   }
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (categoryId) {
       fetchSubCategories(categoryId)
     } else {
