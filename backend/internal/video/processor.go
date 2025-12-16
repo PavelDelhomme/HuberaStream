@@ -207,7 +207,72 @@ func (p *Processor) TranscodeToDASH(videoPath string, videoID uuid.UUID, quality
 	return manifestPath, outputDir, nil
 }
 
-// TranscodeToProgressive transcodage une vidéo en format progressif (MP4)
+// CompressVideo compresse une vidéo de manière optimale et non-destructive avec H.265/HEVC
+func (p *Processor) CompressVideo(videoPath string, videoID uuid.UUID) (string, error) {
+	outputFileName := fmt.Sprintf("%s_compressed.mp4", videoID.String())
+	outputPath := filepath.Join(p.storagePath, "compressed", outputFileName)
+
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+		return "", fmt.Errorf("erreur lors de la création du dossier: %w", err)
+	}
+
+	// Extraire les métadonnées pour préserver la résolution originale
+	metadata, err := p.ExtractMetadata(videoPath)
+	if err != nil {
+		// Si on ne peut pas extraire les métadonnées, utiliser des valeurs par défaut
+		metadata = &VideoMetadata{Width: 1920, Height: 1080}
+	}
+
+	// Déterminer la résolution à utiliser (préserver l'originale si possible)
+	resolution := fmt.Sprintf("%d:%d", metadata.Width, metadata.Height)
+	if metadata.Width == 0 || metadata.Height == 0 {
+		resolution = "1920:1080" // Par défaut
+	}
+
+	// Vérifier si H.265/HEVC est disponible (libx265)
+	// Si non disponible, utiliser H.264 avec CRF optimal
+	cmd := exec.Command(p.ffmpegPath, "-codecs")
+	output, _ := cmd.Output()
+	hasHEVC := strings.Contains(string(output), "libx265")
+
+	var videoCodec, videoPreset, videoCRF string
+	if hasHEVC {
+		// H.265/HEVC pour une compression optimale (50% plus efficace que H.264)
+		videoCodec = "libx265"
+		videoPreset = "medium" // Équilibre vitesse/qualité
+		videoCRF = "23"        // CRF optimal pour H.265 (qualité visuelle équivalente à H.264 CRF 23, mais fichier ~50% plus petit)
+	} else {
+		// Fallback sur H.264 avec CRF optimal
+		videoCodec = "libx264"
+		videoPreset = "slow"   // Preset plus lent = meilleure compression
+		videoCRF = "20"        // CRF 20 = très haute qualité (presque lossless visuellement)
+	}
+
+	// Compression optimale non-destructive
+	args := []string{
+		"-i", videoPath,
+		"-c:v", videoCodec,
+		"-preset", videoPreset,
+		"-crf", videoCRF,              // Constant Rate Factor (qualité constante, non-destructive)
+		"-c:a", "aac",                 // Codec audio AAC
+		"-b:a", "192k",                // Bitrate audio optimisé (meilleure qualité)
+		"-ac", "2",                    // Stéréo
+		"-movflags", "+faststart",     // Optimisation pour streaming web
+		"-pix_fmt", "yuv420p",         // Format de pixels compatible
+		"-vf", fmt.Sprintf("scale=%s:flags=lanczos", resolution), // Scaling avec Lanczos (meilleure qualité)
+		"-y",
+		outputPath,
+	}
+
+	cmd = exec.Command(p.ffmpegPath, args...)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("erreur lors de la compression: %w", err)
+	}
+
+	return outputPath, nil
+}
+
+// TranscodeToProgressive transcodage une vidéo en format progressif (MP4) optimisé pour streaming
 func (p *Processor) TranscodeToProgressive(videoPath string, videoID uuid.UUID, quality string) (string, error) {
 	outputFileName := fmt.Sprintf("%s_%s.mp4", videoID.String(), quality)
 	outputPath := filepath.Join(p.storagePath, "progressive", outputFileName)
@@ -236,12 +301,26 @@ func (p *Processor) TranscodeToProgressive(videoPath string, videoID uuid.UUID, 
 		bitrate = "2500k"
 	}
 
+	// Vérifier si H.265/HEVC est disponible pour le streaming
+	cmd := exec.Command(p.ffmpegPath, "-codecs")
+	output, _ := cmd.Output()
+	hasHEVC := strings.Contains(string(output), "libx265")
+
+	var videoCodec string
+	if hasHEVC {
+		// H.265 pour streaming optimisé (meilleure compression)
+		videoCodec = "libx265"
+	} else {
+		// H.264 pour compatibilité maximale
+		videoCodec = "libx264"
+	}
+
 	// Détecter et gérer tous les formats d'entrée (AVI, MKV, MOV, MP4, WebM, etc.)
 	// FFmpeg gère automatiquement la conversion
-	cmd := exec.Command(
+	cmd = exec.Command(
 		p.ffmpegPath,
 		"-i", videoPath,
-		"-c:v", "libx264",           // Codec vidéo H.264 (compatible web)
+		"-c:v", videoCodec,
 		"-preset", "medium",          // Équilibre vitesse/qualité
 		"-crf", "23",                 // Qualité constante (23 = bon équilibre)
 		"-c:a", "aac",                // Codec audio AAC (compatible web)

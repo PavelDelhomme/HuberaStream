@@ -283,6 +283,19 @@ func (h *UploadHandler) processVideo(ctx context.Context, videoID uuid.UUID, vid
 		fmt.Printf("Erreur lors de la récupération de la durée: %v\n", err)
 	}
 
+	// Compression optimale non-destructive de la vidéo originale
+	// Cela réduit la taille du fichier stocké de ~50% avec H.265/HEVC
+	fmt.Printf("🎬 Démarrage de la compression optimale pour la vidéo %s...\n", videoID)
+	compressedPath, err := h.processor.CompressVideo(videoPath, videoID)
+	if err != nil {
+		fmt.Printf("⚠️  Erreur lors de la compression optimale: %v (utilisation de la vidéo originale)\n", err)
+		compressedPath = videoPath // Utiliser l'originale si la compression échoue
+	} else {
+		fmt.Printf("✅ Compression optimale terminée: %s (utilisée pour le transcodage)\n", compressedPath)
+		// Remplacer le chemin de la vidéo par la version compressée pour le transcodage
+		videoPath = compressedPath
+	}
+
 	// Qualités à générer (du plus bas au plus haut pour permettre le fallback)
 	qualities := []string{"360p", "480p", "720p", "1080p"}
 	

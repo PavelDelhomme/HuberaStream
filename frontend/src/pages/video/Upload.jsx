@@ -509,6 +509,11 @@ const Upload = () => {
       // Étape 4: Uploader les chunks en parallèle avec progression
       setUploadStage('Upload en cours...')
       let lastLoggedProgress = 0
+      
+      // Variables pour l'estimation du temps
+      const uploadStartTime = Date.now()
+      const speedHistory = [] // Historique des vitesses (MB/s)
+      const MAX_HISTORY = 10 // Garder les 10 dernières mesures
 
       await uploadChunksParallel(sessionId, chunksWithHash, api, (progressData) => {
         // Progression de l'upload: 10% à 90% (10% pour init + hash, 80% pour upload, 10% pour finalisation)
@@ -516,21 +521,66 @@ const Upload = () => {
         const roundedProgress = Math.round(uploadProgress)
         setProgress(roundedProgress)
 
+        // Calculer la vitesse actuelle et estimer le temps restant
+        const elapsedTime = (Date.now() - uploadStartTime) / 1000 // en secondes
+        const uploadedMB = progressData.uploadedBytes / (1024 * 1024)
+        const totalMB = progressData.totalBytes / (1024 * 1024)
+        const remainingMB = totalMB - uploadedMB
+        
+        if (elapsedTime > 0 && uploadedMB > 0) {
+          const currentSpeed = uploadedMB / elapsedTime // MB/s
+          speedHistory.push(currentSpeed)
+          
+          // Garder seulement les dernières mesures
+          if (speedHistory.length > MAX_HISTORY) {
+            speedHistory.shift()
+          }
+          
+          // Calculer la vitesse moyenne sur les dernières mesures
+          const avgSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length
+          
+          // Estimer le temps restant
+          let timeRemaining = 0
+          let timeRemainingStr = ''
+          
+          if (avgSpeed > 0 && remainingMB > 0) {
+            timeRemaining = remainingMB / avgSpeed // en secondes
+            
+            if (timeRemaining < 60) {
+              timeRemainingStr = `${Math.ceil(timeRemaining)}s`
+            } else if (timeRemaining < 3600) {
+              const minutes = Math.floor(timeRemaining / 60)
+              const seconds = Math.ceil(timeRemaining % 60)
+              timeRemainingStr = `${minutes}m ${seconds}s`
+            } else {
+              const hours = Math.floor(timeRemaining / 3600)
+              const minutes = Math.floor((timeRemaining % 3600) / 60)
+              timeRemainingStr = `${hours}h ${minutes}m`
+            }
+          }
+
         // Logger seulement tous les 5% ou tous les 50 chunks pour éviter le spam
         const shouldLog = (roundedProgress - lastLoggedProgress >= 5) ||
           (progressData.uploadedChunks % 50 === 0 && progressData.uploadedChunks > 0)
 
         if (shouldLog) {
-          const uploadedMB = (progressData.uploadedBytes / (1024 * 1024)).toFixed(1)
-          const totalMB = (progressData.totalBytes / (1024 * 1024)).toFixed(1)
-          console.log(`📤 Upload: ${roundedProgress}% (${progressData.uploadedChunks}/${progressData.totalChunks} chunks, ${uploadedMB}/${totalMB} MB)`)
+          const uploadedMBStr = uploadedMB.toFixed(1)
+          const totalMBStr = totalMB.toFixed(1)
+          const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(2) : '0.00'
+          console.log(`📤 Upload: ${roundedProgress}% (${progressData.uploadedChunks}/${progressData.totalChunks} chunks, ${uploadedMBStr}/${totalMBStr} MB, ${speedStr} MB/s, ${timeRemainingStr} restant)`)
           lastLoggedProgress = roundedProgress
         }
 
-        // Mettre à jour les détails
-        const uploadedMB = (progressData.uploadedBytes / (1024 * 1024)).toFixed(1)
-        const totalMB = (progressData.totalBytes / (1024 * 1024)).toFixed(1)
-        setUploadDetails(`${progressData.uploadedChunks}/${progressData.totalChunks} chunks • ${uploadedMB}/${totalMB} MB`)
+        // Mettre à jour les détails avec estimation du temps
+        const uploadedMBStr = uploadedMB.toFixed(1)
+        const totalMBStr = totalMB.toFixed(1)
+        const speedStr = avgSpeed > 0 ? avgSpeed.toFixed(2) : '0.00'
+        let detailsStr = `${progressData.uploadedChunks}/${progressData.totalChunks} chunks • ${uploadedMBStr}/${totalMBStr} MB`
+        if (timeRemainingStr) {
+          detailsStr += ` • ${speedStr} MB/s • ~${timeRemainingStr} restant`
+        }
+        setUploadDetails(detailsStr)
+        }
 
         // Mettre à jour le contrôle avec les valeurs actuelles
         uploadControlRef.current.paused = uploadPaused
