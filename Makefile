@@ -401,7 +401,13 @@ check-frontend:
 	@echo "${GREEN}🔍 Vérification du code frontend...${NC}"
 	@if docker ps --format "{{.Names}}" | grep -q "^streammake-frontend$$"; then \
 		echo "${YELLOW}🐳 Utilisation du conteneur Docker...${NC}"; \
-		docker exec streammake-frontend sh -c "cd /app && npm run build --dry-run 2>&1 || echo 'Build check'" || true; \
+		docker exec streammake-frontend sh -c "cd /app && [ -d node_modules ] || npm install --silent" 2>&1 || true; \
+		if docker exec streammake-frontend sh -c "cd /app && grep -q '\"lint\"' package.json" 2>/dev/null; then \
+			echo "${YELLOW}🔍 Vérification ESLint...${NC}"; \
+			docker exec streammake-frontend sh -c "cd /app && npm run lint 2>&1" || echo "${RED}⚠️  ESLint a trouvé des erreurs${NC}"; \
+		else \
+			echo "${YELLOW}⚠️  Script 'lint' non trouvé dans package.json${NC}"; \
+		fi; \
 		echo "${GREEN}✅ Vérification frontend terminée (conteneur)${NC}"; \
 	elif command -v npm >/dev/null 2>&1; then \
 		cd frontend && \
