@@ -321,6 +321,17 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		info.Title = "DVD Extraite"
 	}
 
+	// Parser les streams depuis ffmpeg output pour obtenir les langues et détails
+	var streamLanguages map[int]string
+	var streamDetails map[int]map[string]string
+	if ffmpegOutputStr != "" {
+		streamLanguages = e.parseStreamLanguagesFromFFmpeg(ffmpegOutputStr)
+		streamDetails = e.parseStreamDetailsFromFFmpeg(ffmpegOutputStr)
+	} else {
+		streamLanguages = make(map[int]string)
+		streamDetails = make(map[int]map[string]string)
+	}
+
 	// Compteurs pour les indices de pistes par type
 	videoIdx := 0
 	audioIdx := 0
@@ -348,11 +359,20 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			}
 		}
 
-		// Si pas de langue dans les tags, essayer de la détecter depuis le codec_long_name
+		// Si pas de langue dans les tags, utiliser celle extraite depuis ffmpeg
 		if language == "" {
-			lang := e.detectLanguageFromCodec(stream.CodecLongName, stream.Index)
-			if lang != "" {
+			if lang, ok := streamLanguages[stream.Index]; ok {
 				language = lang
+			} else if details, ok := streamDetails[stream.Index]; ok {
+				if lang, ok := details["language"]; ok {
+					language = lang
+				}
+			} else {
+				// Essayer de la détecter depuis le codec_long_name
+				lang := e.detectLanguageFromCodec(stream.CodecLongName, stream.Index)
+				if lang != "" {
+					language = lang
+				}
 			}
 		}
 
