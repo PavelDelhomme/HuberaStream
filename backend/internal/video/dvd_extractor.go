@@ -1585,6 +1585,56 @@ func (e *DVDExtractor) getVolumeLabel(devicePath string) string {
 	return ""
 }
 
+// findLongestDVDTitle trouve le titre le plus long dans le DVD (comme HandBrake)
+func (e *DVDExtractor) findLongestDVDTitle(devicePath string) (int, error) {
+	// Utiliser lsdvd pour lister tous les titres
+	cmd := exec.Command("lsdvd", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		// Si lsdvd échoue, retourner le titre 1 par défaut
+		return 1, nil
+	}
+
+	outputStr := string(output)
+	longestDuration := 0
+	longestTitle := 1
+
+	// Parser la sortie de lsdvd pour trouver le titre le plus long
+	lines := strings.Split(outputStr, "\n")
+	for _, line := range lines {
+		// Chercher les lignes "Title: X, Length: HH:MM:SS"
+		if strings.Contains(line, "Title:") && strings.Contains(line, "Length:") {
+			// Extraire le numéro de titre
+			titleMatch := regexp.MustCompile(`Title:\s*(\d+)`)
+			titleMatches := titleMatch.FindStringSubmatch(line)
+			if len(titleMatches) < 2 {
+				continue
+			}
+			titleNum, err := strconv.Atoi(titleMatches[1])
+			if err != nil {
+				continue
+			}
+
+			// Extraire la durée
+			durationMatch := regexp.MustCompile(`Length:\s*(\d+):(\d+):(\d+)`)
+			durationMatches := durationMatch.FindStringSubmatch(line)
+			if len(durationMatches) >= 4 {
+				hours, _ := strconv.Atoi(durationMatches[1])
+				minutes, _ := strconv.Atoi(durationMatches[2])
+				seconds, _ := strconv.Atoi(durationMatches[3])
+				totalSeconds := hours*3600 + minutes*60 + seconds
+
+				if totalSeconds > longestDuration {
+					longestDuration = totalSeconds
+					longestTitle = titleNum
+				}
+			}
+		}
+	}
+
+	return longestTitle, nil
+}
+
 // ExtractDVD extrait le DVD avec les pistes sélectionnées
 func (e *DVDExtractor) ExtractDVD(
 	devicePath string,
