@@ -148,33 +148,62 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 
 // GetDVDInfo récupère les informations du DVD (pistes audio/vidéo/sous-titres)
 func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
-	// Pour les DVD, utiliser dvd://1 pour analyser le premier titre
-	// Si devicePath est un device block, utiliser dvd://1 avec -dvd_device
-	dvdInput := "dvd://1"
+	// Construire l'input pour ffmpeg/ffprobe
+	var dvdInput string
+	var ffprobeArgs []string
 	
-	// Si c'est un device block, spécifier le device
 	if strings.HasPrefix(devicePath, "/dev/") {
-		dvdInput = fmt.Sprintf("dvd://1 -dvd_device %s", devicePath)
-	} else if strings.HasSuffix(devicePath, "VIDEO_TS") || strings.Contains(devicePath, "VIDEO_TS") {
-		// Si c'est un chemin vers VIDEO_TS, utiliser directement
+		// Device block - utiliser -dvd_device comme option séparée
+		dvdInput = "dvd://1"
+		ffprobeArgs = []string{
+			"-v", "error",
+			"-dvd_device", devicePath,
+			"-analyzeduration", "20000000",
+			"-probesize", "20000000",
+			"-print_format", "json",
+			"-show_format",
+			"-show_streams",
+			"-show_chapters",
+			dvdInput,
+		}
+	} else if strings.Contains(devicePath, "VIDEO_TS") {
+		// Chemin vers VIDEO_TS - utiliser directement
 		dvdInput = devicePath
+		ffprobeArgs = []string{
+			"-v", "error",
+			"-analyzeduration", "20000000",
+			"-probesize", "20000000",
+			"-print_format", "json",
+			"-show_format",
+			"-show_streams",
+			"-show_chapters",
+			dvdInput,
+		}
+	} else {
+		// Par défaut
+		dvdInput = "dvd://1"
+		ffprobeArgs = []string{
+			"-v", "error",
+			"-analyzeduration", "20000000",
+			"-probesize", "20000000",
+			"-print_format", "json",
+			"-show_format",
+			"-show_streams",
+			"-show_chapters",
+			dvdInput,
+		}
 	}
 
 	// Utiliser ffprobe avec des options spécifiques pour les DVD
-	cmd := exec.Command(
-		"sh", "-c",
-		fmt.Sprintf("%s -v error -analyzeduration 10000000 -probesize 10000000 -print_format json -show_format -show_streams -show_chapters %s", 
-			e.ffprobePath, dvdInput),
-	)
-
+	cmd := exec.Command(e.ffprobePath, ffprobeArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Essayer avec le device directement
+		// Essayer avec le device directement (sans dvd://)
 		cmd2 := exec.Command(
 			e.ffprobePath,
 			"-v", "error",
-			"-analyzeduration", "10000000",
-			"-probesize", "10000000",
+			"-analyzeduration", "20000000",
+			"-probesize", "20000000",
 			"-print_format", "json",
 			"-show_format",
 			"-show_streams",
@@ -248,10 +277,26 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 
 	// Utiliser ffmpeg pour obtenir plus d'informations (titre, réalisateur, langues)
 	var ffmpegOutputStr string
-	ffmpegCmd := exec.Command(
-		"sh", "-c",
-		fmt.Sprintf("%s -i %s -t 0.1 -f null - 2>&1", e.ffmpegPath, dvdInput),
-	)
+	var ffmpegArgs []string
+	
+	if strings.HasPrefix(devicePath, "/dev/") {
+		ffmpegArgs = []string{
+			"-dvd_device", devicePath,
+			"-i", "dvd://1",
+			"-t", "0.1",
+			"-f", "null",
+			"-",
+		}
+	} else {
+		ffmpegArgs = []string{
+			"-i", dvdInput,
+			"-t", "0.1",
+			"-f", "null",
+			"-",
+		}
+	}
+	
+	ffmpegCmd := exec.Command(e.ffmpegPath, ffmpegArgs...)
 	ffmpegOutput, ffmpegErr := ffmpegCmd.CombinedOutput()
 	if ffmpegErr == nil {
 		ffmpegOutputStr = string(ffmpegOutput)
@@ -333,6 +378,22 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			SampleRate: stream.SampleRate,
 		}
 
+		// Enrichir avec les détails depuis ffmpeg si disponibles
+		if details, ok := streamDetails[stream.Index]; ok {
+			if lang, ok := details["language"]; ok && language == "" {
+				language = lang
+				track.Language = lang
+			}
+			if ch, ok := details["channels"]; ok && stream.Channels == 0 {
+				if chInt, err := strconv.Atoi(ch); err == nil {
+					track.Channels = chInt
+				}
+			}
+			if sr, ok := details["sample_rate"]; ok && stream.SampleRate == "" {
+				track.SampleRate = sr
+			}
+		}
+
 		switch stream.CodecType {
 		case "video":
 			track.Type = "video"
@@ -348,11 +409,17 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			track.Type = "audio"
 			// Ajouter des informations sur l'audio
 			audioInfo := stream.CodecName
-			if stream.Channels > 0 {
+			if track.Channels > 0 {
+				audioInfo += fmt.Sprintf(" %dch", track.Channels)
+			} else if stream.Channels > 0 {
 				audioInfo += fmt.Sprintf(" %dch", stream.Channels)
+				track.Channels = stream.Channels
 			}
-			if stream.SampleRate != "" {
+			if track.SampleRate != "" {
+				audioInfo += fmt.Sprintf(" %sHz", track.SampleRate)
+			} else if stream.SampleRate != "" {
 				audioInfo += fmt.Sprintf(" %sHz", stream.SampleRate)
+				track.SampleRate = stream.SampleRate
 			}
 			if language != "" {
 				// Convertir le code langue en nom complet
@@ -360,7 +427,13 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 				audioInfo += fmt.Sprintf(" (%s)", langName)
 				track.Language = language
 			} else {
-				audioInfo += " (Unknown)"
+				// Essayer de deviner depuis le codec ou l'index
+				// Par défaut, première piste audio souvent en français ou anglais
+				if audioIdx == 0 {
+					audioInfo += " (Français présumé)"
+				} else {
+					audioInfo += " (Langue inconnue)"
+				}
 			}
 			track.Title = audioInfo
 			info.AudioTracks = append(info.AudioTracks, track)
@@ -375,7 +448,12 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 				track.Title = fmt.Sprintf("%s (%s)", langName, stream.CodecName)
 				track.Language = language
 			} else {
-				track.Title = fmt.Sprintf("Sous-titre %d (%s)", subtitleIdx+1, stream.CodecName)
+				// Essayer de deviner depuis l'index
+				if subtitleIdx == 0 {
+					track.Title = fmt.Sprintf("Français présumé (%s)", stream.CodecName)
+				} else {
+					track.Title = fmt.Sprintf("Sous-titre %d (%s)", subtitleIdx+1, stream.CodecName)
+				}
 			}
 			info.SubtitleTracks = append(info.SubtitleTracks, track)
 			subtitleIdx++
@@ -666,18 +744,24 @@ func (e *DVDExtractor) ExtractDVD(
 	}
 
 	// Construire la commande ffmpeg
-	dvdInput := "dvd://1"
+	args := []string{}
+	
+	// Ajouter -dvd_device si c'est un device block
 	if strings.HasPrefix(devicePath, "/dev/") {
-		dvdInput = fmt.Sprintf("dvd://1 -dvd_device %s", devicePath)
+		args = append(args, "-dvd_device", devicePath)
 	}
+	
+	args = append(args, "-i", "dvd://1")
+	
+	// Mapper la piste vidéo (ignorer le stream dvd_nav_packet qui est index 0)
+	// Les streams vidéo commencent généralement à l'index 1
+	args = append(args, "-map", fmt.Sprintf("0:%d", videoTrackIndex+1))
 
-	args := []string{
-		"-i", dvdInput,
-		"-map", fmt.Sprintf("0:v:%d", videoTrackIndex),
-	}
-
-	// Ajouter les pistes audio
+	// Ajouter les pistes audio (les indices audio commencent après la vidéo)
+	// Il faut trouver le bon index dans les streams
 	for _, audioIdx := range audioTrackIndices {
+		// Les streams audio sont généralement après la vidéo et les sous-titres
+		// On doit mapper selon l'index réel dans les streams
 		args = append(args, "-map", fmt.Sprintf("0:a:%d", audioIdx))
 	}
 
@@ -686,18 +770,30 @@ func (e *DVDExtractor) ExtractDVD(
 		args = append(args, "-map", fmt.Sprintf("0:s:%d", subIdx))
 	}
 
-	// Codecs
+	// Codecs et options
 	args = append(args,
 		"-c:v", "libx264",
+		"-preset", "medium",
+		"-crf", "23",
 		"-c:a", "aac",
-		"-c:s", "mov_text",
+		"-b:a", "192k",
+	)
+	
+	// Ajouter les sous-titres si présents
+	if len(subtitleTrackIndices) > 0 {
+		args = append(args, "-c:s", "mov_text")
+	}
+	
+	args = append(args,
+		"-movflags", "+faststart",
 		"-y",
 		outputPath,
 	)
 
 	cmd := exec.Command(e.ffmpegPath, args...)
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("erreur lors de l'extraction: %w", err)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("erreur lors de l'extraction: %w (output: %s)", err, string(output))
 	}
 
 	return outputPath, nil

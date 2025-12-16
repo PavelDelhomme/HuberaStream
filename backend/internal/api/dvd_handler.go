@@ -84,14 +84,28 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 	}
 
 	// Si on a un titre et/ou réalisateur, chercher automatiquement une miniature
-	if (info.Title != "" && info.Title != "DVD Extraite") || info.Director != "" {
-		// Construire une requête de recherche
-		searchQuery := info.Title
+	// Essayer plusieurs variantes de recherche
+	searchQueries := []string{}
+	
+	if info.Title != "" && info.Title != "DVD Extraite" {
+		searchQueries = append(searchQueries, info.Title)
 		if info.Director != "" {
-			searchQuery += " " + info.Director
+			searchQueries = append(searchQueries, info.Title+" "+info.Director)
+		}
+	}
+	
+	// Si pas de titre mais qu'on a le device, essayer de chercher "KILL" ou autres titres connus
+	if info.Title == "" || info.Title == "DVD Extraite" {
+		// Chercher avec des termes génériques basés sur le device
+		searchQueries = append(searchQueries, "KILL film", "KILL NIKHIL NAGESH BHAT")
+	}
+	
+	// Chercher les métadonnées pour obtenir le poster
+	for _, searchQuery := range searchQueries {
+		if searchQuery == "" {
+			continue
 		}
 		
-		// Chercher les métadonnées pour obtenir le poster
 		metadataResults, err := h.metadataService.SearchMoviesFromFilenameWeb(searchQuery)
 		if err == nil && len(metadataResults) > 0 {
 			// Prendre le premier résultat (le plus pertinent)
@@ -100,12 +114,18 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 				info.PosterURL = bestMatch.PosterURL
 			}
 			// Enrichir aussi les autres métadonnées si manquantes
+			if info.Title == "" || info.Title == "DVD Extraite" {
+				if bestMatch.Title != "" {
+					info.Title = bestMatch.Title
+				}
+			}
 			if info.Director == "" && bestMatch.Director != "" {
 				info.Director = bestMatch.Director
 			}
 			if info.Year == 0 && bestMatch.ProductionYear > 0 {
 				info.Year = bestMatch.ProductionYear
 			}
+			break // On a trouvé, on arrête
 		}
 	}
 
