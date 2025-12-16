@@ -296,7 +296,7 @@
   justify-content: center;
 }
 
-.quality-item:hover {
+.quality-item:hover:not(.quality-disabled) {
   background: rgba(255, 255, 255, 0.1);
   transform: translateY(-2px);
 }
@@ -305,6 +305,21 @@
   width: 18px;
   height: 18px;
   cursor: pointer;
+}
+
+.quality-item.quality-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.quality-item.quality-disabled input[type="checkbox"] {
+  cursor: not-allowed;
+}
+
+.quality-item.quality-suggested {
+  border-color: #ff0000;
+  background: rgba(255, 0, 0, 0.05);
 }
 
 .actions {
