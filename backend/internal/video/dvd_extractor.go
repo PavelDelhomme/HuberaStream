@@ -1113,7 +1113,6 @@ func (e *DVDExtractor) parseDVDTitles(outputStr string) []DVDTitleInfo {
 	var titles []DVDTitleInfo
 	lines := strings.Split(outputStr, "\n")
 	
-	currentTitle := -1
 	var currentTitleInfo *DVDTitleInfo
 	
 	for _, line := range lines {
@@ -1140,7 +1139,6 @@ func (e *DVDExtractor) parseDVDTitles(outputStr string) []DVDTitleInfo {
 			
 			length := float64(hours*3600 + minutes*60 + seconds) + float64(ms)/1000.0
 			
-			currentTitle = titleNum
 			currentTitleInfo = &DVDTitleInfo{
 				TitleNumber:   titleNum,
 				Length:       length,
