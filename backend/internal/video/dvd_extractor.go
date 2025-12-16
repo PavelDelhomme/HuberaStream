@@ -1598,6 +1598,13 @@ func (e *DVDExtractor) ExtractDVD(
 		return "", fmt.Errorf("erreur lors de la création du dossier: %w", err)
 	}
 
+	// Trouver le titre le plus long (comme HandBrake)
+	longestTitle, err := e.findLongestDVDTitle(devicePath)
+	if err != nil {
+		// En cas d'erreur, utiliser le titre 1 par défaut
+		longestTitle = 1
+	}
+
 	// Construire la commande ffmpeg
 	args := []string{}
 
@@ -1606,7 +1613,8 @@ func (e *DVDExtractor) ExtractDVD(
 		args = append(args, "-dvd_device", devicePath)
 	}
 
-	args = append(args, "-i", "dvd://1")
+	// Utiliser le titre le plus long au lieu de toujours dvd://1
+	args = append(args, "-i", fmt.Sprintf("dvd://%d", longestTitle))
 
 	// Mapper la piste vidéo (ignorer le stream dvd_nav_packet qui est index 0)
 	// Les streams vidéo commencent généralement à l'index 1
@@ -1657,11 +1665,19 @@ func (e *DVDExtractor) ExtractDVD(
 		outputPath,
 	)
 
+	// Log de la commande complète pour debug
+	log.Printf("[DVD Extraction] Commande ffmpeg: %s %s", e.ffmpegPath, strings.Join(args, " "))
+	
 	cmd := exec.Command(e.ffmpegPath, args...)
 	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
+	
 	if err != nil {
-		return "", fmt.Errorf("erreur lors de l'extraction: %w (output: %s)", err, string(output))
+		log.Printf("[DVD Extraction] ERREUR ffmpeg: %v", err)
+		log.Printf("[DVD Extraction] Sortie ffmpeg: %s", outputStr)
+		return "", fmt.Errorf("erreur lors de l'extraction: %w (output: %s)", err, outputStr)
 	}
 
+	log.Printf("[DVD Extraction] Extraction ffmpeg réussie")
 	return outputPath, nil
 }
