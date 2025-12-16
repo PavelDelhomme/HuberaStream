@@ -147,7 +147,11 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 }
 
 // GetDVDInfo récupère les informations du DVD (pistes audio/vidéo/sous-titres)
+// Utilise lsdvd pour une analyse complète de la structure, puis ffprobe/ffmpeg pour les détails
 func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
+	// D'abord, essayer d'utiliser lsdvd pour obtenir la structure complète du DVD
+	lsdvdInfo := e.analyzeDVDWithLsdvd(devicePath)
+	
 	// Utiliser directement le device avec ffprobe (plus fiable que dvd://)
 	var ffprobeInput string
 	if strings.HasPrefix(devicePath, "/dev/") {
