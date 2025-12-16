@@ -449,9 +449,15 @@ const DVDExtract = () => {
       setError('Le titre est requis')
       return
     }
+    // Permettre l'extraction sans audio (vidéo muette) mais avec un avertissement
     if (selectedAudioTracks.length === 0) {
-      setError('Sélectionnez au moins une piste audio')
-      return
+      const confirmNoAudio = window.confirm(
+        '⚠️ Aucune piste audio sélectionnée. La vidéo sera extraite sans son (vidéo muette).\n\n' +
+        'Voulez-vous continuer ?'
+      )
+      if (!confirmNoAudio) {
+        return
+      }
     }
     if (qualities.length === 0) {
       setError('Sélectionnez au moins une qualité')
@@ -762,7 +768,7 @@ const DVDExtract = () => {
               </button>
               <button 
                 onClick={handleExtract} 
-                disabled={loading || !title.trim() || selectedAudioTracks.length === 0}
+                disabled={loading || !title.trim()}
                 className="btn-primary btn-large"
               >
                 🚀 Démarrer l'extraction
