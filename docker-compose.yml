@@ -46,7 +46,7 @@ services:
     container_name: streammake-backend
     labels:
       - "com.streammake.project=streammake"
-    command: /app/main
+    command: sh -c "if [ -f /app/bin/main ]; then /app/bin/main; else /app/main; fi"
     # Accès au lecteur DVD/CD (USB et interne)
     devices:
       - /dev/dvd:/dev/dvd:rw
