@@ -213,8 +213,9 @@ const AdminMediaSettings = () => {
         </div>
 
         <div className="form-actions">
-          <button onClick={handleSave} className="save-button">
-            💾 Sauvegarder les paramètres
+          <button onClick={handleSave} className="action-button btn-save">
+            <span className="action-icon">💾</span>
+            <span className="action-text">Sauvegarder les paramètres</span>
           </button>
         </div>
       </div>

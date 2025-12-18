@@ -20,9 +20,9 @@ if ! command -v go &> /dev/null; then
     exit 1
 fi
 
-# Compiler le backend
-echo -e "${GREEN}Compilation en cours...${NC}"
-CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+# Compiler le backend de manière statique pour Alpine Linux
+echo -e "${GREEN}Compilation en cours (statique pour Alpine)...${NC}"
+CGO_ENABLED=0 GOOS=linux go build -a -ldflags='-s -w' -o main ./cmd/server
 
 if [ ! -f "main" ]; then
     echo -e "${RED}❌ Erreur lors de la compilation${NC}"

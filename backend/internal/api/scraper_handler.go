@@ -37,6 +37,7 @@ func (h *ScraperHandler) Search(c *gin.Context) {
 		Source        models.TorrentSource `json:"source" binding:"required"`
 		CategoryID    *uuid.UUID           `json:"category_id"`
 		SubCategoryID *uuid.UUID           `json:"sub_category_id"`
+		IndexID       *uuid.UUID           `json:"index_id"` // Optionnel : utiliser un index spécifique
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -45,10 +46,40 @@ func (h *ScraperHandler) Search(c *gin.Context) {
 	}
 
 	// Créer le scraper
-	scraper, err := scraper.NewScraper(req.Source)
+	scraperInstance, err := scraper.NewScraper(req.Source)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Source non supportée"})
 		return
+	}
+
+	// Récupérer l'index à utiliser
+	var torrentIndex *models.TorrentIndex
+	if req.IndexID != nil {
+		// Utiliser l'index spécifié
+		var index models.TorrentIndex
+		if err := h.db.First(&index, *req.IndexID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Index non trouvé"})
+			return
+		}
+		if !index.Enabled {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Index désactivé"})
+			return
+		}
+		torrentIndex = &index
+	} else {
+		// Utiliser l'index par défaut pour cette source
+		var index models.TorrentIndex
+		if err := h.db.Where("source = ? AND is_default = ? AND enabled = ?", req.Source, true, true).
+			First(&index).Error; err == nil {
+			torrentIndex = &index
+		}
+	}
+
+	// Configurer le scraper avec l'index si disponible
+	if torrentIndex != nil {
+		if scraperWithURL, ok := scraperInstance.(scraper.ScraperWithCustomURL); ok {
+			scraperWithURL.SetBaseURL(torrentIndex.BaseURL)
+		}
 	}
 
 	// Récupérer la catégorie si fournie
@@ -70,15 +101,24 @@ func (h *ScraperHandler) Search(c *gin.Context) {
 	}
 
 	// Rechercher
-	results, err := scraper.Search(c.Request.Context(), req.Query, category, subCategory)
+	results, err := scraperInstance.Search(c.Request.Context(), req.Query, category, subCategory)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de la recherche"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Erreur lors de la recherche",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"results": results,
 		"count":   len(results),
+		"index_used": func() string {
+			if torrentIndex != nil {
+				return torrentIndex.Name
+			}
+			return "default"
+		}(),
 	})
 }
 

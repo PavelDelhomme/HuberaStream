@@ -21,11 +21,39 @@
   font-size: 14px;
 }
 
-.search-empty {
+.search-empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: #aaaaaa;
-  font-size: 18px;
+  margin-top: 40px;
+}
+
+.search-empty-state .empty-state-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.search-empty-state .empty-state-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 16px 0;
+}
+
+.search-empty-state .empty-state-message {
+  font-size: 16px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.search-empty-state .empty-state-message strong {
+  color: #ffffff;
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 8px;
 }
 
 .loading,

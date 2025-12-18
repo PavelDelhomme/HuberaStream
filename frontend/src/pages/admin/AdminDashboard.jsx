@@ -216,8 +216,13 @@ const AdminDashboard = () => {
           </Link>
           <Link to="/admin/torrent-configs" className="admin-menu-card">
             <div className="menu-card-icon">🔧</div>
-            <h3>Configurations</h3>
+            <h3>Configurations de téléchargement automatique</h3>
             <p>Gérer les configurations de téléchargement</p>
+          </Link>
+          <Link to="/admin/torrent-candidates" className="admin-menu-card">
+            <div className="menu-card-icon">🎯</div>
+            <h3>Candidats Torrents</h3>
+            <p>Voir et gérer les torrents trouvés automatiquement</p>
           </Link>
           <Link to="/admin/media-settings" className="admin-menu-card">
             <div className="menu-card-icon">🎬</div>

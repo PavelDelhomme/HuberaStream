@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -89,7 +90,7 @@ func Load() *Config {
 		// Utiliser les URLs spécifiques si définies, sinon TORRENT_CLIENT_PATH, sinon défaut
 		TorrentClientPath:             getTorrentClientPath(),
 		TorrentClientType:             getEnv("TORRENT_CLIENT_TYPE", "transmission"), // transmission, qbittorrent, deluge, rtorrent
-		TorrentDownloadPath:           getEnv("TORRENT_DOWNLOAD_PATH", "./storage/torrents/downloads"),
+		TorrentDownloadPath:           getTorrentDownloadPath(),
 		EnableAutoDownload:            getEnv("ENABLE_AUTO_DOWNLOAD", "false") == "true",
 		TorrentClientTransmissionURL:  getEnv("TRANSMISSION_URL", "http://transmission:9091/transmission/rpc"),
 		TorrentClientTransmissionUser: getEnv("TRANSMISSION_USER", "transmission"),
@@ -115,6 +116,21 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// getAbsolutePath convertit un chemin relatif en chemin absolu
+func getAbsolutePath(path string) string {
+	// Si le chemin est déjà absolu, le retourner tel quel
+	if filepath.IsAbs(path) {
+		return path
+	}
+	// Sinon, le convertir en chemin absolu
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		// En cas d'erreur, retourner le chemin original
+		return path
+	}
+	return absPath
 }
 
 // getTorrentClientPath retourne l'URL du client torrent en fonction du type et des variables d'environnement
@@ -147,4 +163,16 @@ func getTorrentClientPath() string {
 	default:
 		return "http://transmission:9091/transmission/rpc"
 	}
+}
+
+// getTorrentDownloadPath retourne le chemin de téléchargement pour les torrents
+// Ce chemin doit être tel que le client torrent le voit dans son conteneur
+func getTorrentDownloadPath() string {
+	path := getEnv("TORRENT_DOWNLOAD_PATH", "/downloads")
+	// Si le chemin commence par /downloads, le garder tel quel (c'est le chemin dans le conteneur Transmission)
+	if strings.HasPrefix(path, "/downloads") {
+		return path
+	}
+	// Sinon, utiliser getAbsolutePath pour les autres cas
+	return getAbsolutePath(path)
 }

@@ -183,3 +183,8 @@ func (s *TorrentService) RemoveTorrent(ctx context.Context, torrentID string) er
 func (s *TorrentService) GetTorrentStatus(ctx context.Context, torrentID string) (*TorrentStatus, error) {
 	return s.client.GetTorrentStatus(ctx, torrentID)
 }
+
+// ListAllTorrents liste tous les torrents du client
+func (s *TorrentService) ListAllTorrents(ctx context.Context) ([]*TorrentStatus, error) {
+	return s.client.ListTorrents(ctx)
+}

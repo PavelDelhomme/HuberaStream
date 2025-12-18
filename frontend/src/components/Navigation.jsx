@@ -310,7 +310,7 @@ const Navigation = () => {
                         <span className="dropdown-section-title">⚙️ Administration</span>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -319,10 +319,11 @@ const Navigation = () => {
                           }}
                         >
                           📊 Tableau de bord
+                          {location.pathname === '/admin' && <span className="active-indicator">●</span>}
                         </button>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/users' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -331,10 +332,11 @@ const Navigation = () => {
                           }}
                         >
                           👥 Utilisateurs
+                          {location.pathname === '/admin/users' && <span className="active-indicator">●</span>}
                         </button>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/categories' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -343,12 +345,13 @@ const Navigation = () => {
                           }}
                         >
                           📂 Catégories
+                          {location.pathname === '/admin/categories' && <span className="active-indicator">●</span>}
                         </button>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/videos' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -357,10 +360,11 @@ const Navigation = () => {
                           }}
                         >
                           📹 Gérer Vidéos
+                          {location.pathname === '/admin/videos' && <span className="active-indicator">●</span>}
                         </button>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/upload' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -369,10 +373,11 @@ const Navigation = () => {
                           }}
                         >
                           ⬆️ Upload Vidéo
+                          {location.pathname === '/upload' && <span className="active-indicator">●</span>}
                         </button>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/dvd-extract' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -381,12 +386,13 @@ const Navigation = () => {
                           }}
                         >
                           📀 Extraire DVD
+                          {location.pathname === '/dvd-extract' && <span className="active-indicator">●</span>}
                         </button>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">📥 Torrents</span>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/torrents' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -395,10 +401,11 @@ const Navigation = () => {
                           }}
                         >
                           📥 Gérer Torrents
+                          {location.pathname === '/admin/torrents' && <span className="active-indicator">●</span>}
                         </button>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/torrent-clients' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -407,10 +414,11 @@ const Navigation = () => {
                           }}
                         >
                           ⚙️ Clients Torrent
+                          {location.pathname === '/admin/torrent-clients' && <span className="active-indicator">●</span>}
                         </button>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/torrent-configs' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -418,13 +426,27 @@ const Navigation = () => {
                             navigate('/admin/torrent-configs');
                           }}
                         >
-                          ⚙️ Configurations
+                          ⚙️ Configurations de téléchargement automatique
+                          {location.pathname === '/admin/torrent-configs' && <span className="active-indicator">●</span>}
+                        </button>
+                        <button
+                          type="button"
+                          className={`dropdown-item ${location.pathname === '/admin/torrent-indexes' ? 'active' : ''}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setShowUserMenu(false);
+                            navigate('/admin/torrent-indexes');
+                          }}
+                        >
+                          🔍 Index de Torrents
+                          {location.pathname === '/admin/torrent-indexes' && <span className="active-indicator">●</span>}
                         </button>
                         <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎛️ Paramètres</span>
                         <button
                           type="button"
-                          className="dropdown-item" 
+                          className={`dropdown-item ${location.pathname === '/admin/media-settings' ? 'active' : ''}`}
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -433,6 +455,7 @@ const Navigation = () => {
                           }}
                         >
                           🎬 Paramètres Média
+                          {location.pathname === '/admin/media-settings' && <span className="active-indicator">●</span>}
                         </button>
                         <div className="dropdown-divider"></div>
                       </>

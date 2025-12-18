@@ -30,6 +30,8 @@ const AdminVideos = () => {
       return
     }
     fetchVideos()
+    // Vérifier s'il y a des vidéos invalides au chargement
+    fetchInvalidVideos()
   }, [user, authLoading, isAdmin, navigate])
 
   const fetchVideos = async () => {
@@ -215,23 +217,27 @@ const AdminVideos = () => {
       <div className="admin-videos-header">
         <h1>🎬 Gestion des Vidéos</h1>
         <div className="admin-videos-actions">
-          <button 
-            onClick={async () => {
-              const invalid = await fetchInvalidVideos()
-              setShowInvalidList(!showInvalidList)
-            }}
-            className="admin-action-button info"
-            disabled={cleaning}
-          >
-            {showInvalidList ? '👁️ Masquer' : '👁️ Voir'} les vidéos invalides
-          </button>
-          <button 
-            onClick={handleCleanInvalidVideos} 
-            className="admin-action-button clean"
-            disabled={cleaning}
-          >
-            {cleaning ? '🧹 Nettoyage...' : '🧹 Nettoyer les vidéos invalides'}
-          </button>
+          {invalidVideos.length > 0 && (
+            <>
+              <button 
+                onClick={async () => {
+                  const invalid = await fetchInvalidVideos()
+                  setShowInvalidList(!showInvalidList)
+                }}
+                className="admin-action-button info"
+                disabled={cleaning}
+              >
+                {showInvalidList ? '👁️ Masquer' : '👁️ Voir'} les vidéos invalides
+              </button>
+              <button 
+                onClick={handleCleanInvalidVideos} 
+                className="admin-action-button clean"
+                disabled={cleaning}
+              >
+                {cleaning ? '🧹 Nettoyage...' : '🧹 Nettoyer les vidéos invalides'}
+              </button>
+            </>
+          )}
           <Link to="/upload" className="admin-action-button primary">
             ⬆️ Upload Vidéo
           </Link>

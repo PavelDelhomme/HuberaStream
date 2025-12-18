@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -33,38 +34,56 @@ type TorrentClientStatus struct {
 
 // GetTorrentClientsStatus retourne le statut de tous les clients torrent
 func (h *TorrentClientsHandler) GetTorrentClientsStatus(c *gin.Context) {
+	ctx := c.Request.Context()
 	clients := []TorrentClientStatus{
 		{
 			Type:      "transmission",
 			Name:      "Transmission",
-			Available: true,
+			Available: h.testClientConnection(ctx, "transmission"),
 			WebPort:   "3305",
 			WebURL:    "http://localhost:3305",
 		},
 		{
 			Type:      "qbittorrent",
 			Name:      "qBittorrent",
-			Available: true,
+			Available: h.testClientConnection(ctx, "qbittorrent"),
 			WebPort:   "3306",
 			WebURL:    "http://localhost:3306",
 		},
 		{
 			Type:      "deluge",
 			Name:      "Deluge",
-			Available: true,
+			Available: h.testClientConnection(ctx, "deluge"),
 			WebPort:   "3307",
 			WebURL:    "http://localhost:3307",
 		},
 		{
 			Type:      "rtorrent",
 			Name:      "rTorrent/ruTorrent",
-			Available: true,
+			Available: false, // Pas encore implémenté
 			WebPort:   "3308",
 			WebURL:    "http://localhost:3308",
 		},
 	}
 
 	c.JSON(http.StatusOK, gin.H{"clients": clients})
+}
+
+// testClientConnection teste rapidement la connexion à un client
+func (h *TorrentClientsHandler) testClientConnection(ctx context.Context, clientType string) bool {
+	// Créer une config temporaire pour le test
+	testCfg := *h.cfg
+	clientTypeEnum := torrent.ClientType(clientType)
+	
+	// Utiliser les URLs de la config
+	client, err := torrent.NewTorrentClient(clientTypeEnum, &testCfg)
+	if err != nil {
+		return false
+	}
+	
+	// Tester en listant les torrents (avec timeout court)
+	_, err = client.ListTorrents(ctx)
+	return err == nil
 }
 
 // GetCurrentTorrentClient retourne le client torrent actuellement configuré

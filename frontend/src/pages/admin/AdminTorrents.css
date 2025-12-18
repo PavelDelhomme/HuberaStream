@@ -319,9 +319,33 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ff0000 0%, #cc0000 100%);
+  background: linear-gradient(90deg, #3498db 0%, #2980b9 100%);
   transition: width 0.3s;
   border-radius: 5px;
+}
+
+.metadata-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  color: #3498db;
+  font-size: 14px;
+}
+
+.loading-spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(52, 152, 219, 0.3);
+  border-top-color: #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .torrent-details {
@@ -370,27 +394,102 @@
   border-color: #ff0000;
 }
 
-.search-form button {
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
+/* Action buttons style (même que AdminTorrentConfigs) */
+.action-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background-color: #2a2a2a;
+  border: 2px solid #404040;
+  border-radius: 25px;
   cursor: pointer;
-  font-size: 16px;
+  user-select: none;
+  transition: all 0.3s ease;
+  font-size: 14px;
   font-weight: 500;
-  transition: all 0.3s;
+}
+
+.action-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-icon {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.action-text {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.search-form button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+.btn-search {
+  background-color: rgba(108, 92, 231, 0.15);
+  border-color: #6c5ce7;
 }
 
-.search-form button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-search:hover:not(:disabled) {
+  background-color: rgba(108, 92, 231, 0.25);
+  border-color: #6c5ce7;
+  box-shadow: 0 4px 12px rgba(108, 92, 231, 0.3);
+}
+
+.btn-search.loading {
+  background-color: rgba(255, 193, 7, 0.15);
+  border-color: #ffc107;
+}
+
+.btn-search .action-text {
+  color: #6c5ce7;
+}
+
+.btn-search.loading .action-text {
+  color: #ffc107;
+}
+
+.btn-download {
+  background-color: rgba(40, 167, 69, 0.15);
+  border-color: #28a745;
+}
+
+.btn-download:hover:not(:disabled) {
+  background-color: rgba(40, 167, 69, 0.25);
+  border-color: #28a745;
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.btn-download .action-text {
+  color: #28a745;
+}
+
+.btn-library {
+  background-color: rgba(0, 123, 255, 0.15);
+  border-color: #007bff;
+}
+
+.btn-library:hover:not(:disabled) {
+  background-color: rgba(0, 123, 255, 0.25);
+  border-color: #007bff;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.btn-library .action-text {
+  color: #007bff;
 }
 
 .search-results,
@@ -444,22 +543,8 @@
   gap: 8px;
 }
 
-.download-btn {
+.result-actions .action-button {
   flex: 1;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.3s;
-}
-
-.download-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
 }
 
 /* Parcourir catégories */
@@ -530,11 +615,36 @@
   text-align: center;
   padding: 60px 20px;
   color: rgba(255, 255, 255, 0.5);
+  grid-column: 1 / -1;
 }
 
-.empty-state p {
-  margin: 8px 0;
+.empty-state-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 16px 0;
+}
+
+.empty-state-message {
   font-size: 16px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.empty-state-message strong {
+  color: #ffffff;
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 8px;
 }
 
 /* Responsive */

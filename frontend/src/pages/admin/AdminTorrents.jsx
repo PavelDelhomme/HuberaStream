@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
@@ -38,6 +38,9 @@ const AdminTorrents = () => {
     sub_category_id: ''
   })
   const [categories, setCategories] = useState([])
+  
+  // Ref pour stocker les torrents dans l'interval (évite la boucle infinie)
+  const torrentsRef = useRef([])
 
   useEffect(() => {
     if (authLoading) return
@@ -51,11 +54,21 @@ const AdminTorrents = () => {
     }
     fetchTorrents(true) // Chargement initial
     fetchCategories()
+    
+    // Écouter l'événement de téléchargement de candidat
+    const handleTorrentDownloaded = () => {
+      // Rafraîchir la liste des torrents après un téléchargement
+      setTimeout(() => {
+        fetchTorrentsBackground()
+      }, 1000) // Attendre 1 seconde pour que le backend ait fini de créer le torrent
+    }
+    window.addEventListener('torrentDownloaded', handleTorrentDownloaded)
+    
     // Auto-refresh toutes les 5 secondes UNIQUEMENT s'il y a des torrents actifs
     const interval = setInterval(() => {
       if (autoRefreshEnabled) {
-        // Vérifier s'il y a des torrents actifs (pending, downloading, seeding)
-        const hasActiveTorrents = torrents.some(t => 
+        // Utiliser la ref pour éviter la dépendance sur torrents
+        const hasActiveTorrents = torrentsRef.current.some(t => 
           t.status === 'pending' || t.status === 'downloading' || t.status === 'seeding'
         )
         // Ne rafraîchir que s'il y a des torrents actifs
@@ -63,9 +76,17 @@ const AdminTorrents = () => {
           fetchTorrentsBackground()
         }
       }
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [user, authLoading, isAdmin, navigate, autoRefreshEnabled, torrents])
+    }, 5000) // Rafraîchir toutes les 5 secondes pour voir la progression en temps réel
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('torrentDownloaded', handleTorrentDownloaded)
+    }
+  }, [user, authLoading, isAdmin, navigate, autoRefreshEnabled]) // Retiré torrents des dépendances
+
+  // Mettre à jour la ref quand torrents change
+  useEffect(() => {
+    torrentsRef.current = torrents
+  }, [torrents])
 
   const fetchTorrents = async (isInitial = false) => {
     try {
@@ -373,6 +394,8 @@ const AdminTorrents = () => {
           >
             <option value="custom">Custom</option>
             <option value="1337x">1337x</option>
+            <option value="piratebay">The Pirate Bay</option>
+            <option value="torrentdownload">TorrentDownload</option>
             <option value="rarbg">RARBG</option>
             <option value="yts">YTS</option>
             <option value="nyaa">Nyaa</option>
@@ -452,24 +475,42 @@ const AdminTorrents = () => {
                     </div>
                   )}
                   <div className="torrent-progress">
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{ width: `${torrent.progress || 0}%` }}
-                      />
-                    </div>
-                    <span>{torrent.progress ? torrent.progress.toFixed(1) : 0}%</span>
+                    {torrent.size === 0 && torrent.status === 'pending' ? (
+                      <div className="metadata-loading">
+                        <div className="loading-spinner-small"></div>
+                        <span>Récupération des métadonnées...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="progress-bar">
+                          <div
+                            className="progress-fill"
+                            style={{ width: `${torrent.progress || 0}%` }}
+                          />
+                        </div>
+                        <span>{torrent.progress ? torrent.progress.toFixed(1) : 0}%</span>
+                      </>
+                    )}
                   </div>
                   <div className="torrent-details">
-                    <span>📦 Taille: {formatBytes(torrent.size)}</span>
+                    <span>📦 Taille: {torrent.size > 0 ? formatBytes(torrent.size) : 'En attente...'}</span>
                     <span>⬇️ Téléchargé: {formatBytes(torrent.downloaded)}</span>
-                    {torrent.download_speed > 0 && (
-                      <span>⚡ Vitesse: {formatBytes(torrent.download_speed)}/s</span>
+                    {torrent.status === 'downloading' && (
+                      <>
+                        {torrent.download_speed > 0 ? (
+                          <span>⚡ Vitesse: {formatBytes(torrent.download_speed)}/s</span>
+                        ) : (
+                          <span>⏳ En attente de connexion...</span>
+                        )}
+                      </>
                     )}
-                    {torrent.seeders !== undefined && (
+                    {torrent.status === 'pending' && torrent.size === 0 && (
+                      <span>⏳ Récupération des métadonnées...</span>
+                    )}
+                    {torrent.seeders !== undefined && torrent.seeders > 0 && (
                       <span>🌱 Seeders: {torrent.seeders}</span>
                     )}
-                    {torrent.leechers !== undefined && (
+                    {torrent.leechers !== undefined && torrent.leechers > 0 && (
                       <span>👥 Leechers: {torrent.leechers}</span>
                     )}
                     <span>🔗 Source: {torrent.source}</span>
@@ -497,8 +538,13 @@ const AdminTorrents = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
             />
-            <button onClick={handleSearch} disabled={searching}>
-              {searching ? '⏳ Recherche...' : '🔍 Rechercher'}
+            <button 
+              className={`action-button btn-search ${searching ? 'loading' : ''}`}
+              onClick={handleSearch} 
+              disabled={searching}
+            >
+              <span className="action-icon">{searching ? '⏳' : '🔍'}</span>
+              <span className="action-text">{searching ? 'Recherche...' : 'Rechercher'}</span>
             </button>
           </div>
           <div className="search-results">
@@ -536,9 +582,32 @@ const AdminTorrents = () => {
                 </div>
               </div>
             ))}
-            {searchResults.length === 0 && !searching && (
+            {searchResults.length === 0 && !searching && searchQuery && (
               <div className="empty-state">
-                <p>Entrez un terme de recherche et cliquez sur "Rechercher"</p>
+                <p className="empty-state-icon">🔍</p>
+                <p className="empty-state-title">Aucun résultat trouvé</p>
+                <p className="empty-state-message">
+                  Aucun torrent ne correspond à votre recherche "{searchQuery}".
+                  <br />
+                  <strong>Suggestions :</strong>
+                  <br />
+                  • Vérifiez l'orthographe
+                  <br />
+                  • Essayez des termes plus génériques
+                  <br />
+                  • Vérifiez que le site 1337x est accessible
+                </p>
+              </div>
+            )}
+            {searchResults.length === 0 && !searching && !searchQuery && (
+              <div className="empty-state">
+                <p className="empty-state-icon">🔍</p>
+                <p className="empty-state-title">Rechercher un torrent</p>
+                <p className="empty-state-message">
+                  Entrez un terme de recherche dans le champ ci-dessus et cliquez sur "Rechercher" pour trouver des torrents.
+                  <br />
+                  <strong>Exemples :</strong> "Game of Thrones S01E01", "The Matrix", "Inception 1080p"
+                </p>
               </div>
             )}
           </div>
@@ -617,17 +686,19 @@ const AdminTorrents = () => {
                   <div className="result-actions">
                     <button
                       onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name, false)}
-                      className="download-btn"
+                      className="action-button btn-download"
                       title="Télécharger le torrent"
                     >
-                      ⬇️ Télécharger
+                      <span className="action-icon">⬇️</span>
+                      <span className="action-text">Télécharger</span>
                     </button>
                     <button
                       onClick={() => handleDownloadFrom1337x(result.torrent_url, result.name, true)}
-                      className="download-btn library-btn"
+                      className="action-button btn-library"
                       title="Ajouter à la bibliothèque (téléchargement + ajout automatique à l'accueil)"
                     >
-                      📚 Ajouter à la bibliothèque
+                      <span className="action-icon">📚</span>
+                      <span className="action-text">Ajouter à la bibliothèque</span>
                     </button>
                   </div>
                 </div>
@@ -635,7 +706,11 @@ const AdminTorrents = () => {
             )}
             {browseResults.length === 0 && !browsing && (
               <div className="empty-state">
-                <p>Aucun résultat pour cette catégorie</p>
+                <p className="empty-state-icon">📭</p>
+                <p className="empty-state-title">Aucun résultat pour cette catégorie</p>
+                <p className="empty-state-message">
+                  Essayez de changer de catégorie ou de langue, ou passez à la page suivante.
+                </p>
               </div>
             )}
           </div>

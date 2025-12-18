@@ -4,10 +4,28 @@
 PROJECT_NAME := streammake
 DOCKER_COMPOSE_FILE := docker-compose.yml
 STREAMMAKE_CONTAINERS := streammake-postgres streammake-redis streammake-backend streammake-frontend streammake-nginx streammake-transmission streammake-qbittorrent streammake-deluge streammake-rtorrent
-GREEN := \033[0;32m
-YELLOW := \033[0;33m
-RED := \033[0;31m
-NC := \033[0m
+
+# Détection du support des couleurs
+ifneq ($(TERM),)
+  ifneq ($(TERM),dumb)
+    ifneq ($(NO_COLOR),1)
+      HAS_COLOR := 1
+    endif
+  endif
+endif
+
+# Codes de couleur (seulement si le terminal les supporte)
+ifeq ($(HAS_COLOR),1)
+  GREEN := \033[0;32m
+  YELLOW := \033[0;33m
+  RED := \033[0;31m
+  NC := \033[0m
+else
+  GREEN :=
+  YELLOW :=
+  RED :=
+  NC :=
+endif
 
 help:
 	@echo "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

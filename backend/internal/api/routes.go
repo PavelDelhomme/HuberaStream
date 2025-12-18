@@ -54,6 +54,7 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
 	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
 	favoriteHandler := NewFavoriteHandler(db, cfg)
+	torrentIndexHandler := NewTorrentIndexHandler(db, cfg)
 
 	// Routes publiques
 	api := router.Group("/api")
@@ -222,6 +223,28 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			torrentConfigs.POST("", torrentHandler.CreateTorrentConfig)
 			torrentConfigs.PUT("/:id", torrentHandler.UpdateTorrentConfig)
 			torrentConfigs.DELETE("/:id", torrentHandler.DeleteTorrentConfig)
+			torrentConfigs.POST("/:id/trigger-search", torrentHandler.TriggerConfigSearch)
+		}
+
+		// Candidats de torrent (résultats de recherche automatique)
+		torrentCandidates := admin.Group("/torrent-candidates")
+		{
+			torrentCandidates.GET("", torrentHandler.ListTorrentCandidates)
+			torrentCandidates.POST("/:id/approve", torrentHandler.ApproveTorrentCandidate)
+			torrentCandidates.POST("/:id/disapprove", torrentHandler.DisapproveTorrentCandidate)
+			torrentCandidates.POST("/:id/reject", torrentHandler.RejectTorrentCandidate)
+			torrentCandidates.POST("/:id/download", torrentHandler.DownloadTorrentCandidate)
+			torrentCandidates.POST("/:id/learn", torrentHandler.LearnFromCandidate)
+			torrentCandidates.DELETE("/:id", torrentHandler.DeleteTorrentCandidate)
+			torrentCandidates.DELETE("/config/:configId/all", torrentHandler.DeleteAllTorrentCandidatesByConfig)
+		}
+
+		// Patterns d'apprentissage
+		learningPatterns := admin.Group("/torrent-learning-patterns")
+		{
+			learningPatterns.GET("", torrentHandler.ListLearningPatterns)
+			learningPatterns.POST("", torrentHandler.CreateLearningPattern)
+			learningPatterns.DELETE("/:id", torrentHandler.DeleteLearningPattern)
 		}
 
 		// Gestion des clients torrent
@@ -249,6 +272,17 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			scrapers.POST("/crawler/start", scraperHandler.StartCrawler)
 			scrapers.POST("/crawler/stop", scraperHandler.StopCrawler)
 			scrapers.GET("/crawler/status", scraperHandler.GetCrawlerStatus)
+		}
+
+		// Index de torrents (configuration des sites de torrents)
+		torrentIndexes := admin.Group("/torrent-indexes")
+		{
+			torrentIndexes.GET("", torrentIndexHandler.ListTorrentIndexes)
+			torrentIndexes.GET("/:id", torrentIndexHandler.GetTorrentIndex)
+			torrentIndexes.POST("", torrentIndexHandler.CreateTorrentIndex)
+			torrentIndexes.PUT("/:id", torrentIndexHandler.UpdateTorrentIndex)
+			torrentIndexes.DELETE("/:id", torrentIndexHandler.DeleteTorrentIndex)
+			torrentIndexes.POST("/:id/test", torrentIndexHandler.TestTorrentIndex)
 		}
 
 		// Upload par chunks (avec pause/reprise)

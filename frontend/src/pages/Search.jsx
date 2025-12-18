@@ -68,9 +68,29 @@ const Search = () => {
     <div className="search-container">
       <div className="search-results-header">
         <h2>Résultats pour "{query}"</h2>
-        <p className="results-count">{videos.length} vidéo(s) trouvée(s)</p>
+        {videos.length > 0 ? (
+          <p className="results-count">{videos.length} vidéo(s) trouvée(s)</p>
+        ) : (
+          <div className="search-empty-state">
+            <p className="empty-state-icon">🔍</p>
+            <p className="empty-state-title">Aucun résultat trouvé</p>
+            <p className="empty-state-message">
+              Aucune vidéo ne correspond à votre recherche "{query}".
+              <br />
+              <strong>Suggestions :</strong>
+              <br />
+              • Vérifiez l'orthographe
+              <br />
+              • Essayez des termes plus génériques
+              <br />
+              • Utilisez moins de mots-clés
+              <br />
+              • Vérifiez que les vidéos sont bien disponibles dans la bibliothèque
+            </p>
+          </div>
+        )}
       </div>
-      <VideoGrid videos={videos} />
+      {videos.length > 0 && <VideoGrid videos={videos} />}
     </div>
   )
 }

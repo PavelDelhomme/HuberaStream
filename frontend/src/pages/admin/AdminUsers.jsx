@@ -181,14 +181,14 @@ const AdminUsers = () => {
                   </select>
                 </td>
                 <td>
-                  <label className="toggle-switch">
+                  <label className={`toggle-button ${u.is_active ? 'enabled' : 'disabled'}`}>
                     <input
                       type="checkbox"
                       checked={u.is_active}
                       onChange={(e) => handleUpdateUser(u.id, { is_active: e.target.checked })}
                     />
-                    <span className="toggle-slider"></span>
-                    <span className="toggle-label">{u.is_active ? 'Actif' : 'Inactif'}</span>
+                    <span className="toggle-checkbox-custom"></span>
+                    <span className="toggle-text">{u.is_active ? 'Actif' : 'Inactif'}</span>
                   </label>
                 </td>
                 <td>
@@ -196,19 +196,21 @@ const AdminUsers = () => {
                     {!u.is_active && (
                       <button
                         onClick={() => handleUpdateUser(u.id, { is_active: true })}
-                        className="approve-button"
+                        className="action-button btn-approve"
                         title="Valider l'inscription"
                       >
-                        ✅ Valider
+                        <span className="action-icon">✅</span>
+                        <span className="action-text">Valider</span>
                       </button>
                     )}
                     <button
                       onClick={() => handleDeleteUser(u.id)}
-                      className="delete-button"
+                      className="action-button btn-delete"
                       disabled={u.id === user.id}
                       title="Supprimer l'utilisateur"
                     >
-                      🗑️ Supprimer
+                      <span className="action-icon">🗑️</span>
+                      <span className="action-text">Supprimer</span>
                     </button>
                   </div>
                 </td>

@@ -46,7 +46,7 @@ services:
     container_name: streammake-backend
     labels:
       - "com.streammake.project=streammake"
-    command: sh -c "if [ -f /app/bin/main ]; then /app/bin/main; else /app/main; fi"
+    command: sh -c "ls -la /app/bin/ 2>&1 || true; ls -la /app/ 2>&1 || true; if [ -f /app/bin/main ] && [ -x /app/bin/main ]; then echo 'Exécution de /app/bin/main'; exec /app/bin/main; elif [ -f /app/main ] && [ -x /app/main ]; then echo 'Exécution de /app/main'; exec /app/main; else echo 'Aucun binaire exécutable trouvé'; exit 1; fi"
     # Accès au lecteur DVD/CD (USB et interne)
     devices:
       - /dev/dvd:/dev/dvd:rw
@@ -81,6 +81,7 @@ services:
       VIDEO_STORAGE_PATH: /app/storage/videos
       THUMBNAIL_STORAGE_PATH: /app/storage/thumbnails
       TORRENT_STORAGE_PATH: /app/storage/torrents
+      TORRENT_DOWNLOAD_PATH: /downloads
       ADMIN_EMAIL: ${ADMIN_EMAIL:-dev@delhomme.ovh}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminStreamMake2024!}
       PORT: 8080

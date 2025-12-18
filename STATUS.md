@@ -1,6 +1,46 @@
 # Status du Projet StreamMake
 
-**Dernière mise à jour**: 10 décembre 2025
+**Dernière mise à jour**: 18 décembre 2025
+
+## 🔴 PRIORITÉS À VALIDER / À FAIRE (En haut de la liste)
+
+### ⚠️ À VALIDER EN PRIORITÉ
+
+1. **Test des nouvelles sources de torrents** 🔴
+   - [ ] Tester The Pirate Bay avec recherche "alice" ou "inception"
+   - [ ] Tester TorrentDownload avec recherche "alice" ou "inception"
+   - [ ] Tester 1337x.proxyninja.net (via base_url personnalisée)
+   - [ ] Vérifier que les résultats sont correctement parsés
+   - [ ] Vérifier que les candidats sont créés correctement
+
+2. **Amélioration du filtrage audio** 🔴
+   - [x] Filtrage des fichiers audio (MP3, FLAC, etc.)
+   - [x] Filtrage des versions instrumentales
+   - [ ] Tester avec plusieurs recherches pour valider le filtrage
+   - [ ] Vérifier qu'aucun fichier audio n'apparaît dans les candidats
+
+3. **Gestion des torrents en téléchargement** 🟡
+   - [x] Affichage de la progression avec barre de chargement
+   - [x] Indicateur "Récupération des métadonnées..."
+   - [x] Affichage de la vitesse de téléchargement
+   - [ ] Tester le rafraîchissement automatique toutes les 5 secondes
+   - [ ] Vérifier que la progression se met à jour correctement
+   - [ ] Tester pause/resume des torrents
+
+4. **Système de candidats torrent** 🟡
+   - [x] Création automatique de candidats lors de la recherche
+   - [x] Rafraîchissement automatique du modal après recherche
+   - [x] Affichage des candidats même s'ils ne respectent pas les filtres (marqués comme rejetés)
+   - [ ] Tester l'approbation/désapprobation de candidats
+   - [ ] Tester le téléchargement depuis les candidats
+   - [ ] Vérifier que les candidats rejetés ne sont pas téléchargés automatiquement
+
+5. **Post-traitement automatique** 🔴
+   - [ ] Détection automatique de fin de téléchargement
+   - [ ] Extraction des fichiers vidéo depuis les torrents terminés
+   - [ ] Création automatique d'entrées vidéo dans la base de données
+   - [ ] Association avec catégories et métadonnées
+   - [ ] Transcodage automatique après téléchargement
 
 ## 🎯 État Actuel du Projet
 
@@ -109,6 +149,16 @@
 - [x] Modèles pour configurations de torrents
 - [x] API REST pour gestion des torrents
 - [x] Support de multiples sources (1337x, RARBG, YTS, Nyaa, Custom)
+- [x] **NOUVEAU**: Support The Pirate Bay (piratebay)
+- [x] **NOUVEAU**: Support TorrentDownload (torrentdownload)
+- [x] **NOUVEAU**: Support 1337x.proxyninja.net (via base_url)
+- [x] **NOUVEAU**: Système de candidats torrent (pending, approved, rejected, downloaded)
+- [x] **NOUVEAU**: Filtrage automatique des fichiers audio et versions instrumentales
+- [x] **NOUVEAU**: Rafraîchissement automatique des candidats après recherche
+- [x] **NOUVEAU**: Affichage de la progression de téléchargement avec barre
+- [x] **NOUVEAU**: Indicateur de récupération des métadonnées
+- [x] **NOUVEAU**: Affichage de la vitesse de téléchargement
+- [x] **NOUVEAU**: Système d'index de torrents configurable
 
 ## 🚧 En Cours / À Implémenter
 
@@ -126,21 +176,31 @@
 - [ ] **À FAIRE**: Gestion des erreurs de connexion aux clients
 
 ### Scrapers de Sources Torrent
-- [x] Scraper 1337x (basique, à améliorer avec parser HTML complet)
+- [x] Scraper 1337x (parser HTML amélioré avec goquery)
 - [x] Scraper RARBG (API officielle)
 - [x] Scraper YTS (API officielle)
 - [x] Scraper Nyaa (parser HTML)
+- [x] **NOUVEAU**: Scraper The Pirate Bay (parser HTML avec goquery)
+- [x] **NOUVEAU**: Scraper TorrentDownload (parser HTML avec goquery)
 - [x] Service de recherche unifié
-- [ ] **À FAIRE**: Amélioration des parsers HTML pour 1337x et Nyaa
-- [ ] **À FAIRE**: Gestion des erreurs et retry
+- [x] Support des URLs personnalisées (base_url, search_url)
+- [x] Gestion de la compression Brotli/Gzip
+- [x] Filtrage automatique des fichiers audio et versions instrumentales
+- [ ] **À FAIRE**: Gestion des erreurs et retry améliorée
 - [ ] **À FAIRE**: Cache des résultats de recherche
 
 ### Téléchargement Automatique
 - [x] Service de monitoring des configurations
 - [x] Recherche automatique selon mots-clés
 - [x] Filtrage par seeders, taille, qualité
-- [x] Ajout automatique au client torrent
-- [x] Suivi de progression
+- [x] **NOUVEAU**: Système de candidats (création, approbation, rejet)
+- [x] **NOUVEAU**: Filtrage automatique des fichiers audio/instrumentaux
+- [x] **NOUVEAU**: Création de candidats même s'ils ne respectent pas les filtres (marqués comme rejetés)
+- [x] **NOUVEAU**: Rafraîchissement automatique du modal après recherche
+- [x] Ajout automatique au client torrent (pour candidats approuvés)
+- [x] Suivi de progression avec mise à jour automatique
+- [x] Affichage de la vitesse de téléchargement
+- [x] Gestion des statuts (pending, downloading, seeding, completed, error, paused)
 - [ ] **À FAIRE**: Post-traitement (transcodage, organisation)
 - [ ] **À FAIRE**: Détection automatique de fin de téléchargement
 - [ ] **À FAIRE**: Création automatique de vidéo depuis torrent
