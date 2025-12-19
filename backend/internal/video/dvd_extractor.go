@@ -461,12 +461,83 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	
 	
 	if jsonStart < 0 {
-		return nil, fmt.Errorf("impossible de trouver le début du JSON dans la sortie ffprobe")
+		// Dernière tentative : chercher la première { et supprimer tout ce qui est avant "programs", "format", ou "streams"
+		firstBrace := strings.Index(outputStr, "{")
+		if firstBrace >= 0 {
+			// Chercher la première occurrence de "programs", "format", ou "streams" après {
+			searchStart := firstBrace
+			searchEnd := firstBrace + 500 // Chercher dans les 500 premiers caractères
+			if searchEnd > len(outputStr) {
+				searchEnd = len(outputStr)
+			}
+			searchArea := outputStr[searchStart:searchEnd]
+			
+			// Chercher les clés JSON
+			keyPositions := []int{
+				strings.Index(searchArea, `"programs"`),
+				strings.Index(searchArea, `"format"`),
+				strings.Index(searchArea, `"streams"`),
+			}
+			
+			// Trouver la position la plus proche de {
+			minPos := -1
+			for _, pos := range keyPositions {
+				if pos >= 0 && (minPos < 0 || pos < minPos) {
+					minPos = pos
+				}
+			}
+			
+			if minPos >= 0 {
+				// Trouver le { correspondant (peut être avant minPos si les messages AC3 sont entre)
+				// Chercher en arrière depuis la clé pour trouver le { le plus proche
+				for i := searchStart + minPos; i >= searchStart; i-- {
+					if outputStr[i] == '{' {
+						jsonStart = i
+						log.Printf("[DVD Info] JSON trouvé (dernière tentative) à la position %d", jsonStart)
+						break
+					}
+				}
+			}
+		}
+	}
+	
+	if jsonStart < 0 {
+		// Si toujours pas trouvé, essayer de parser directement en supprimant tout avant la première {
+		firstBrace := strings.Index(outputStr, "{")
+		if firstBrace >= 0 {
+			jsonStart = firstBrace
+			log.Printf("[DVD Info] Utilisation de la première accolade à la position %d (parsing forcé)", jsonStart)
+		} else {
+			return nil, fmt.Errorf("impossible de trouver le début du JSON dans la sortie ffprobe")
+		}
 	}
 	
 	// Extraire le JSON à partir de la position trouvée
 	outputStr = outputStr[jsonStart:]
 	log.Printf("[DVD Info] Texte avant JSON supprimé: %d caractères", jsonStart)
+	
+	// Nettoyer les messages d'erreur AC3 qui peuvent être entre { et la première clé JSON
+	// Chercher la première occurrence de "programs", "format", ou "streams"
+	firstKeyPos := -1
+	for _, key := range []string{`"programs"`, `"format"`, `"streams"`} {
+		pos := strings.Index(outputStr, key)
+		if pos >= 0 && (firstKeyPos < 0 || pos < firstKeyPos) {
+			firstKeyPos = pos
+		}
+	}
+	
+	if firstKeyPos > 1 {
+		// Il y a du texte entre { et la première clé, le supprimer
+		// Garder { et tout ce qui vient après la première clé
+		// Mais d'abord, trouver le { correspondant
+		bracePos := strings.Index(outputStr, "{")
+		if bracePos >= 0 && firstKeyPos > bracePos+1 {
+			// Il y a du texte entre { et la clé, reconstruire le JSON
+			cleanedJSON := "{" + outputStr[firstKeyPos:]
+			outputStr = cleanedJSON
+			log.Printf("[DVD Info] Messages d'erreur supprimés entre { et la première clé JSON (%d caractères)", firstKeyPos-bracePos-1)
+		}
+	}
 	
 	// Chercher la fin du JSON (dernière accolade fermante) au cas où
 	jsonEnd := strings.LastIndex(outputStr, "}")
