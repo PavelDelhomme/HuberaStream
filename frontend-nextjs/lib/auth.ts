@@ -24,8 +24,8 @@ export const authService = {
     Cookies.set('token', token, { 
       expires,
       sameSite: 'lax', // Permet l'envoi du cookie en cross-site pour les liens
-      secure: window.location.protocol === 'https:', // Secure seulement en HTTPS
-      path: '/' // Accessible sur tout le site
+      secure: false, // En développement localhost, secure doit être false
+      path: '/', // Accessible sur tout le site
     })
     
     return { token, user }
