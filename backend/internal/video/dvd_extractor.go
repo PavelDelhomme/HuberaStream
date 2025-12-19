@@ -1241,18 +1241,19 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 
 // extractSubtitleTracksFromFFmpeg extrait les sous-titres depuis ffmpeg
 func (e *DVDExtractor) extractSubtitleTracksFromFFmpeg(devicePath string) []DVDTrack {
-	dvdInput := "dvd://1"
-	if strings.HasPrefix(devicePath, "/dev/") {
-		dvdInput = fmt.Sprintf("dvd://1 -dvd_device %s", devicePath)
-	}
-
 	cmd := exec.Command(
 		e.ffmpegPath,
-		"-i", dvdInput,
+		"-i", "dvd://1",
 		"-t", "0.1",
 		"-f", "null",
 		"-",
 	)
+	
+	// Définir la variable d'environnement DVD_DEVICE si c'est un device block
+	if strings.HasPrefix(devicePath, "/dev/") {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("DVD_DEVICE=%s", devicePath))
+	}
+	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return []DVDTrack{}
@@ -1960,11 +1961,6 @@ func (e *DVDExtractor) ExtractDVD(
 	// Construire la commande ffmpeg
 	args := []string{}
 
-	// Ajouter -dvd_device si c'est un device block
-	if strings.HasPrefix(devicePath, "/dev/") {
-		args = append(args, "-dvd_device", devicePath)
-	}
-
 	// Utiliser le titre le plus long au lieu de toujours dvd://1
 	args = append(args, "-i", fmt.Sprintf("dvd://%d", longestTitle))
 
@@ -2021,6 +2017,14 @@ func (e *DVDExtractor) ExtractDVD(
 	log.Printf("[DVD Extraction] Commande ffmpeg: %s %s", e.ffmpegPath, strings.Join(args, " "))
 	
 	cmd := exec.Command(e.ffmpegPath, args...)
+	
+	// Définir la variable d'environnement DVD_DEVICE si c'est un device block
+	// (ffmpeg ne supporte pas l'option -dvd_device dans cette version)
+	if strings.HasPrefix(devicePath, "/dev/") {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("DVD_DEVICE=%s", devicePath))
+		log.Printf("[DVD Extraction] Variable d'environnement DVD_DEVICE définie: %s", devicePath)
+	}
+	
 	output, err := cmd.CombinedOutput()
 	outputStr := string(output)
 	
