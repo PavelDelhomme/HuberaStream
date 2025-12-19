@@ -39,14 +39,28 @@ export default function DVDExtractPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
+      // Vérifier d'abord si le token existe
       if (!authService.isAuthenticated()) {
         router.push('/login?redirect=/dvd-extract')
         return
       }
 
+      // Récupérer l'utilisateur actuel
       const currentUser = await authService.getCurrentUser()
+      
+      // Si getCurrentUser retourne null, cela peut être dû à :
+      // 1. Token invalide/expiré (401) -> getCurrentUser supprime déjà le token
+      // 2. Erreur réseau temporaire -> ne pas rediriger immédiatement
       if (!currentUser) {
-        router.push('/login')
+        // Vérifier si le token existe encore (si non, c'est qu'il a été supprimé par getCurrentUser)
+        if (!authService.isAuthenticated()) {
+          router.push('/login?redirect=/dvd-extract')
+          return
+        }
+        // Sinon, c'est probablement une erreur réseau, réessayer après un délai
+        setTimeout(() => {
+          checkAuth()
+        }, 1000)
         return
       }
 
