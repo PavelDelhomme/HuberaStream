@@ -1,0 +1,123 @@
+.not-found-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #000000 0%, #0f0f0f 100%);
+  padding: 20px;
+}
+
+.not-found-container {
+  max-width: 600px;
+  width: 100%;
+  text-align: center;
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.not-found-icon {
+  font-size: 80px;
+  margin-bottom: 20px;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+.not-found-title {
+  font-size: 72px;
+  font-weight: bold;
+  color: #ff0000;
+  margin-bottom: 16px;
+  text-shadow: 0 4px 20px rgba(255, 0, 0, 0.5);
+}
+
+.not-found-subtitle {
+  font-size: 32px;
+  font-weight: 600;
+  color: #ffffff;
+  margin-bottom: 16px;
+}
+
+.not-found-message {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.not-found-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn-home,
+.btn-search {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s;
+  display: inline-block;
+}
+
+.btn-home {
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  color: #ffffff;
+}
+
+.btn-home:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
+}
+
+.btn-search {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-search:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 768px) {
+  .not-found-container {
+    padding: 24px;
+  }
+
+  .not-found-title {
+    font-size: 48px;
+  }
+
+  .not-found-subtitle {
+    font-size: 24px;
+  }
+
+  .not-found-message {
+    font-size: 16px;
+  }
+
+  .not-found-actions {
+    flex-direction: column;
+  }
+
+  .btn-home,
+  .btn-search {
+    width: 100%;
+  }
+}
+
