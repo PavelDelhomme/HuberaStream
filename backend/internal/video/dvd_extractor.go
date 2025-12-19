@@ -361,9 +361,11 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	}
 
 	// Utiliser ffprobe avec des options spécifiques pour les DVD
+	// Utiliser -v error pour réduire les warnings, et séparer stdout/stderr
 	cmd := exec.Command(
 		e.ffprobePath,
-		"-v", "error",
+		"-v", "error", // Réduire les messages d'erreur/warning
+		"-hide_banner", // Cacher la bannière
 		"-analyzeduration", "30000000", // 30 secondes d'analyse
 		"-probesize", "30000000", // 30 MB de probe
 		"-print_format", "json",
@@ -373,11 +375,31 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		"-show_programs",
 		ffprobeInput,
 	)
-	output, err := cmd.CombinedOutput()
+	
+	// Capturer stdout et stderr séparément pour éviter la pollution JSON
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	err := cmd.Run()
 	if err != nil {
-		return nil, fmt.Errorf("erreur lors de l'analyse du DVD: %w (output: %s)", err, string(output))
+		// Log les erreurs stderr mais ne pas les inclure dans le JSON
+		log.Printf("[DVD Info] Erreurs ffprobe (stderr): %s", stderr.String())
+		return nil, fmt.Errorf("erreur lors de l'analyse du DVD: %w (stderr: %s)", err, stderr.String())
 	}
+	
+	output := stdout.Bytes()
 
+	// Nettoyer le JSON en enlevant les lignes qui ne sont pas du JSON valide
+	outputStr := string(output)
+	// Chercher le début du JSON (première accolade ouvrante)
+	jsonStart := strings.Index(outputStr, "{")
+	if jsonStart > 0 {
+		// Il y a du texte avant le JSON, l'enlever
+		outputStr = outputStr[jsonStart:]
+		log.Printf("[DVD Info] Texte avant JSON supprimé: %d caractères", jsonStart)
+	}
+	
 	var probeData struct {
 		Format struct {
 			Duration string            `json:"duration"`

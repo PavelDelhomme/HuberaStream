@@ -18,9 +18,15 @@ export const authService = {
     const response = await api.post('/auth/login', { email, password })
     const { token, user } = response.data
     
-    // Stocker le token dans un cookie HTTP-only via le backend
-    // Pour l'instant, on utilise js-cookie côté client
-    Cookies.set('token', token, { expires: 7 }) // 7 jours
+    // Stocker le token dans un cookie avec persistance sécurisée
+    // Expiration : 30 jours pour admin, 7 jours pour user (selon backend)
+    const expires = user.role === 'admin' ? 30 : 7
+    Cookies.set('token', token, { 
+      expires,
+      sameSite: 'lax', // Permet l'envoi du cookie en cross-site pour les liens
+      secure: window.location.protocol === 'https:', // Secure seulement en HTTPS
+      path: '/' // Accessible sur tout le site
+    })
     
     return { token, user }
   },
@@ -29,7 +35,13 @@ export const authService = {
     const response = await api.post('/auth/register', { email, password, name })
     const { token, user } = response.data
     
-    Cookies.set('token', token, { expires: 7 })
+    const expires = user.role === 'admin' ? 30 : 7
+    Cookies.set('token', token, { 
+      expires,
+      sameSite: 'lax',
+      secure: window.location.protocol === 'https:',
+      path: '/'
+    })
     
     return { token, user }
   },
