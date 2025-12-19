@@ -70,10 +70,14 @@ export const authService = {
       const response = await api.get('/users/me')
       return response.data
     } catch (error: any) {
-      // Si erreur 401, supprimer le token
-      if (error.response?.status === 401) {
-        Cookies.remove('token')
+      // Si erreur 401 ou 403, supprimer le token (token invalide/expiré)
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        Cookies.remove('token', { path: '/' })
+        return null
       }
+      // Pour les autres erreurs (réseau, 500, etc.), retourner null mais garder le token
+      // L'appelant pourra réessayer
+      console.error('[Auth] Erreur lors de la récupération de l\'utilisateur:', error.response?.status || error.message)
       return null
     }
   },
