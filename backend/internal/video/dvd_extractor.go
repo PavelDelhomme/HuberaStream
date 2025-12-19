@@ -402,38 +402,81 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		log.Printf("[DVD Info] Output brut: %s", outputStr)
 	}
 	
-	// Supprimer toutes les lignes qui commencent par [ (messages d'erreur AC3, etc.)
-	// Ces messages peuvent apparaître dans stdout même avec -v error
-	lines := strings.Split(outputStr, "\n")
-	var jsonLines []string
-	jsonStartIdx := -1
+	// Le problème : les messages d'erreur AC3 peuvent apparaître juste après {
+	// Exemple: { [ac3 @ ...] error ... "programs": [...]
+	// Il faut trouver le début réel du JSON qui est après ces messages
 	
-	// Trouver où commence le JSON (première ligne avec {)
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		// Chercher une ligne qui commence par { (début du JSON)
-		if strings.HasPrefix(trimmed, "{") {
-			jsonStartIdx = i
-			log.Printf("[DVD Info] JSON trouvé à la ligne %d, %d lignes ignorées avant", i+1, i)
-			break
+	// Chercher le pattern JSON valide : { suivi de "programs", "format", ou "streams"
+	// Ces clés sont toujours présentes dans la sortie ffprobe
+	jsonPatterns := []string{`{"programs"`, `{"format"`, `{"streams"`, `{ "programs"`, `{ "format"`, `{ "streams"`}
+	var jsonStart = -1
+	
+	for _, pattern := range jsonPatterns {
+		idx := strings.Index(outputStr, pattern)
+		if idx >= 0 {
+			// Trouver l'accolade ouvrante correspondante (peut être avant)
+			// Chercher en arrière depuis idx pour trouver le { correspondant
+			for i := idx; i >= 0; i-- {
+				if outputStr[i] == '{' {
+					jsonStart = i
+					break
+				}
+			}
+			if jsonStart >= 0 {
+				log.Printf("[DVD Info] JSON valide trouvé avec pattern '%s' à la position %d", pattern, jsonStart)
+				break
+			}
 		}
 	}
 	
-	// Si on a trouvé le début du JSON, prendre toutes les lignes à partir de là
-	if jsonStartIdx >= 0 {
-		jsonLines = lines[jsonStartIdx:]
-	} else {
-		// Fallback : chercher la première accolade dans le texte
-		jsonStart := strings.Index(outputStr, "{")
-		if jsonStart > 0 {
-			outputStr = outputStr[jsonStart:]
-			log.Printf("[DVD Info] Texte avant JSON supprimé: %d caractères", jsonStart)
+	// Si on n'a pas trouvé avec les patterns, chercher simplement la première {
+	// puis vérifier qu'elle est suivie d'une clé JSON valide
+	if jsonStart < 0 {
+		firstBrace := strings.Index(outputStr, "{")
+		if firstBrace >= 0 {
+			// Vérifier que après { il y a une clé JSON valide dans les 100 prochains caractères
+			afterBrace := outputStr[firstBrace:min(firstBrace+200, len(outputStr))]
+			hasValidKey := strings.Contains(afterBrace, `"programs"`) || 
+			               strings.Contains(afterBrace, `"format"`) || 
+			               strings.Contains(afterBrace, `"streams"`)
+			
+			if hasValidKey {
+				jsonStart = firstBrace
+				log.Printf("[DVD Info] JSON trouvé à la position %d (première accolade avec clé valide)", jsonStart)
+			} else {
+				// Chercher la prochaine { qui a une clé valide
+				searchStart := firstBrace + 1
+				for {
+					nextBrace := strings.Index(outputStr[searchStart:], "{")
+					if nextBrace < 0 {
+						break
+					}
+					actualPos := searchStart + nextBrace
+					afterBraceEnd := actualPos + 200
+					if afterBraceEnd > len(outputStr) {
+						afterBraceEnd = len(outputStr)
+					}
+					afterBrace := outputStr[actualPos:afterBraceEnd]
+					if strings.Contains(afterBrace, `"programs"`) || 
+					   strings.Contains(afterBrace, `"format"`) || 
+					   strings.Contains(afterBrace, `"streams"`) {
+						jsonStart = actualPos
+						log.Printf("[DVD Info] JSON trouvé à la position %d (accolade suivante avec clé valide)", jsonStart)
+						break
+					}
+					searchStart = actualPos + 1
+				}
+			}
 		}
-		jsonLines = []string{outputStr}
 	}
 	
-	// Rejoindre les lignes
-	outputStr = strings.Join(jsonLines, "\n")
+	if jsonStart < 0 {
+		return nil, fmt.Errorf("impossible de trouver le début du JSON dans la sortie ffprobe")
+	}
+	
+	// Extraire le JSON à partir de la position trouvée
+	outputStr = outputStr[jsonStart:]
+	log.Printf("[DVD Info] Texte avant JSON supprimé: %d caractères", jsonStart)
 	
 	// Chercher la fin du JSON (dernière accolade fermante) au cas où
 	jsonEnd := strings.LastIndex(outputStr, "}")
