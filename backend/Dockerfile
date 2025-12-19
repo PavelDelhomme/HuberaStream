@@ -29,7 +29,9 @@ RUN apk add --no-cache \
     file \
     util-linux \
     ca-certificates \
-    tzdata
+    tzdata \
+    lsblk \
+    coreutils
 
 WORKDIR /app
 

@@ -46,7 +46,7 @@ services:
     container_name: streammake-backend
     labels:
       - "com.streammake.project=streammake"
-    command: sh -c "ls -la /app/bin/ 2>&1 || true; ls -la /app/ 2>&1 || true; if [ -f /app/bin/main ] && [ -x /app/bin/main ]; then echo 'Exécution de /app/bin/main'; exec /app/bin/main; elif [ -f /app/main ] && [ -x /app/main ]; then echo 'Exécution de /app/main'; exec /app/main; else echo 'Aucun binaire exécutable trouvé'; exit 1; fi"
+    command: sh -c "if [ -f /app/bin/main ] && [ -x /app/bin/main ]; then echo 'Exécution de /app/bin/main (binaire local)'; exec /app/bin/main; elif [ -f /app/main ] && [ -x /app/main ]; then echo 'Exécution de /app/main (image Docker)'; exec /app/main; else echo 'Aucun binaire exécutable trouvé'; exit 1; fi"
     # Accès au lecteur DVD/CD (USB et interne)
     # Utiliser privileged pour accéder à tous les devices block
     privileged: true # Nécessaire pour accéder aux devices
