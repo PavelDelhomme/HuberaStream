@@ -61,29 +61,41 @@ func NewDVDExtractor() *DVDExtractor {
 func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 	var detectedDevices []string
 
+	log.Printf("[DVD Detection] Démarrage de la détection du lecteur DVD...")
+
 	// Méthode 1: Utiliser lsblk pour détecter les lecteurs optiques (plus fiable)
 	cmd := exec.Command("lsblk", "-d", "-n", "-o", "NAME,TYPE,MODEL")
 	output, err := cmd.Output()
 	if err == nil {
+		log.Printf("[DVD Detection] lsblk output: %s", string(output))
 		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 		for _, line := range lines {
 			fields := strings.Fields(line)
 			if len(fields) >= 2 && fields[1] == "rom" {
 				deviceName := fields[0]
 				devicePath := fmt.Sprintf("/dev/%s", deviceName)
+				log.Printf("[DVD Detection] Lecteur optique détecté par lsblk: %s", devicePath)
 				// Vérifier que le device existe et est accessible
 				if info, err := os.Stat(devicePath); err == nil && !info.IsDir() {
 					// Vérifier les permissions (doit être un device block)
 					if info.Mode()&os.ModeDevice != 0 {
 						detectedDevices = append(detectedDevices, devicePath)
+						log.Printf("[DVD Detection] Device validé: %s", devicePath)
+					} else {
+						log.Printf("[DVD Detection] Device %s n'est pas un device block", devicePath)
 					}
+				} else {
+					log.Printf("[DVD Detection] Device %s non accessible: %v", devicePath, err)
 				}
 			}
 		}
+	} else {
+		log.Printf("[DVD Detection] Erreur lors de l'exécution de lsblk: %v", err)
 	}
 
 	// Si on a trouvé des devices avec lsblk, retourner le premier
 	if len(detectedDevices) > 0 {
+		log.Printf("[DVD Detection] Device détecté via lsblk: %s", detectedDevices[0])
 		return detectedDevices[0], nil
 	}
 
@@ -93,21 +105,29 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 		"/dev/sr1",
 		"/dev/sr2",
 		"/dev/sr3", // Ajouté pour les lecteurs USB
-		"/dev/dvd",
 		"/dev/cdrom",
 		"/dev/cdrom0",
 		"/dev/cdrom1",
 	}
 
+	log.Printf("[DVD Detection] Vérification des devices standards...")
 	for _, device := range possibleDevices {
 		if info, err := os.Stat(device); err == nil {
+			log.Printf("[DVD Detection] Device trouvé: %s", device)
 			// Vérifier si c'est un device block
 			if info.Mode()&os.ModeDevice != 0 {
 				// Vérifier que c'est un device block (pas un dossier)
 				if !info.IsDir() {
 					detectedDevices = append(detectedDevices, device)
+					log.Printf("[DVD Detection] Device validé: %s", device)
+				} else {
+					log.Printf("[DVD Detection] Device %s est un dossier, ignoré", device)
 				}
+			} else {
+				log.Printf("[DVD Detection] Device %s n'est pas un device block", device)
 			}
+		} else {
+			log.Printf("[DVD Detection] Device %s non accessible: %v", device, err)
 		}
 	}
 

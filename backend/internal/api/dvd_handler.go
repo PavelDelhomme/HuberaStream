@@ -42,21 +42,28 @@ func NewDVDHandler(db *gorm.DB, cfg *config.Config, uploadHandler *UploadHandler
 
 // DetectDVD détecte le lecteur DVD
 func (h *DVDHandler) DetectDVD(c *gin.Context) {
+	log.Printf("[DVD Detection] Démarrage de la détection du lecteur DVD...")
+	
 	device, err := h.extractor.DetectDVDDevice()
 	if err != nil {
+		log.Printf("[DVD Detection] Erreur lors de la détection automatique: %v", err)
+		
 		// Retourner 200 avec un message d'erreur plutôt que 404
 		// pour que le frontend puisse gérer l'erreur correctement
 		// Inclure aussi une liste de devices à essayer manuellement
-		possibleDevices := []string{"/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/dvd", "/dev/cdrom"}
+		possibleDevices := []string{"/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/cdrom", "/dev/cdrom0", "/dev/cdrom1"}
 		var availableDevices []string
 		for _, d := range possibleDevices {
 			if info, statErr := os.Stat(d); statErr == nil && !info.IsDir() {
 				if info.Mode()&os.ModeDevice != 0 {
 					availableDevices = append(availableDevices, d)
+					log.Printf("[DVD Detection] Device disponible trouvé: %s", d)
 				}
 			}
 		}
 
+		log.Printf("[DVD Detection] %d device(s) disponible(s) trouvé(s)", len(availableDevices))
+		
 		c.JSON(http.StatusOK, gin.H{
 			"device":            "",
 			"error":             "Aucun lecteur DVD détecté automatiquement",
@@ -67,6 +74,7 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[DVD Detection] Lecteur DVD détecté avec succès: %s", device)
 	c.JSON(http.StatusOK, gin.H{
 		"device":  device,
 		"message": "Lecteur DVD détecté",
