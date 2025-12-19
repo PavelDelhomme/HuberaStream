@@ -393,12 +393,47 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 
 	// Nettoyer le JSON en enlevant les lignes qui ne sont pas du JSON valide
 	outputStr := string(output)
-	// Chercher le début du JSON (première accolade ouvrante)
+	
+	// Supprimer toutes les lignes qui commencent par [ (messages d'erreur AC3, etc.)
+	lines := strings.Split(outputStr, "\n")
+	var jsonLines []string
+	inJson := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Si on trouve une accolade ouvrante, on commence le JSON
+		if strings.HasPrefix(trimmed, "{") {
+			inJson = true
+		}
+		// Si on est dans le JSON ou si la ligne est vide, on la garde
+		if inJson || trimmed == "" {
+			jsonLines = append(jsonLines, line)
+		} else if strings.HasPrefix(trimmed, "[") {
+			// Ignorer les lignes qui commencent par [ (messages d'erreur)
+			log.Printf("[DVD Info] Ligne ignorée (message d'erreur): %s", trimmed)
+			continue
+		} else if !inJson {
+			// Avant le JSON, ignorer les lignes qui ne sont pas du JSON
+			log.Printf("[DVD Info] Ligne ignorée (avant JSON): %s", trimmed)
+			continue
+		}
+	}
+	
+	outputStr = strings.Join(jsonLines, "\n")
+	
+	// Chercher le début du JSON (première accolade ouvrante) au cas où
 	jsonStart := strings.Index(outputStr, "{")
 	if jsonStart > 0 {
 		// Il y a du texte avant le JSON, l'enlever
 		outputStr = outputStr[jsonStart:]
 		log.Printf("[DVD Info] Texte avant JSON supprimé: %d caractères", jsonStart)
+	}
+	
+	// Chercher la fin du JSON (dernière accolade fermante) au cas où
+	jsonEnd := strings.LastIndex(outputStr, "}")
+	if jsonEnd > 0 && jsonEnd < len(outputStr)-1 {
+		// Il y a du texte après le JSON, l'enlever
+		outputStr = outputStr[:jsonEnd+1]
+		log.Printf("[DVD Info] Texte après JSON supprimé: %d caractères", len(outputStr)-jsonEnd-1)
 	}
 	
 	var probeData struct {
