@@ -70,7 +70,7 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 		}
 		
 		// Ajouter aussi les points de montage trouvés
-		mountPoints := h.extractor.findMountPoints()
+		mountPoints := h.extractor.FindMountPoints()
 		for _, mp := range mountPoints {
 			if info, statErr := os.Stat(mp); statErr == nil && info.IsDir() {
 				// Vérifier si c'est un DVD (contient VIDEO_TS)

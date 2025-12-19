@@ -158,7 +158,7 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 
 	// Méthode 3: Vérifier les points de montage (Linux, macOS, Windows)
 	// Utiliser mount ou df pour trouver tous les points de montage
-	mountPoints := e.findMountPoints()
+	mountPoints := e.FindMountPoints()
 	
 	log.Printf("[DVD Detection] Points de montage trouvés: %v", mountPoints)
 	
@@ -192,9 +192,9 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 	return "", fmt.Errorf("aucun lecteur DVD détecté. Assurez-vous qu'un DVD/CD est inséré et que le lecteur est accessible. Vérifiez aussi que le conteneur Docker a accès aux devices (/dev/sr0, /dev/dvd, /dev/cdrom, etc.)")
 }
 
-// findMountPoints trouve tous les points de montage possibles pour les DVD/CD
+// FindMountPoints trouve tous les points de montage possibles pour les DVD/CD
 // Fonctionne sur Linux, macOS et Windows (WSL)
-func (e *DVDExtractor) findMountPoints() []string {
+func (e *DVDExtractor) FindMountPoints() []string {
 	var mountPoints []string
 
 	// Points de montage Linux standards
