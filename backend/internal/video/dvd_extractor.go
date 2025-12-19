@@ -406,9 +406,15 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	// Exemple: { [ac3 @ ...] error ... "programs": [...]
 	// Il faut trouver le début réel du JSON qui est après ces messages
 	
-	// Chercher le pattern JSON valide : { suivi de "programs", "format", ou "streams"
+	// Chercher le pattern JSON valide : { suivi (éventuellement après une nouvelle ligne) de "programs", "format", ou "streams"
 	// Ces clés sont toujours présentes dans la sortie ffprobe
-	jsonPatterns := []string{`{"programs"`, `{"format"`, `{"streams"`, `{ "programs"`, `{ "format"`, `{ "streams"`}
+	// Les messages d'erreur AC3 peuvent être sur des lignes séparées avant le JSON
+	jsonPatterns := []string{
+		`{"programs"`, `{"format"`, `{"streams"`, 
+		`{ "programs"`, `{ "format"`, `{ "streams"`,
+		`{\n    "programs"`, `{\n    "format"`, `{\n    "streams"`,
+		`{\r\n    "programs"`, `{\r\n    "format"`, `{\r\n    "streams"`,
+	}
 	var jsonStart = -1
 	
 	for _, pattern := range jsonPatterns {
@@ -425,6 +431,29 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			if jsonStart >= 0 {
 				log.Printf("[DVD Info] JSON valide trouvé avec pattern '%s' à la position %d", pattern, jsonStart)
 				break
+			}
+		}
+	}
+	
+	// Si pas trouvé, chercher { suivi d'une nouvelle ligne puis d'espaces puis d'une clé JSON
+	if jsonStart < 0 {
+		// Chercher toutes les occurrences de { et vérifier si elles sont suivies d'une clé JSON valide
+		for i := 0; i < len(outputStr); i++ {
+			if outputStr[i] == '{' {
+				// Vérifier les 50 prochains caractères pour une clé JSON valide
+				end := i + 50
+				if end > len(outputStr) {
+					end = len(outputStr)
+				}
+				afterBrace := outputStr[i:end]
+				// Chercher "programs", "format", ou "streams" (peut être après des espaces/nouvelle ligne)
+				if strings.Contains(afterBrace, `"programs"`) || 
+				   strings.Contains(afterBrace, `"format"`) || 
+				   strings.Contains(afterBrace, `"streams"`) {
+					jsonStart = i
+					log.Printf("[DVD Info] JSON valide trouvé à la position %d (accolade suivie d'une clé valide)", jsonStart)
+					break
+				}
 			}
 		}
 	}
