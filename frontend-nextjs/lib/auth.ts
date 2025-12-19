@@ -63,9 +63,17 @@ export const authService = {
 
   async getCurrentUser(): Promise<User | null> {
     try {
+      const token = this.getToken()
+      if (!token) {
+        return null
+      }
       const response = await api.get('/users/me')
       return response.data
-    } catch (error) {
+    } catch (error: any) {
+      // Si erreur 401, supprimer le token
+      if (error.response?.status === 401) {
+        Cookies.remove('token')
+      }
       return null
     }
   },

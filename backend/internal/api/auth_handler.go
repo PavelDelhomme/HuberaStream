@@ -111,7 +111,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	// Vérifier que l'utilisateur est actif
 	if !user.IsActive {
 		c.JSON(http.StatusForbidden, gin.H{
-			"error":           "Compte en attente d'approbation",
+			"error":            "Compte en attente d'approbation",
 			"pending_approval": true,
 		})
 		return

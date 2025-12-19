@@ -43,11 +43,11 @@ func NewDVDHandler(db *gorm.DB, cfg *config.Config, uploadHandler *UploadHandler
 // DetectDVD détecte le lecteur DVD
 func (h *DVDHandler) DetectDVD(c *gin.Context) {
 	log.Printf("[DVD Detection] Démarrage de la détection du lecteur DVD...")
-	
+
 	device, err := h.extractor.DetectDVDDevice()
 	if err != nil {
 		log.Printf("[DVD Detection] Erreur lors de la détection automatique: %v", err)
-		
+
 		// Retourner 200 avec un message d'erreur plutôt que 404
 		// pour que le frontend puisse gérer l'erreur correctement
 		// Inclure aussi une liste de devices à essayer manuellement
@@ -68,7 +68,7 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 				}
 			}
 		}
-		
+
 		// Ajouter aussi les points de montage trouvés
 		mountPoints := h.extractor.FindMountPoints()
 		for _, mp := range mountPoints {
@@ -88,7 +88,7 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 		}
 
 		log.Printf("[DVD Detection] %d device(s) disponible(s) trouvé(s)", len(availableDevices))
-		
+
 		c.JSON(http.StatusOK, gin.H{
 			"device":            "",
 			"error":             "Aucun lecteur DVD détecté automatiquement",
@@ -188,7 +188,7 @@ type ExtractDVDRequest struct {
 // ExtractDVD extrait le DVD et crée une vidéo
 func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 	log.Printf("[DVD Extraction] Requête d'extraction reçue")
-	
+
 	userID, _ := c.Get("user_id")
 	userIDStr := userID.(string)
 	userUUID, _ := uuid.Parse(userIDStr)
