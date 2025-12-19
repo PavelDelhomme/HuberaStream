@@ -1,0 +1,14 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Installer les dépendances
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+# Exposer le port
+EXPOSE 3000
+
+# Commande par défaut (sera override par docker-compose)
+CMD ["npm", "run", "dev"]
+

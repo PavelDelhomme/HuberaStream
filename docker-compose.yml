@@ -117,18 +117,24 @@ services:
   frontend-nextjs:
     build:
       context: ./frontend-nextjs
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: streammake-frontend-nextjs
     labels:
       - "com.streammake.project=streammake"
     environment:
       NEXT_PUBLIC_API_URL: "http://localhost:3300/api"
-      NODE_ENV: production
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - ./frontend-nextjs:/app
+      - /app/node_modules
+      - /app/.next
     depends_on:
       - backend
     networks:
       - streammake-network
     restart: unless-stopped
+    command: npm run dev
 
   # Frontend React (ancien système - désactivé par défaut, profile legacy)
   frontend:
