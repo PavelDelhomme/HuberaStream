@@ -60,9 +60,13 @@ services:
     volumes:
       - video_storage:/app/storage/videos
       - thumbnail_storage:/app/storage/thumbnails
-      # Monter les points de montage DVD si disponibles
+      # Monter les points de montage DVD si disponibles (Linux)
       - /mnt/cdrom:/mnt/cdrom:ro
       - /media/cdrom:/media/cdrom:ro
+      - /run/media:/run/media:ro
+      - /media:/media:ro
+      # Points de montage macOS (si applicable)
+      - /Volumes:/Volumes:ro
       # Partager le volume de config qBittorrent pour configuration automatique
       - qbittorrent_config:/config/qbittorrent:ro
       # MODE DÉVELOPPEMENT: Monter le binaire compilé localement (si disponible)
