@@ -531,16 +531,21 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		}
 	}
 	
-	if firstKeyPos > 0 {
-		// Il y a du texte avant la première clé, le supprimer
-		// Reconstruire le JSON en commençant par { suivi directement de la première clé
+	if firstKeyPos >= 0 {
+		// Trouvé une clé JSON, reconstruire le JSON proprement
 		bracePos := strings.Index(outputStr, "{")
-		if bracePos >= 0 && firstKeyPos > bracePos {
-			// Reconstruire : { + première clé + reste
-			cleanedJSON := "{" + outputStr[firstKeyPos:]
-			outputStr = cleanedJSON
-			log.Printf("[DVD Info] Messages d'erreur supprimés entre { et '%s' (%d caractères supprimés)", firstKey, firstKeyPos-bracePos-1)
-		} else if bracePos < 0 {
+		if bracePos >= 0 {
+			if firstKeyPos > bracePos {
+				// Il y a du texte entre { et la première clé, le supprimer
+				// Reconstruire : { + première clé + reste
+				cleanedJSON := "{" + outputStr[firstKeyPos:]
+				outputStr = cleanedJSON
+				log.Printf("[DVD Info] Messages d'erreur supprimés entre { et '%s' (%d caractères supprimés)", firstKey, firstKeyPos-bracePos-1)
+			} else if firstKeyPos == bracePos {
+				// La clé est juste après {, pas de nettoyage nécessaire
+				log.Printf("[DVD Info] JSON propre, pas de nettoyage nécessaire (clé '%s' à la position %d)", firstKey, firstKeyPos)
+			}
+		} else {
 			// Pas de { trouvé, ajouter { au début
 			cleanedJSON := "{" + outputStr[firstKeyPos:]
 			outputStr = cleanedJSON
@@ -552,6 +557,8 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		if bracePos > 0 {
 			outputStr = outputStr[bracePos:]
 			log.Printf("[DVD Info] Texte avant { supprimé (%d caractères)", bracePos)
+		} else if bracePos < 0 {
+			log.Printf("[DVD Info] ⚠️ Aucune clé JSON trouvée et pas de {, JSON peut être invalide")
 		}
 	}
 	
