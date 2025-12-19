@@ -225,7 +225,7 @@
   transition: transform 0.3s;
 }
 
-.nav-dropdown:hover .dropdown-arrow {
+.dropdown-arrow.open {
   transform: rotate(180deg);
 }
 
@@ -238,17 +238,14 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   min-width: 280px;
+  max-width: 350px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   padding: 8px;
   z-index: 1001;
   animation: slideDown 0.3s ease;
   pointer-events: auto;
-  overflow: visible;
-  display: none;
-}
-
-.nav-dropdown:hover .dropdown-menu {
-  display: block;
+  overflow-y: auto;
+  max-height: calc(100vh - 100px);
 }
 
 @keyframes slideDown {
@@ -431,12 +428,37 @@
     z-index: 1002;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    opacity: 0;
+    transform: translateY(-20px);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
   }
 
   .search-container.active {
     opacity: 1;
     transform: translateY(0);
     pointer-events: auto;
+  }
+
+  .nav-search {
+    width: 100%;
+  }
+
+  .nav-search .search-input {
+    border-radius: 40px 0 0 40px;
+    padding: 14px 20px;
+    font-size: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-right: none;
+  }
+
+  .nav-search .search-button {
+    border-radius: 0 40px 40px 0;
+    border-left: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-left: none;
+    padding: 14px 24px;
+    min-width: 60px;
   }
 
   .nav-main-links {
@@ -468,5 +490,12 @@
 
   .nav-logo {
     font-size: 20px;
+  }
+
+  .dropdown-menu {
+    right: 0;
+    left: auto;
+    min-width: 260px;
+    max-width: calc(100vw - 30px);
   }
 }

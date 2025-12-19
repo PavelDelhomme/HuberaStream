@@ -11,9 +11,11 @@ export default function Navigation() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearchBar, setShowSearchBar] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const loadUser = async () => {
@@ -61,7 +63,7 @@ export default function Navigation() {
     }
   }, [showSearchBar])
 
-  // Fermer la barre de recherche si on clique ailleurs
+  // Fermer la barre de recherche et le menu si on clique ailleurs
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (showSearchBar && 
@@ -69,10 +71,15 @@ export default function Navigation() {
           !(event.target as Element)?.closest('.search-toggle-button')) {
         setShowSearchBar(false)
       }
+      if (showUserMenu && 
+          userMenuRef.current && 
+          !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false)
+      }
     }
     document.addEventListener('click', handleClickOutside, true)
     return () => document.removeEventListener('click', handleClickOutside, true)
-  }, [showSearchBar])
+  }, [showSearchBar, showUserMenu])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -157,76 +164,166 @@ export default function Navigation() {
                 </Link>
               )}
               {authService.isAdmin(user) && (
-                <div className="nav-dropdown">
-                  <button className="user-menu-button">
+                <div className="nav-dropdown" ref={userMenuRef}>
+                  <button 
+                    className="user-menu-button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setShowUserMenu(!showUserMenu)
+                    }}
+                  >
                     <span className="user-avatar">{user.email.charAt(0).toUpperCase()}</span>
                     <span className="username">{user.email.split('@')[0]}</span>
-                    <span className="dropdown-arrow">▼</span>
+                    <span className={`dropdown-arrow ${showUserMenu ? 'open' : ''}`}>▼</span>
                   </button>
-                  <div className="dropdown-menu user-dropdown">
+                  {showUserMenu && (
+                    <div className="dropdown-menu user-dropdown" onClick={(e) => e.stopPropagation()}>
                     <span className="dropdown-username">
                       {user.email.split('@')[0]}
                       <span className="admin-badge">👑 Admin</span>
                     </span>
                     <div className="dropdown-divider"></div>
                     <span className="dropdown-section-title">⚙️ Administration</span>
-                    <Link href="/admin/dashboard" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/dashboard" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       📊 Tableau de bord
                     </Link>
-                    <Link href="/admin/users" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/users" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       👥 Utilisateurs
                     </Link>
-                    <Link href="/admin/categories" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/categories" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       📂 Catégories
                     </Link>
                     <div className="dropdown-divider"></div>
                     <span className="dropdown-section-title">🎬 Gestion Vidéos</span>
-                    <Link href="/admin/videos" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/videos" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       📹 Gérer Vidéos
                     </Link>
-                    <Link href="/video/upload" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/video/upload" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       ⬆️ Upload Vidéo
                     </Link>
-                    <Link href="/dvd-extract" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/dvd-extract" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       📀 Extraire DVD
                     </Link>
                     <div className="dropdown-divider"></div>
                     <span className="dropdown-section-title">📥 Torrents</span>
-                    <Link href="/admin/torrents" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/torrents" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       📥 Gérer Torrents
                     </Link>
-                    <Link href="/admin/torrent-clients" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/torrent-clients" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       ⚙️ Clients Torrent
                     </Link>
-                    <Link href="/admin/torrent-configs" prefetch={false} className="dropdown-item">
-                      ⚙️ Configurations
+                    <Link 
+                      href="/admin/torrent-configs" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      ⚙️ Configurations de téléchargement automatique
                     </Link>
-                    <Link href="/admin/torrent-indexes" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/torrent-candidates" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
+                      🎯 Candidats Torrents
+                    </Link>
+                    <Link 
+                      href="/admin/torrent-indexes" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       🔍 Index de Torrents
                     </Link>
                     <div className="dropdown-divider"></div>
                     <span className="dropdown-section-title">🎛️ Paramètres</span>
-                    <Link href="/admin/media-settings" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/admin/media-settings" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       🎬 Paramètres Média
                     </Link>
                     <div className="dropdown-divider"></div>
-                    <Link href="/user/profile" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/user/profile" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       👤 Mon Profil
                     </Link>
-                    <Link href="/user/favorites" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/user/favorites" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       ⭐ Favoris
                     </Link>
-                    <Link href="/user/history" prefetch={false} className="dropdown-item">
+                    <Link 
+                      href="/user/history" 
+                      prefetch={false} 
+                      className="dropdown-item"
+                      onClick={() => setShowUserMenu(false)}
+                    >
                       📺 Historique
                     </Link>
                     <div className="dropdown-divider"></div>
                     <button 
-                      onClick={handleLogout} 
+                      onClick={() => {
+                        handleLogout()
+                        setShowUserMenu(false)
+                      }} 
                       className="dropdown-item dropdown-item-danger"
                     >
                       🚪 Déconnexion
                     </button>
                   </div>
+                  )}
                 </div>
               )}
               {!authService.isAdmin(user) && (
