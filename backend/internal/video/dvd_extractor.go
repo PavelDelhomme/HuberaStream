@@ -100,15 +100,40 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 	}
 
 	// Méthode 2: Essayer différents chemins de lecteurs DVD courants
+	// Linux
 	possibleDevices := []string{
 		"/dev/sr0",
 		"/dev/sr1",
 		"/dev/sr2",
-		"/dev/sr3", // Ajouté pour les lecteurs USB
+		"/dev/sr3",
+		"/dev/sr4",
 		"/dev/cdrom",
 		"/dev/cdrom0",
 		"/dev/cdrom1",
+		"/dev/dvd",
+		"/dev/dvdrw",
 	}
+	
+	// macOS (si on est sur macOS ou dans Docker Desktop sur Mac)
+	macDevices := []string{
+		"/dev/disk1",
+		"/dev/disk2",
+		"/dev/disk3",
+		"/dev/disk4",
+		"/dev/rdisk1",
+		"/dev/rdisk2",
+		"/dev/rdisk3",
+		"/dev/rdisk4",
+	}
+	possibleDevices = append(possibleDevices, macDevices...)
+	
+	// Windows/WSL (si applicable)
+	windowsDevices := []string{
+		"/mnt/d",
+		"/mnt/e",
+		"/mnt/f",
+	}
+	possibleDevices = append(possibleDevices, windowsDevices...)
 
 	log.Printf("[DVD Detection] Vérification des devices standards...")
 	for _, device := range possibleDevices {
@@ -131,16 +156,15 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 		}
 	}
 
-	// Méthode 3: Vérifier les points de montage
-	mountPoints := []string{
-		"/mnt/cdrom",
-		"/media/cdrom",
-		"/media/cdrom0",
-		"/media/cdrom1",
-	}
-
+	// Méthode 3: Vérifier les points de montage (Linux, macOS, Windows)
+	// Utiliser mount ou df pour trouver tous les points de montage
+	mountPoints := e.findMountPoints()
+	
+	log.Printf("[DVD Detection] Points de montage trouvés: %v", mountPoints)
+	
 	for _, mountPoint := range mountPoints {
 		if info, err := os.Stat(mountPoint); err == nil && info.IsDir() {
+			log.Printf("[DVD Detection] Vérification du point de montage: %s", mountPoint)
 			// Vérifier s'il contient des fichiers DVD
 			files, err := os.ReadDir(mountPoint)
 			if err == nil && len(files) > 0 {
@@ -149,6 +173,7 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 				for _, file := range files {
 					if file.Name() == "VIDEO_TS" || file.Name() == "video_ts" {
 						hasVideoTS = true
+						log.Printf("[DVD Detection] DVD trouvé au point de montage: %s", mountPoint)
 						break
 					}
 				}
@@ -165,6 +190,153 @@ func (e *DVDExtractor) DetectDVDDevice() (string, error) {
 	}
 
 	return "", fmt.Errorf("aucun lecteur DVD détecté. Assurez-vous qu'un DVD/CD est inséré et que le lecteur est accessible. Vérifiez aussi que le conteneur Docker a accès aux devices (/dev/sr0, /dev/dvd, /dev/cdrom, etc.)")
+}
+
+// findMountPoints trouve tous les points de montage possibles pour les DVD/CD
+// Fonctionne sur Linux, macOS et Windows (WSL)
+func (e *DVDExtractor) findMountPoints() []string {
+	var mountPoints []string
+
+	// Points de montage Linux standards
+	linuxMountPoints := []string{
+		"/mnt/cdrom",
+		"/mnt/cdrom0",
+		"/mnt/cdrom1",
+		"/media/cdrom",
+		"/media/cdrom0",
+		"/media/cdrom1",
+		"/run/media",
+		"/media",
+	}
+
+	// Points de montage macOS
+	macMountPoints := []string{
+		"/Volumes",
+	}
+
+	// Points de montage Windows/WSL
+	windowsMountPoints := []string{
+		"/mnt/d",
+		"/mnt/e",
+		"/mnt/f",
+	}
+
+	// Ajouter tous les points de montage standards
+	mountPoints = append(mountPoints, linuxMountPoints...)
+	mountPoints = append(mountPoints, macMountPoints...)
+	mountPoints = append(mountPoints, windowsMountPoints...)
+
+	// Méthode 1: Utiliser la commande 'mount' pour trouver les points de montage
+	cmd := exec.Command("mount")
+	output, err := cmd.Output()
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, line := range lines {
+			// Parser la sortie de mount pour trouver les devices optiques
+			// Format typique: /dev/sr0 on /run/media/pactivisme/KILL type iso9660
+			fields := strings.Fields(line)
+			if len(fields) >= 3 {
+				device := fields[0]
+				mountPoint := fields[2]
+				
+				// Vérifier si c'est un device optique (sr*, cdrom, disk* sur macOS)
+				if strings.HasPrefix(device, "/dev/sr") || 
+				   strings.Contains(device, "cdrom") ||
+				   (strings.HasPrefix(device, "/dev/disk") && strings.Contains(line, "iso9660")) {
+					// Vérifier que le point de montage n'est pas déjà dans la liste
+					found := false
+					for _, mp := range mountPoints {
+						if mp == mountPoint {
+							found = true
+							break
+						}
+					}
+					if !found {
+						mountPoints = append(mountPoints, mountPoint)
+						log.Printf("[DVD Detection] Point de montage trouvé via mount: %s (device: %s)", mountPoint, device)
+					}
+				}
+			}
+		}
+	}
+
+	// Méthode 2: Utiliser 'df' pour trouver les systèmes de fichiers montés
+	cmd = exec.Command("df", "-T")
+	output, err = cmd.Output()
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, line := range lines {
+			// Chercher les systèmes de fichiers iso9660 (DVD/CD) ou udf
+			if strings.Contains(line, "iso9660") || strings.Contains(line, "udf") {
+				fields := strings.Fields(line)
+				if len(fields) >= 7 {
+					mountPoint := fields[6]
+					// Vérifier que le point de montage n'est pas déjà dans la liste
+					found := false
+					for _, mp := range mountPoints {
+						if mp == mountPoint {
+							found = true
+							break
+						}
+					}
+					if !found {
+						mountPoints = append(mountPoints, mountPoint)
+						log.Printf("[DVD Detection] Point de montage trouvé via df: %s", mountPoint)
+					}
+				}
+			}
+		}
+	}
+
+	// Méthode 3: Pour Linux, scanner /run/media et /media pour trouver les sous-dossiers
+	// (ex: /run/media/pactivisme/KILL)
+	scanDirs := []string{"/run/media", "/media", "/Volumes"}
+	for _, scanDir := range scanDirs {
+		if info, err := os.Stat(scanDir); err == nil && info.IsDir() {
+			entries, err := os.ReadDir(scanDir)
+			if err == nil {
+				for _, entry := range entries {
+					if entry.IsDir() {
+						fullPath := filepath.Join(scanDir, entry.Name())
+						// Vérifier si c'est un sous-dossier (ex: /run/media/user/DVD_NAME)
+						subEntries, err := os.ReadDir(fullPath)
+						if err == nil {
+							for _, subEntry := range subEntries {
+								if subEntry.IsDir() {
+									subPath := filepath.Join(fullPath, subEntry.Name())
+									// Vérifier que ce n'est pas déjà dans la liste
+									found := false
+									for _, mp := range mountPoints {
+										if mp == subPath {
+											found = true
+											break
+										}
+									}
+									if !found {
+										mountPoints = append(mountPoints, subPath)
+										log.Printf("[DVD Detection] Point de montage trouvé via scan: %s", subPath)
+									}
+								}
+							}
+						}
+						// Ajouter aussi le dossier direct (pour macOS /Volumes/DVD_NAME)
+						found := false
+						for _, mp := range mountPoints {
+							if mp == fullPath {
+								found = true
+								break
+							}
+						}
+						if !found {
+							mountPoints = append(mountPoints, fullPath)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return mountPoints
 }
 
 // GetDVDInfo récupère les informations du DVD (pistes audio/vidéo/sous-titres)
