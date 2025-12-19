@@ -39,8 +39,8 @@ export const authService = {
     Cookies.set('token', token, { 
       expires,
       sameSite: 'lax',
-      secure: window.location.protocol === 'https:',
-      path: '/'
+      secure: false, // En développement localhost, secure doit être false
+      path: '/',
     })
     
     return { token, user }
