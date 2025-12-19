@@ -435,18 +435,19 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		}
 	}
 	
-	// Si pas trouvé, chercher { suivi d'une nouvelle ligne puis d'espaces puis d'une clé JSON
+	// Si pas trouvé avec les patterns, chercher toutes les accolades { et vérifier si elles sont suivies d'une clé JSON valide
 	if jsonStart < 0 {
 		// Chercher toutes les occurrences de { et vérifier si elles sont suivies d'une clé JSON valide
+		// Les messages d'erreur AC3 peuvent être entre { et la première clé JSON
 		for i := 0; i < len(outputStr); i++ {
 			if outputStr[i] == '{' {
-				// Vérifier les 50 prochains caractères pour une clé JSON valide
-				end := i + 50
+				// Vérifier les 200 prochains caractères pour une clé JSON valide (peut y avoir des messages d'erreur entre)
+				end := i + 200
 				if end > len(outputStr) {
 					end = len(outputStr)
 				}
 				afterBrace := outputStr[i:end]
-				// Chercher "programs", "format", ou "streams" (peut être après des espaces/nouvelle ligne)
+				// Chercher "programs", "format", ou "streams" (peut être après des espaces/nouvelle ligne/messages d'erreur)
 				if strings.Contains(afterBrace, `"programs"`) || 
 				   strings.Contains(afterBrace, `"format"`) || 
 				   strings.Contains(afterBrace, `"streams"`) {
@@ -458,46 +459,6 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		}
 	}
 	
-	// Si on n'a pas trouvé avec les patterns, chercher simplement la première {
-	// puis vérifier qu'elle est suivie d'une clé JSON valide
-	if jsonStart < 0 {
-		firstBrace := strings.Index(outputStr, "{")
-		if firstBrace >= 0 {
-			// Vérifier que après { il y a une clé JSON valide dans les 100 prochains caractères
-			afterBrace := outputStr[firstBrace:min(firstBrace+200, len(outputStr))]
-			hasValidKey := strings.Contains(afterBrace, `"programs"`) || 
-			               strings.Contains(afterBrace, `"format"`) || 
-			               strings.Contains(afterBrace, `"streams"`)
-			
-			if hasValidKey {
-				jsonStart = firstBrace
-				log.Printf("[DVD Info] JSON trouvé à la position %d (première accolade avec clé valide)", jsonStart)
-			} else {
-				// Chercher la prochaine { qui a une clé valide
-				searchStart := firstBrace + 1
-				for {
-					nextBrace := strings.Index(outputStr[searchStart:], "{")
-					if nextBrace < 0 {
-						break
-					}
-					actualPos := searchStart + nextBrace
-					afterBraceEnd := actualPos + 200
-					if afterBraceEnd > len(outputStr) {
-						afterBraceEnd = len(outputStr)
-					}
-					afterBrace := outputStr[actualPos:afterBraceEnd]
-					if strings.Contains(afterBrace, `"programs"`) || 
-					   strings.Contains(afterBrace, `"format"`) || 
-					   strings.Contains(afterBrace, `"streams"`) {
-						jsonStart = actualPos
-						log.Printf("[DVD Info] JSON trouvé à la position %d (accolade suivante avec clé valide)", jsonStart)
-						break
-					}
-					searchStart = actualPos + 1
-				}
-			}
-		}
-	}
 	
 	if jsonStart < 0 {
 		return nil, fmt.Errorf("impossible de trouver le début du JSON dans la sortie ffprobe")
