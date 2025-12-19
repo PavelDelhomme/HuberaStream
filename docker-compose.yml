@@ -109,6 +109,24 @@ services:
       - streammake-network
     restart: unless-stopped
 
+  # Frontend Next.js (nouveau système - actif par défaut)
+  frontend-nextjs:
+    build:
+      context: ./frontend-nextjs
+      dockerfile: Dockerfile
+    container_name: streammake-frontend-nextjs
+    labels:
+      - "com.streammake.project=streammake"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:3300/api"
+      NODE_ENV: production
+    depends_on:
+      - backend
+    networks:
+      - streammake-network
+    restart: unless-stopped
+
+  # Frontend React (ancien système - désactivé par défaut, profile legacy)
   frontend:
     image: streammake-frontend:latest
     build:
@@ -118,8 +136,6 @@ services:
     labels:
       - "com.streammake.project=streammake"
     environment:
-      # Utiliser Nginx comme reverse proxy (port 3300)
-      # Le problème 403 Forbidden a été résolu en configurant SetTrustedProxies dans Gin
       REACT_APP_API_URL: "http://localhost:3300/api"
       VITE_API_URL: "http://localhost:3300/api"
     volumes:
@@ -132,6 +148,8 @@ services:
     networks:
       - streammake-network
     restart: unless-stopped
+    profiles:
+      - legacy # Service optionnel, activé avec: docker-compose --profile legacy up
 
   nginx:
     image: nginx:alpine
@@ -146,7 +164,7 @@ services:
       - "3300:80" # Port principal via nginx
     depends_on:
       - backend
-      - frontend
+      - frontend-nextjs
     networks:
       - streammake-network
     restart: unless-stopped

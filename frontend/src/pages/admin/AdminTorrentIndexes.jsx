@@ -13,6 +13,8 @@ const AdminTorrentIndexes = () => {
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingIndex, setEditingIndex] = useState(null)
   const [testingIndex, setTestingIndex] = useState(null)
+  const [testResults, setTestResults] = useState(null)
+  const [showTestResults, setShowTestResults] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     source: '1337x',
@@ -121,7 +123,13 @@ const AdminTorrentIndexes = () => {
     try {
       const response = await api.post(`/admin/torrent-indexes/${indexId}/test`)
       if (response.data.success) {
-        alert(`✅ Test réussi ! ${response.data.message}`)
+        setTestResults({
+          message: response.data.message,
+          count: response.data.results_count,
+          results: response.data.results || [],
+          limited: response.data.limited || false
+        })
+        setShowTestResults(true)
       } else {
         alert(`❌ Test échoué : ${response.data.message}`)
       }
@@ -366,8 +374,102 @@ const AdminTorrentIndexes = () => {
           ))
         )}
       </div>
+
+      {showTestResults && testResults && (
+        <div className="test-results-modal">
+          <div className="test-results-content">
+            <div className="test-results-header">
+              <h2>📊 Résultats du test</h2>
+              <button
+                className="close-button"
+                onClick={() => {
+                  setShowTestResults(false)
+                  setTestResults(null)
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="test-results-body">
+              <p className="test-summary">
+                {testResults.message}
+                {testResults.limited && (
+                  <span className="limited-note"> (affichage limité à 10 résultats)</span>
+                )}
+              </p>
+              {testResults.results && testResults.results.length > 0 ? (
+                <div className="test-results-list">
+                  {testResults.results.map((result, idx) => (
+                    <div key={idx} className="test-result-item">
+                      <div className="result-header">
+                        <h4>{result.name || 'Sans nom'}</h4>
+                        {result.quality && (
+                          <span className="badge badge-quality">{result.quality}</span>
+                        )}
+                        {result.language && (
+                          <span className="badge badge-language">{result.language}</span>
+                        )}
+                      </div>
+                      <div className="result-details">
+                        {result.size > 0 && (
+                          <span className="detail">📦 {formatBytes(result.size)}</span>
+                        )}
+                        {result.seeders !== undefined && (
+                          <span className="detail">🌱 {result.seeders} seeders</span>
+                        )}
+                        {result.leechers !== undefined && (
+                          <span className="detail">👥 {result.leechers} leechers</span>
+                        )}
+                      </div>
+                      <div className="result-links">
+                        {(result.MagnetURL || result.magnet_url) && (
+                          <a
+                            href={result.MagnetURL || result.magnet_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="link-button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              const magnetUrl = result.MagnetURL || result.magnet_url
+                              navigator.clipboard.writeText(magnetUrl)
+                              alert('Lien magnet copié dans le presse-papier')
+                            }}
+                          >
+                            🔗 Copier Magnet
+                          </a>
+                        )}
+                        {(result.TorrentURL || result.torrent_url) && (
+                          <a
+                            href={result.TorrentURL || result.torrent_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="link-button"
+                          >
+                            🔗 Voir la page
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="no-results">Aucun résultat trouvé</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+// Fonction utilitaire pour formater les bytes
+const formatBytes = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
 }
 
 export default AdminTorrentIndexes

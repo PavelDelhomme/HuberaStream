@@ -238,10 +238,18 @@ func (h *TorrentIndexHandler) TestTorrentIndex(c *gin.Context) {
 		return
 	}
 
+	// Limiter à 10 résultats pour l'affichage
+	displayResults := results
+	if len(results) > 10 {
+		displayResults = results[:10]
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": fmt.Sprintf("Index testé avec succès, %d résultats trouvés", len(results)),
+		"success":       true,
+		"message":       fmt.Sprintf("Index testé avec succès, %d résultats trouvés", len(results)),
 		"results_count": len(results),
+		"results":       displayResults,
+		"limited":       len(results) > 10,
 	})
 }
 

@@ -1,0 +1,68 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { authService, User } from '@/lib/auth'
+import Link from 'next/link'
+import './AdminLayout.css'
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (!authService.isAuthenticated()) {
+        router.push('/login?redirect=/admin')
+        return
+      }
+
+      const currentUser = await authService.getCurrentUser()
+      if (!currentUser || !authService.isAdmin(currentUser)) {
+        router.push('/')
+        return
+      }
+
+      setUser(currentUser)
+      setLoading(false)
+    }
+    checkAuth()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="admin-layout">
+        <div className="loading">Vérification des permissions...</div>
+      </div>
+    )
+  }
+
+  if (!user || !authService.isAdmin(user)) {
+    return null
+  }
+
+  return (
+    <div className="admin-layout">
+      <div className="admin-sidebar">
+        <h2>🔧 Administration</h2>
+        <nav className="admin-nav">
+          <Link href="/admin/dashboard">📊 Tableau de bord</Link>
+          <Link href="/admin/users">👥 Utilisateurs</Link>
+          <Link href="/admin/videos">🎬 Vidéos</Link>
+          <Link href="/admin/torrents">📥 Torrents</Link>
+          <Link href="/admin/torrent-configs">⚙️ Configurations</Link>
+          <Link href="/admin/torrent-candidates">🎯 Candidats</Link>
+          <Link href="/admin/torrent-indexes">🔍 Index</Link>
+          <Link href="/admin/torrent-clients">💻 Clients</Link>
+          <Link href="/admin/categories">📁 Catégories</Link>
+          <Link href="/admin/media-settings">🎛️ Paramètres</Link>
+        </nav>
+      </div>
+      <div className="admin-content">
+        {children}
+      </div>
+    </div>
+  )
+}
+

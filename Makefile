@@ -60,7 +60,13 @@ help:
 	@echo "  ${GREEN}dev${NC}                Mode développement avec hot reload"
 	@echo "  ${GREEN}dev-backend${NC}        Backend hors Docker (go run)"
 	@echo "  ${GREEN}dev-frontend${NC}       Frontend hors Docker (npm run dev)"
+	@echo "  ${GREEN}dev-nextjs${NC}         Frontend Next.js hors Docker (npm run dev)"
 	@echo "  ${GREEN}debug-backend${NC}      Backend avec debugger Delve"
+	@echo ""
+	@echo "${YELLOW}📦 NEXT.JS:${NC}"
+	@echo "  ${GREEN}install-nextjs${NC}     Installer dépendances Next.js"
+	@echo "  ${GREEN}build-nextjs${NC}       Build Next.js pour production"
+	@echo "  ${GREEN}up-legacy${NC}           Démarrer avec ancien frontend React (profile legacy)"
 	@echo ""
 	@echo "${YELLOW}🧪 TESTS:${NC}"
 	@echo "  ${GREEN}check${NC}             Vérification complète avant démarrage (recommandé)"
@@ -142,10 +148,20 @@ up:
 			fi; \
 		}; \
 	fi
-	@if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "streammake-frontend:latest" 2>/dev/null; then \
-		echo "${YELLOW}⚠️  Image frontend manquante.${NC}"; \
-		echo "${YELLOW}💡 Utilisez 'make setup-images' pour créer toutes les images${NC}"; \
-		echo "${YELLOW}⚠️  Continuons sans image frontend personnalisée (utilisera node:20-alpine)${NC}"; \
+	@if ! docker images --format "{{.Repository}}:{{.Tag}}" | grep -q "streammake-frontend-nextjs" 2>/dev/null; then \
+		echo "${YELLOW}⚠️  Image frontend-nextjs manquante.${NC}"; \
+		echo "${YELLOW}💡 Build de l'image Next.js...${NC}"; \
+		if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build frontend-nextjs || { \
+				echo "${RED}❌ Erreur lors du build de Next.js${NC}"; \
+				echo "${YELLOW}💡 Essayez: make build-nextjs${NC}"; \
+			}; \
+		else \
+			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build frontend-nextjs || { \
+				echo "${RED}❌ Erreur lors du build de Next.js${NC}"; \
+				echo "${YELLOW}💡 Essayez: make build-nextjs${NC}"; \
+			}; \
+		fi; \
 	fi
 	@echo "${GREEN}✅ Images vérifiées${NC}"
 	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
@@ -316,13 +332,11 @@ clean-all:
 # ============================================================================
 
 logs:
-	@echo "${GREEN}📋 Logs StreamMake (scrollable, appuyez 'F' pour suivre, 'q' pour quitter)...${NC}"
+	@echo "${GREEN}📋 Logs StreamMake en temps réel (Ctrl+C pour quitter)...${NC}"
 	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
-		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | grep -E "(streammake|backend|frontend|nginx|postgres|redis)" | less -R +F || \
-		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | less -R +F; \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs -f; \
 	else \
-		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | grep -E "(streammake|backend|frontend|nginx|postgres|redis)" | less -R +F || \
-		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs --tail=500 2>&1 | less -R +F; \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) logs -f; \
 	fi
 
 logs-follow:
@@ -375,8 +389,17 @@ dev-backend:
 	@cd backend && go run ./cmd/server
 
 dev-frontend:
-	@echo "${GREEN}💻 Frontend en mode développement (hors Docker)...${NC}"
-	@cd frontend && npm run dev
+	@echo "${YELLOW}⚠️  L'ancien frontend React n'est plus utilisé. Utilisez 'make dev-nextjs' pour Next.js${NC}"
+	@echo "${GREEN}💻 Frontend Next.js en mode développement (hors Docker)...${NC}"
+	@make dev-nextjs
+
+dev-nextjs:
+	@echo "${GREEN}💻 Frontend Next.js en mode développement (hors Docker)...${NC}"
+	@if [ ! -d "frontend-nextjs/node_modules" ]; then \
+		echo "${YELLOW}📦 Installation des dépendances...${NC}"; \
+		cd frontend-nextjs && npm install --legacy-peer-deps; \
+	fi
+	@cd frontend-nextjs && npm run dev
 
 debug-backend:
 	@echo "${GREEN}🐛 Backend avec debugger Delve...${NC}"
@@ -602,3 +625,40 @@ install-torrents:
 setup-images:
 	@echo "${GREEN}🔨 Création des images Docker...${NC}"
 	@./scripts/setup-images.sh
+
+# ============================================================================
+# NEXT.JS
+# ============================================================================
+
+install-nextjs:
+	@echo "${GREEN}📦 Installation des dépendances Next.js...${NC}"
+	@if [ ! -d "frontend-nextjs" ]; then \
+		echo "${RED}❌ Le dossier frontend-nextjs n'existe pas${NC}"; \
+		exit 1; \
+	fi
+	@cd frontend-nextjs && npm install --legacy-peer-deps
+	@echo "${GREEN}✅ Dépendances Next.js installées${NC}"
+
+build-nextjs:
+	@echo "${GREEN}🔨 Build Next.js pour production...${NC}"
+	@if [ ! -d "frontend-nextjs" ]; then \
+		echo "${RED}❌ Le dossier frontend-nextjs n'existe pas${NC}"; \
+		exit 1; \
+	fi
+	@if [ ! -d "frontend-nextjs/node_modules" ]; then \
+		echo "${YELLOW}📦 Installation des dépendances...${NC}"; \
+		cd frontend-nextjs && npm install --legacy-peer-deps; \
+	fi
+	@cd frontend-nextjs && npm run build
+	@echo "${GREEN}✅ Build Next.js terminé${NC}"
+
+up-legacy:
+	@echo "${YELLOW}⚠️  Démarrage avec l'ancien frontend React (legacy)...${NC}"
+	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) --profile legacy up -d frontend; \
+	else \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) --profile legacy up -d frontend; \
+	fi
+	@echo "${GREEN}✅ Ancien frontend React démarré${NC}"
+	@echo "${YELLOW}Frontend React (legacy): http://localhost:3304${NC}"
+	@echo "${YELLOW}⚠️  Note: Next.js est maintenant le frontend par défaut sur http://localhost:3300${NC}"
