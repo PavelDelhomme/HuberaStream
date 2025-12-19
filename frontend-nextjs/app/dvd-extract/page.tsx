@@ -38,12 +38,23 @@ export default function DVDExtractPage() {
   const [cancelling, setCancelling] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
   const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const hasCheckedAuthRef = useRef(false)
 
   useEffect(() => {
+    // Éviter les vérifications multiples
+    if (hasCheckedAuthRef.current) {
+      console.log('[DVD-Extract] ⚠️ Vérification déjà en cours, ignoré')
+      return
+    }
+
     let isMounted = true
 
     const checkAuth = async () => {
+      hasCheckedAuthRef.current = true
       console.log('[DVD-Extract] 🔍 Début vérification authentification')
+      
+      // Attendre un peu pour s'assurer que les cookies sont chargés (problème Next.js SSR)
+      await new Promise(resolve => setTimeout(resolve, 100))
       
       // Vérifier d'abord si le token existe
       const hasToken = authService.isAuthenticated()
@@ -53,6 +64,7 @@ export default function DVDExtractPage() {
       if (!hasToken) {
         console.log('[DVD-Extract] ❌ Pas de token, redirection vers login')
         if (isMounted) {
+          hasCheckedAuthRef.current = false
           router.push('/login?redirect=/dvd-extract')
         }
         return
@@ -80,11 +92,13 @@ export default function DVDExtractPage() {
         
         if (!stillHasToken) {
           console.log('[DVD-Extract] ❌ Token supprimé, redirection vers login')
+          hasCheckedAuthRef.current = false
           router.push('/login?redirect=/dvd-extract')
           return
         }
         // Sinon, c'est probablement une erreur réseau, réessayer après un délai
         console.log('[DVD-Extract] 🔄 Réessai dans 1 seconde...')
+        hasCheckedAuthRef.current = false // Permettre le réessai
         if (authCheckTimeoutRef.current) {
           clearTimeout(authCheckTimeoutRef.current)
         }
@@ -102,6 +116,7 @@ export default function DVDExtractPage() {
       
       if (!isAdmin) {
         console.log('[DVD-Extract] ❌ Pas admin, redirection vers accueil')
+        hasCheckedAuthRef.current = false
         router.push('/')
         return
       }
@@ -118,6 +133,7 @@ export default function DVDExtractPage() {
     return () => {
       console.log('[DVD-Extract] 🧹 Nettoyage useEffect')
       isMounted = false
+      hasCheckedAuthRef.current = false
       if (authCheckTimeoutRef.current) {
         clearTimeout(authCheckTimeoutRef.current)
         authCheckTimeoutRef.current = null
