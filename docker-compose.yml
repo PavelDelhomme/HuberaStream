@@ -65,6 +65,8 @@ services:
       - /media/cdrom:/media/cdrom:ro
       - /run/media:/run/media:ro
       - /media:/media:ro
+      # Monter explicitement le point de montage du DVD si disponible
+      - /run/media/pactivisme/KILL:/run/media/pactivisme/KILL:ro
       # Points de montage macOS (si applicable)
       - /Volumes:/Volumes:ro
       # Partager le volume de config qBittorrent pour configuration automatique
