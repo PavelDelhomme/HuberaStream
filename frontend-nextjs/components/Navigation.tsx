@@ -2,23 +2,51 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { authService, User } from '@/lib/auth'
 import './Navigation.css'
 
 export default function Navigation() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const pathname = usePathname()
 
   useEffect(() => {
     const loadUser = async () => {
       if (authService.isAuthenticated()) {
-        const currentUser = await authService.getCurrentUser()
-        setUser(currentUser)
+        try {
+          const currentUser = await authService.getCurrentUser()
+          if (currentUser) {
+            setUser(currentUser)
+          } else {
+            // Token invalide, supprimer le cookie
+            authService.logout()
+            setUser(null)
+          }
+        } catch (error) {
+          // Erreur lors de la récupération de l'utilisateur
+          authService.logout()
+          setUser(null)
+        }
+      } else {
+        setUser(null)
       }
       setLoading(false)
     }
     loadUser()
-  }, [])
+
+    // Réécouter les changements de cookie (pour détecter les déconnexions)
+    const checkAuth = () => {
+      if (!authService.isAuthenticated()) {
+        setUser(null)
+      }
+    }
+
+    // Vérifier l'authentification toutes les secondes (pour détecter les changements)
+    const interval = setInterval(checkAuth, 1000)
+
+    return () => clearInterval(interval)
+  }, [pathname]) // Recharger quand la route change
 
   const handleLogout = () => {
     authService.logout()
