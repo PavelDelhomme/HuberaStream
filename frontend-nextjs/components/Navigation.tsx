@@ -69,7 +69,12 @@ export default function Navigation() {
           {user ? (
             <>
               {authService.isAdmin(user) && (
-                <Link href="/admin/dashboard">Admin</Link>
+                <>
+                  <Link href="/admin/dashboard">📊 Admin</Link>
+                  <Link href="/admin/torrents">📥 Torrents</Link>
+                  <Link href="/dvd-extract">📀 DVD</Link>
+                  <Link href="/video/upload">⬆️ Upload</Link>
+                </>
               )}
               <Link href="/user/profile">Profil</Link>
               <Link href="/user/history">Historique</Link>
