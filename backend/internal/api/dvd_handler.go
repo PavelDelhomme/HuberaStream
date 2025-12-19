@@ -51,13 +51,38 @@ func (h *DVDHandler) DetectDVD(c *gin.Context) {
 		// Retourner 200 avec un message d'erreur plutôt que 404
 		// pour que le frontend puisse gérer l'erreur correctement
 		// Inclure aussi une liste de devices à essayer manuellement
-		possibleDevices := []string{"/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/cdrom", "/dev/cdrom0", "/dev/cdrom1"}
+		possibleDevices := []string{
+			"/dev/sr0", "/dev/sr1", "/dev/sr2", "/dev/sr3", "/dev/sr4",
+			"/dev/cdrom", "/dev/cdrom0", "/dev/cdrom1",
+			"/dev/dvd", "/dev/dvdrw",
+			// macOS
+			"/dev/disk1", "/dev/disk2", "/dev/disk3", "/dev/disk4",
+			"/dev/rdisk1", "/dev/rdisk2", "/dev/rdisk3", "/dev/rdisk4",
+		}
 		var availableDevices []string
 		for _, d := range possibleDevices {
 			if info, statErr := os.Stat(d); statErr == nil && !info.IsDir() {
 				if info.Mode()&os.ModeDevice != 0 {
 					availableDevices = append(availableDevices, d)
 					log.Printf("[DVD Detection] Device disponible trouvé: %s", d)
+				}
+			}
+		}
+		
+		// Ajouter aussi les points de montage trouvés
+		mountPoints := h.extractor.findMountPoints()
+		for _, mp := range mountPoints {
+			if info, statErr := os.Stat(mp); statErr == nil && info.IsDir() {
+				// Vérifier si c'est un DVD (contient VIDEO_TS)
+				files, err := os.ReadDir(mp)
+				if err == nil {
+					for _, file := range files {
+						if file.Name() == "VIDEO_TS" || file.Name() == "video_ts" {
+							availableDevices = append(availableDevices, mp)
+							log.Printf("[DVD Detection] Point de montage DVD trouvé: %s", mp)
+							break
+						}
+					}
 				}
 			}
 		}
