@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { authService, User } from '@/lib/auth'
 import api from '@/lib/api'
 import Link from 'next/link'
@@ -34,18 +34,40 @@ export default function HomeContent() {
   const [categories, setCategories] = useState<any[]>([])
   const [videosByCategory, setVideosByCategory] = useState<Record<string, Video[]>>({})
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedRef = useRef(false)
+  const userIdRef = useRef<string | null>(null)
 
+  // Charger l'utilisateur une seule fois au montage
   useEffect(() => {
-    const loadData = async () => {
+    const loadUser = async () => {
       if (authService.isAuthenticated()) {
         const currentUser = await authService.getCurrentUser()
         setUser(currentUser)
+        userIdRef.current = currentUser?.id || null
+      } else {
+        setUser(null)
+        userIdRef.current = null
       }
-      
+    }
+    loadUser()
+  }, []) // Pas de dépendances - exécuté une seule fois
+
+  // Charger les données une seule fois après le chargement de l'utilisateur
+  useEffect(() => {
+    if (hasLoadedRef.current) return
+    
+    const loadData = async () => {
+      hasLoadedRef.current = true
       await fetchAllData()
     }
-    loadData()
-  }, [user])
+    
+    // Attendre un peu pour que l'utilisateur soit chargé
+    const timer = setTimeout(() => {
+      loadData()
+    }, 100)
+    
+    return () => clearTimeout(timer)
+  }, []) // Pas de dépendances - exécuté une seule fois
 
   const filterValidVideos = (videos: Video[]): Video[] => {
     if (!videos || !Array.isArray(videos)) return []
@@ -62,8 +84,11 @@ export default function HomeContent() {
       setLoading(true)
       setError(null)
       
+      // Utiliser userIdRef pour éviter les dépendances sur l'objet user
+      const currentUserId = userIdRef.current || user?.id
+      
       // Récupérer les vidéos en cours de visionnage (si connecté)
-      if (user) {
+      if (currentUserId) {
         try {
           const continueResponse = await api.get('/continue-watching')
           const historyItems = continueResponse.data.videos || []
@@ -90,7 +115,7 @@ export default function HomeContent() {
             params: { 
               page: 1, 
               limit: 12,
-              user_id: user.id,
+              user_id: currentUserId,
               status: 'all'
             }
           })
