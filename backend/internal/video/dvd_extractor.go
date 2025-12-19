@@ -363,9 +363,11 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 
 	// Utiliser ffprobe avec des options spécifiques pour les DVD
 	// Utiliser -v error pour réduire les warnings, et séparer stdout/stderr
+	// Utiliser -loglevel error pour forcer les erreurs vers stderr uniquement
 	cmd := exec.Command(
 		e.ffprobePath,
 		"-v", "error", // Réduire les messages d'erreur/warning
+		"-loglevel", "error", // Forcer les erreurs vers stderr uniquement
 		"-hide_banner", // Cacher la bannière
 		"-analyzeduration", "30000000", // 30 secondes d'analyse
 		"-probesize", "30000000", // 30 MB de probe
