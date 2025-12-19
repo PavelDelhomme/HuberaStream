@@ -60,34 +60,34 @@ export default function Navigation() {
   return (
     <nav className="navigation">
       <div className="nav-container">
-        <Link href="/" className="nav-logo">
+        <Link href="/" className="nav-logo" prefetch={false}>
           🎬 StreamMake
         </Link>
         <div className="nav-links">
-          <Link href="/">Accueil</Link>
-          <Link href="/search">Recherche</Link>
+          <Link href="/" prefetch={false}>Accueil</Link>
+          <Link href="/search" prefetch={false}>Recherche</Link>
           {user ? (
             <>
               {authService.isAdmin(user) && (
                 <>
-                  <Link href="/admin/dashboard">📊 Admin</Link>
-                  <Link href="/admin/torrents">📥 Torrents</Link>
-                  <Link href="/dvd-extract">📀 DVD</Link>
-                  <Link href="/video/upload">⬆️ Upload</Link>
+                  <Link href="/admin/dashboard" prefetch={false}>📊 Admin</Link>
+                  <Link href="/admin/torrents" prefetch={false}>📥 Torrents</Link>
+                  <Link href="/dvd-extract" prefetch={false}>📀 DVD</Link>
+                  <Link href="/video/upload" prefetch={false}>⬆️ Upload</Link>
                 </>
               )}
-              <Link href="/user/profile">Profil</Link>
-              <Link href="/user/history">Historique</Link>
-              <Link href="/user/favorites">Favoris</Link>
-              <Link href="/user/playlists">Listes</Link>
+              <Link href="/user/profile" prefetch={false}>Profil</Link>
+              <Link href="/user/history" prefetch={false}>Historique</Link>
+              <Link href="/user/favorites" prefetch={false}>Favoris</Link>
+              <Link href="/user/playlists" prefetch={false}>Listes</Link>
               <button onClick={handleLogout} className="nav-button">
                 Déconnexion
               </button>
             </>
           ) : (
             <>
-              <Link href="/login">Connexion</Link>
-              <Link href="/register">Inscription</Link>
+              <Link href="/login" prefetch={false}>Connexion</Link>
+              <Link href="/register" prefetch={false}>Inscription</Link>
             </>
           )}
         </div>
