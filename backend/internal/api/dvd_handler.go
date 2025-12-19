@@ -369,7 +369,12 @@ func (h *DVDHandler) calculateFileChecksum(filePath string) (string, error) {
 
 // GetExtractionStatus récupère le statut de l'extraction
 func (h *DVDHandler) GetExtractionStatus(c *gin.Context) {
-	videoID := c.Param("id")
+	videoIDParam := c.Param("id")
+	videoID, err := uuid.Parse(videoIDParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID de vidéo invalide"})
+		return
+	}
 
 	var video models.Video
 	if err := h.db.Where("id = ?", videoID).First(&video).Error; err != nil {

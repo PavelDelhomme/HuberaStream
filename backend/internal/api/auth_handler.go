@@ -108,6 +108,15 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// Vérifier que l'utilisateur est actif
+	if !user.IsActive {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":           "Compte en attente d'approbation",
+			"pending_approval": true,
+		})
+		return
+	}
+
 	// Générer le token JWT avec une expiration adaptée selon le rôle
 	// Admin : 30 jours pour une meilleure persistance en localhost
 	// User : 7 jours
