@@ -36,9 +36,14 @@ export default function DVDExtractPage() {
   const [analyzingStage, setAnalyzingStage] = useState('')
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [authLoading, setAuthLoading] = useState(true)
+  const retryCountRef = useRef(0)
+  const maxRetries = 3
 
   useEffect(() => {
     const checkAuth = async () => {
+      setAuthLoading(true)
+      
       // Vérifier d'abord si le token existe
       if (!authService.isAuthenticated()) {
         router.push('/login?redirect=/dvd-extract')
@@ -50,21 +55,39 @@ export default function DVDExtractPage() {
       
       // Si getCurrentUser retourne null, cela peut être dû à :
       // 1. Token invalide/expiré (401) -> getCurrentUser supprime déjà le token
-      // 2. Erreur réseau temporaire -> ne pas rediriger immédiatement
+      // 2. Erreur réseau temporaire -> réessayer avec limite
       if (!currentUser) {
         // Vérifier si le token existe encore (si non, c'est qu'il a été supprimé par getCurrentUser)
         if (!authService.isAuthenticated()) {
           router.push('/login?redirect=/dvd-extract')
           return
         }
-        // Sinon, c'est probablement une erreur réseau, réessayer après un délai
-        setTimeout(() => {
-          checkAuth()
-        }, 1000)
+        
+        // Limiter le nombre de réessais pour éviter les boucles infinies
+        if (retryCountRef.current < maxRetries) {
+          retryCountRef.current++
+          setTimeout(() => {
+            checkAuth()
+          }, 1000)
+          return
+        } else {
+          // Trop de tentatives, considérer comme erreur réseau permanente
+          setAuthLoading(false)
+          setError('Impossible de vérifier l\'authentification. Veuillez réessayer.')
+          return
+        }
+      }
+
+      // Vérifier que l'utilisateur est admin (requis pour l'extraction DVD)
+      if (!authService.isAdmin(currentUser)) {
+        router.push('/')
         return
       }
 
+      // Réinitialiser le compteur de réessais en cas de succès
+      retryCountRef.current = 0
       setUser(currentUser)
+      setAuthLoading(false)
       fetchCategories()
       checkForActiveExtraction()
     }
@@ -406,10 +429,10 @@ export default function DVDExtractPage() {
     }
   }
 
-  if (!user) {
+  if (authLoading || !user) {
     return (
       <div className="dvd-extract-page">
-        <div className="loading">Chargement...</div>
+        <div className="loading">Vérification des permissions...</div>
       </div>
     )
   }

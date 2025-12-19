@@ -29,11 +29,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expiré ou invalide
-      Cookies.remove('token')
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login'
-      }
+      // Token expiré ou invalide - supprimer le cookie
+      // Mais ne pas rediriger automatiquement, laisser les composants gérer
+      Cookies.remove('token', { path: '/' })
     }
     return Promise.reject(error)
   }
