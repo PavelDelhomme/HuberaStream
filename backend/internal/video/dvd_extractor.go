@@ -517,25 +517,41 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	log.Printf("[DVD Info] Texte avant JSON supprimé: %d caractères", jsonStart)
 	
 	// Nettoyer les messages d'erreur AC3 qui peuvent être entre { et la première clé JSON
+	// Le JSON peut commencer par { suivi directement de messages d'erreur, puis "programs"
+	// Exemple: { [ac3 @ ...] error ... "programs": [...]
+	
 	// Chercher la première occurrence de "programs", "format", ou "streams"
 	firstKeyPos := -1
+	firstKey := ""
 	for _, key := range []string{`"programs"`, `"format"`, `"streams"`} {
 		pos := strings.Index(outputStr, key)
 		if pos >= 0 && (firstKeyPos < 0 || pos < firstKeyPos) {
 			firstKeyPos = pos
+			firstKey = key
 		}
 	}
 	
-	if firstKeyPos > 1 {
-		// Il y a du texte entre { et la première clé, le supprimer
-		// Garder { et tout ce qui vient après la première clé
-		// Mais d'abord, trouver le { correspondant
+	if firstKeyPos > 0 {
+		// Il y a du texte avant la première clé, le supprimer
+		// Reconstruire le JSON en commençant par { suivi directement de la première clé
 		bracePos := strings.Index(outputStr, "{")
-		if bracePos >= 0 && firstKeyPos > bracePos+1 {
-			// Il y a du texte entre { et la clé, reconstruire le JSON
+		if bracePos >= 0 && firstKeyPos > bracePos {
+			// Reconstruire : { + première clé + reste
 			cleanedJSON := "{" + outputStr[firstKeyPos:]
 			outputStr = cleanedJSON
-			log.Printf("[DVD Info] Messages d'erreur supprimés entre { et la première clé JSON (%d caractères)", firstKeyPos-bracePos-1)
+			log.Printf("[DVD Info] Messages d'erreur supprimés entre { et '%s' (%d caractères supprimés)", firstKey, firstKeyPos-bracePos-1)
+		} else if bracePos < 0 {
+			// Pas de { trouvé, ajouter { au début
+			cleanedJSON := "{" + outputStr[firstKeyPos:]
+			outputStr = cleanedJSON
+			log.Printf("[DVD Info] { ajouté au début, messages d'erreur supprimés avant '%s'", firstKey)
+		}
+	} else {
+		// Aucune clé trouvée, essayer de trouver { et supprimer tout ce qui est avant
+		bracePos := strings.Index(outputStr, "{")
+		if bracePos > 0 {
+			outputStr = outputStr[bracePos:]
+			log.Printf("[DVD Info] Texte avant { supprimé (%d caractères)", bracePos)
 		}
 	}
 	
