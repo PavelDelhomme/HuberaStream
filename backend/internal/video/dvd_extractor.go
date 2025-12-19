@@ -432,8 +432,9 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		} `json:"chapters"`
 	}
 
-	if err := json.Unmarshal(output, &probeData); err != nil {
-		return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, string(output))
+	// Parser le JSON nettoyé
+	if err := json.Unmarshal([]byte(outputStr), &probeData); err != nil {
+		return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr)
 	}
 
 	// Initialiser tous les tableaux pour éviter les valeurs null en JSON
