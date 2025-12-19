@@ -37,45 +37,45 @@ export default function DVDExtractPage() {
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [cancelling, setCancelling] = useState(false)
   const [authLoading, setAuthLoading] = useState(true)
-  const retryCountRef = useRef(0)
-  const maxRetries = 3
+  const authCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
+    let isMounted = true
+
     const checkAuth = async () => {
-      setAuthLoading(true)
-      
       // Vérifier d'abord si le token existe
       if (!authService.isAuthenticated()) {
-        router.push('/login?redirect=/dvd-extract')
+        if (isMounted) {
+          router.push('/login?redirect=/dvd-extract')
+        }
         return
       }
 
       // Récupérer l'utilisateur actuel
       const currentUser = await authService.getCurrentUser()
       
+      // Si le composant a été démonté, ne pas continuer
+      if (!isMounted) return
+      
       // Si getCurrentUser retourne null, cela peut être dû à :
       // 1. Token invalide/expiré (401) -> getCurrentUser supprime déjà le token
-      // 2. Erreur réseau temporaire -> réessayer avec limite
+      // 2. Erreur réseau temporaire -> ne pas rediriger immédiatement
       if (!currentUser) {
         // Vérifier si le token existe encore (si non, c'est qu'il a été supprimé par getCurrentUser)
         if (!authService.isAuthenticated()) {
           router.push('/login?redirect=/dvd-extract')
           return
         }
-        
-        // Limiter le nombre de réessais pour éviter les boucles infinies
-        if (retryCountRef.current < maxRetries) {
-          retryCountRef.current++
-          setTimeout(() => {
-            checkAuth()
-          }, 1000)
-          return
-        } else {
-          // Trop de tentatives, considérer comme erreur réseau permanente
-          setAuthLoading(false)
-          setError('Impossible de vérifier l\'authentification. Veuillez réessayer.')
-          return
+        // Sinon, c'est probablement une erreur réseau, réessayer après un délai
+        if (authCheckTimeoutRef.current) {
+          clearTimeout(authCheckTimeoutRef.current)
         }
+        authCheckTimeoutRef.current = setTimeout(() => {
+          if (isMounted) {
+            checkAuth()
+          }
+        }, 1000)
+        return
       }
 
       // Vérifier que l'utilisateur est admin (requis pour l'extraction DVD)
@@ -84,14 +84,21 @@ export default function DVDExtractPage() {
         return
       }
 
-      // Réinitialiser le compteur de réessais en cas de succès
-      retryCountRef.current = 0
       setUser(currentUser)
       setAuthLoading(false)
       fetchCategories()
       checkForActiveExtraction()
     }
+    
     checkAuth()
+
+    return () => {
+      isMounted = false
+      if (authCheckTimeoutRef.current) {
+        clearTimeout(authCheckTimeoutRef.current)
+        authCheckTimeoutRef.current = null
+      }
+    }
   }, [router])
 
   useEffect(() => {
