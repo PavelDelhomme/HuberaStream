@@ -43,30 +43,48 @@ export default function DVDExtractPage() {
     let isMounted = true
 
     const checkAuth = async () => {
+      console.log('[DVD-Extract] 🔍 Début vérification authentification')
+      
       // Vérifier d'abord si le token existe
-      if (!authService.isAuthenticated()) {
+      const hasToken = authService.isAuthenticated()
+      const tokenValue = authService.getToken()
+      console.log('[DVD-Extract] Token présent:', hasToken, 'Token value:', tokenValue ? `${tokenValue.substring(0, 20)}...` : 'null')
+      
+      if (!hasToken) {
+        console.log('[DVD-Extract] ❌ Pas de token, redirection vers login')
         if (isMounted) {
           router.push('/login?redirect=/dvd-extract')
         }
         return
       }
 
+      console.log('[DVD-Extract] 📡 Appel getCurrentUser...')
       // Récupérer l'utilisateur actuel
       const currentUser = await authService.getCurrentUser()
+      console.log('[DVD-Extract] Utilisateur récupéré:', currentUser ? `ID: ${currentUser.id}, Role: ${currentUser.role}` : 'null')
       
       // Si le composant a été démonté, ne pas continuer
-      if (!isMounted) return
+      if (!isMounted) {
+        console.log('[DVD-Extract] ⚠️ Composant démonté, arrêt')
+        return
+      }
       
       // Si getCurrentUser retourne null, cela peut être dû à :
       // 1. Token invalide/expiré (401) -> getCurrentUser supprime déjà le token
       // 2. Erreur réseau temporaire -> ne pas rediriger immédiatement
       if (!currentUser) {
+        console.log('[DVD-Extract] ⚠️ Utilisateur null, vérification token...')
         // Vérifier si le token existe encore (si non, c'est qu'il a été supprimé par getCurrentUser)
-        if (!authService.isAuthenticated()) {
+        const stillHasToken = authService.isAuthenticated()
+        console.log('[DVD-Extract] Token toujours présent:', stillHasToken)
+        
+        if (!stillHasToken) {
+          console.log('[DVD-Extract] ❌ Token supprimé, redirection vers login')
           router.push('/login?redirect=/dvd-extract')
           return
         }
         // Sinon, c'est probablement une erreur réseau, réessayer après un délai
+        console.log('[DVD-Extract] 🔄 Réessai dans 1 seconde...')
         if (authCheckTimeoutRef.current) {
           clearTimeout(authCheckTimeoutRef.current)
         }
@@ -79,11 +97,16 @@ export default function DVDExtractPage() {
       }
 
       // Vérifier que l'utilisateur est admin (requis pour l'extraction DVD)
-      if (!authService.isAdmin(currentUser)) {
+      const isAdmin = authService.isAdmin(currentUser)
+      console.log('[DVD-Extract] Vérification admin:', isAdmin, 'Role:', currentUser.role)
+      
+      if (!isAdmin) {
+        console.log('[DVD-Extract] ❌ Pas admin, redirection vers accueil')
         router.push('/')
         return
       }
 
+      console.log('[DVD-Extract] ✅ Authentification OK, chargement page')
       setUser(currentUser)
       setAuthLoading(false)
       fetchCategories()
@@ -93,6 +116,7 @@ export default function DVDExtractPage() {
     checkAuth()
 
     return () => {
+      console.log('[DVD-Extract] 🧹 Nettoyage useEffect')
       isMounted = false
       if (authCheckTimeoutRef.current) {
         clearTimeout(authCheckTimeoutRef.current)
