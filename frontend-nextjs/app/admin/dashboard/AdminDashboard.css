@@ -2,9 +2,26 @@
   color: #ffffff;
 }
 
+.admin-dashboard {
+  padding: 30px;
+  max-width: 1600px;
+  margin: 0 auto;
+  min-height: calc(100vh - 70px);
+  padding-top: calc(70px + 30px);
+}
+
 .admin-dashboard h1 {
   font-size: 36px;
   margin-bottom: 30px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .admin-dashboard h1 {
+    font-size: 28px;
+  }
 }
 
 .stats-grid {

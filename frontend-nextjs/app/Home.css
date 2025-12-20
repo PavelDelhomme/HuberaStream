@@ -1,5 +1,6 @@
 .home-container {
   min-height: calc(100vh - 70px);
+  padding-top: 70px;
   background: linear-gradient(180deg, #000000 0%, #0f0f0f 100%);
   padding-bottom: 40px;
 }

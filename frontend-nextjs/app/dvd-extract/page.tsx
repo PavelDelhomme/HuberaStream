@@ -21,10 +21,17 @@ export default function DVDExtractPage() {
   const [categoryId, setCategoryId] = useState('')
   const [subCategoryId, setSubCategoryId] = useState('')
   const [isPublic, setIsPublic] = useState(false)
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null)
+  const [metadataResults, setMetadataResults] = useState<any[]>([])
+  const [showMetadataResults, setShowMetadataResults] = useState(false)
+  const [selectedMetadata, setSelectedMetadata] = useState<any>(null)
+  const [searchingMetadata, setSearchingMetadata] = useState(false)
   const [selectedVideoTrack, setSelectedVideoTrack] = useState(0)
   const [selectedAudioTracks, setSelectedAudioTracks] = useState<number[]>([])
   const [selectedSubtitleTracks, setSelectedSubtitleTracks] = useState<number[]>([])
   const [qualities, setQualities] = useState<string[]>(['1080p', '720p', '480p'])
+  const [availableQualities, setAvailableQualities] = useState<string[]>(['2160p', '1440p', '1080p', '720p', '480p', '360p'])
   const [categories, setCategories] = useState<any[]>([])
   const [subCategories, setSubCategories] = useState<any[]>([])
   const [extracting, setExtracting] = useState(false)
@@ -125,6 +132,7 @@ export default function DVDExtractPage() {
       setUser(currentUser)
       setAuthLoading(false)
       fetchCategories()
+      fetchMediaSettings()
       checkForActiveExtraction()
     }
     
@@ -180,6 +188,38 @@ export default function DVDExtractPage() {
     }
   }
 
+  const fetchMediaSettings = async () => {
+    try {
+      const response = await api.get('/admin/media-settings')
+      const settings = response.data
+      
+      // Récupérer les qualités disponibles depuis les paramètres
+      const configuredQualities = settings.transcoding_qualities || []
+      if (configuredQualities.length > 0) {
+        setAvailableQualities(configuredQualities)
+        // Définir les qualités par défaut parmi celles disponibles
+        const defaultQualities = ['1080p', '720p', '480p'].filter(q => configuredQualities.includes(q))
+        if (defaultQualities.length > 0) {
+          setQualities(defaultQualities)
+        } else {
+          // Si aucune qualité par défaut n'est disponible, prendre la première
+          setQualities([configuredQualities[0]])
+        }
+      } else {
+        // Par défaut, toutes les qualités sont disponibles
+        const allQualities = ['2160p', '1440p', '1080p', '720p', '480p', '360p']
+        setAvailableQualities(allQualities)
+        setQualities(['1080p', '720p', '480p'])
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des paramètres média:', error)
+      // En cas d'erreur, utiliser les valeurs par défaut
+      const allQualities = ['2160p', '1440p', '1080p', '720p', '480p', '360p']
+      setAvailableQualities(allQualities)
+      setQualities(['1080p', '720p', '480p'])
+    }
+  }
+
   const checkForActiveExtraction = async () => {
     try {
       const response = await api.get('/videos?status=processing')
@@ -230,6 +270,10 @@ export default function DVDExtractPage() {
           } else if (videoProgress < 90) {
             setExtractionStage('Transcodage multi-qualités...')
             setExtractionDetails(`Génération des formats (${Math.round(videoProgress)}%)`)
+          } else if (videoProgress >= 100) {
+            // Si le pourcentage est à 100% mais que le statut est encore "processing"
+            setExtractionStage('⏳ Finalisation en cours...')
+            setExtractionDetails('Finalisation des fichiers, optimisation et génération des formats...')
           } else {
             setExtractionStage('Finalisation...')
             setExtractionDetails(`Finalisation (${Math.round(videoProgress)}%)`)
@@ -239,6 +283,36 @@ export default function DVDExtractPage() {
           pollIntervalRef.current = null
           setExtractionProgress(100)
           setExtractionStage('Extraction terminée !')
+          
+          // Uploader la miniature si elle a été sélectionnée (fichier ou URL depuis métadonnées)
+          if (videoIdToPoll) {
+            try {
+              setExtractionDetails('Upload de la miniature...')
+              
+              if (thumbnailFile) {
+                // Upload depuis un fichier
+                const thumbnailData = new FormData()
+                thumbnailData.append('thumbnail', thumbnailFile)
+                await api.post(`/videos/${videoIdToPoll}/thumbnail`, thumbnailData, {
+                  headers: {
+                    'Content-Type': 'multipart/form-data',
+                  },
+                })
+              } else if (selectedMetadata?.poster_url) {
+                // Upload depuis une URL (métadonnées)
+                const thumbnailData = new FormData()
+                thumbnailData.append('thumbnail_url', selectedMetadata.poster_url)
+                await api.post(`/videos/${videoIdToPoll}/thumbnail`, thumbnailData, {
+                  headers: {
+                    'Content-Type': 'multipart/form-data',
+                  },
+                })
+              }
+            } catch (error) {
+              console.error('Erreur lors de l\'upload de la miniature:', error)
+            }
+          }
+          
           setTimeout(() => {
             router.push(`/video/${videoIdToPoll}`)
           }, 2000)
@@ -336,8 +410,8 @@ export default function DVDExtractPage() {
 
       clearInterval(progressInterval)
       clearInterval(stageInterval)
-      setAnalyzingProgress(100)
-      setAnalyzingStage('Analyse terminée !')
+      setAnalyzingProgress(90)
+      setAnalyzingStage('Analyse terminée, recherche de métadonnées...')
 
       if (response.data) {
         const dvdData = {
@@ -353,9 +427,21 @@ export default function DVDExtractPage() {
         setSelectedVideoTrack(0)
         setSelectedAudioTracks(dvdData.audio_tracks.length > 0 ? [0] : [])
         setSelectedSubtitleTracks([])
+        
+        // Rechercher automatiquement les métadonnées depuis le titre du DVD
+        if (dvdData.title && dvdData.title.trim() !== '' && dvdData.title !== 'DVD Extraite') {
+          // Passer le réalisateur et l'année si disponibles pour améliorer la recherche
+          setAnalyzingStage('Recherche de métadonnées en cours...')
+          await searchMetadataFromTitle(dvdData.title, dvdData.director, dvdData.year)
+        }
+        
+        setAnalyzingProgress(100)
+        setAnalyzingStage('Analyse terminée !')
         setStep(3)
       } else {
         setError('Aucune information trouvée sur le DVD.')
+        setAnalyzingProgress(0)
+        setAnalyzingStage('')
       }
     } catch (error: any) {
       const errorMessage = error.response?.data?.message ||
@@ -391,6 +477,150 @@ export default function DVDExtractPage() {
         ? prev.filter((q) => q !== quality)
         : [...prev, quality]
     )
+  }
+
+  const decodeHtmlEntities = (text: string) => {
+    if (!text || typeof text !== 'string') return text
+    const textarea = document.createElement('textarea')
+    textarea.innerHTML = text
+    return textarea.value
+  }
+
+  const searchMetadataFromTitle = async (title: string, director?: string, year?: number) => {
+    if (!title || title.trim() === '') return
+
+    setSearchingMetadata(true)
+    setMetadataResults([])
+    setShowMetadataResults(false)
+    setAnalyzingStage('Recherche de métadonnées en cours...')
+
+    try {
+      // Construire la requête avec le titre, le réalisateur et l'année si disponibles
+      const searchPayload: any = {
+        filename: title
+      }
+      
+      // Ajouter le réalisateur si fourni en paramètre ou disponible dans les infos du DVD
+      const directorToUse = director || dvdInfo?.director
+      if (directorToUse) {
+        searchPayload.director = directorToUse
+      }
+      
+      // Ajouter l'année si fournie en paramètre ou disponible dans les infos du DVD
+      const yearToUse = year || dvdInfo?.year
+      if (yearToUse) {
+        searchPayload.year = yearToUse
+      }
+
+      const response = await api.post('/admin/videos/search-metadata', searchPayload)
+
+      const results = response.data.results || []
+      if (results.length > 0) {
+        setMetadataResults(results)
+        setShowMetadataResults(true)
+        setAnalyzingStage('Métadonnées trouvées !')
+      } else {
+        setAnalyzingStage('Aucune métadonnée trouvée')
+      }
+    } catch (error) {
+      console.error('Erreur lors de la recherche de métadonnées:', error)
+      setAnalyzingStage('Erreur lors de la recherche de métadonnées')
+    } finally {
+      setSearchingMetadata(false)
+    }
+  }
+
+  const selectMetadata = (metadata: any) => {
+    setSelectedMetadata(metadata)
+    setShowMetadataResults(false)
+
+    if (metadata.title) {
+      setTitle(decodeHtmlEntities(metadata.title))
+    }
+
+    if (metadata.synopsis || metadata.description) {
+      setDescription(decodeHtmlEntities(metadata.synopsis || metadata.description || ''))
+    }
+
+    if (metadata.poster_url) {
+      setThumbnailPreview(metadata.poster_url)
+      // Réinitialiser thumbnailFile pour utiliser l'affiche depuis les métadonnées
+      setThumbnailFile(null)
+    }
+
+    // Mapper les genres aux catégories si disponibles
+    if (metadata.genres && metadata.genres.length > 0 && categories.length > 0) {
+      // Mapping des genres IMDb vers les catégories de l'application
+      const genreMapping: { [key: string]: string[] } = {
+        'action': ['action', 'aventure', 'combat'],
+        'adventure': ['aventure', 'action'],
+        'comedy': ['comédie', 'humour'],
+        'drama': ['drame', 'dramatique'],
+        'horror': ['horreur', 'épouvante', 'thriller'],
+        'thriller': ['thriller', 'suspense', 'horreur'],
+        'sci-fi': ['science-fiction', 'sf', 'futuriste'],
+        'science fiction': ['science-fiction', 'sf'],
+        'fantasy': ['fantastique', 'fantasy'],
+        'romance': ['romance', 'romantique', 'amour'],
+        'crime': ['crime', 'policier', 'thriller'],
+        'mystery': ['mystère', 'policier', 'thriller'],
+        'animation': ['animation', 'dessin animé'],
+        'family': ['famille', 'jeunesse'],
+        'war': ['guerre', 'militaire'],
+        'western': ['western', 'cowboy'],
+        'documentary': ['documentaire'],
+        'biography': ['biographie', 'biopic'],
+        'history': ['historique', 'histoire'],
+        'sport': ['sport', 'sportif'],
+        'music': ['musical', 'musique'],
+        'musical': ['musical', 'musique'],
+      }
+
+      // Chercher une catégorie correspondante pour chaque genre
+      let categoryFound = false
+      for (const genre of metadata.genres) {
+        const genreLower = genre.toLowerCase().trim()
+        const possibleNames = genreMapping[genreLower] || [genreLower]
+        
+        // Chercher une catégorie qui correspond à l'un des noms possibles
+        const matchingCategory = categories.find((cat: any) => {
+          if (!cat.name) return false
+          const catNameLower = cat.name.toLowerCase().trim()
+          // Vérifier correspondance exacte ou partielle
+          return possibleNames.some(name => {
+            const nameLower = name.toLowerCase().trim()
+            return catNameLower === nameLower || 
+                   catNameLower.includes(nameLower) || 
+                   nameLower.includes(catNameLower)
+          })
+        })
+        
+        if (matchingCategory) {
+          setCategoryId(matchingCategory.id)
+          // Réinitialiser la sous-catégorie
+          setSubCategoryId('')
+          categoryFound = true
+          console.log(`✅ Catégorie automatiquement sélectionnée: ${matchingCategory.name} (genre: ${genre})`)
+          break // Utiliser la première correspondance trouvée
+        }
+      }
+      
+      if (!categoryFound) {
+        console.log('⚠️ Aucune catégorie trouvée pour les genres:', metadata.genres)
+      }
+    }
+  }
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setThumbnailFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setThumbnailPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
   }
 
   const handleCancelExtraction = async () => {
@@ -457,7 +687,9 @@ export default function DVDExtractPage() {
         video_track_index: selectedVideoTrack,
         audio_track_indices: selectedAudioTracks,
         subtitle_track_indices: selectedSubtitleTracks,
-        qualities
+        qualities,
+        trailer_url: selectedMetadata?.trailer_url || null,
+        platform: selectedMetadata?.platform || null
       })
 
       setVideoId(response.data.video_id)
@@ -593,14 +825,91 @@ export default function DVDExtractPage() {
               <h3>📝 Informations de la vidéo</h3>
               <div className="form-group">
                 <label>Titre *</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Titre de la vidéo"
-                  className="form-input"
-                />
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Titre de la vidéo"
+                    className="form-input"
+                    style={{ flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => searchMetadataFromTitle(title)}
+                    disabled={!title.trim() || searchingMetadata}
+                    className="btn-secondary"
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {searchingMetadata ? '🔍 Recherche...' : '🔍 Rechercher métadonnées'}
+                  </button>
+                </div>
               </div>
+              
+              {showMetadataResults && metadataResults.length > 0 && (
+                <div className="metadata-results" style={{ marginBottom: '20px', marginTop: '10px' }}>
+                  <h4 style={{ marginBottom: '10px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.8)' }}>
+                    Résultats de recherche:
+                  </h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' }}>
+                    {metadataResults.map((result: any, idx: number) => (
+                      <div
+                        key={idx}
+                        onClick={() => selectMetadata(result)}
+                        style={{
+                          cursor: 'pointer',
+                          padding: '12px',
+                          background: selectedMetadata?.imdb_id === result.imdb_id 
+                            ? 'rgba(255, 0, 0, 0.2)' 
+                            : 'rgba(255, 255, 255, 0.05)',
+                          border: selectedMetadata?.imdb_id === result.imdb_id 
+                            ? '2px solid #ff0000' 
+                            : '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '8px',
+                          transition: 'all 0.3s'
+                        }}
+                      >
+                        {result.poster_url && (
+                          <img
+                            src={result.poster_url}
+                            alt={result.title}
+                            style={{ width: '100%', height: 'auto', borderRadius: '4px', marginBottom: '8px' }}
+                          />
+                        )}
+                        <div style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '4px' }}>
+                          {result.title}
+                        </div>
+                        {result.year && (
+                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '2px' }}>
+                            📅 {result.year}
+                          </div>
+                        )}
+                        {result.duration && (
+                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '2px' }}>
+                            ⏱️ {result.duration}
+                          </div>
+                        )}
+                        {result.platform && (
+                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '2px' }}>
+                            📺 {result.platform}
+                          </div>
+                        )}
+                        {result.trailer_url && (
+                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '2px' }}>
+                            🎬 Bande-annonce disponible
+                          </div>
+                        )}
+                        {result.rating && (
+                          <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '2px' }}>
+                            ⭐ {result.rating}/10
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <div className="form-group">
                 <label>Description</label>
                 <textarea
@@ -610,6 +919,46 @@ export default function DVDExtractPage() {
                   className="form-textarea"
                   rows={3}
                 />
+              </div>
+              
+              <div className="form-group">
+                <label>Affiche (optionnel)</label>
+                {thumbnailPreview && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <img
+                      src={thumbnailPreview}
+                      alt="Aperçu"
+                      style={{ maxWidth: '200px', maxHeight: '300px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.2)' }}
+                    />
+                    {selectedMetadata?.poster_url && (
+                      <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', marginTop: '8px' }}>
+                        Affiche sélectionnée depuis les métadonnées
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!selectedMetadata?.poster_url && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailChange}
+                    className="form-input"
+                  />
+                )}
+                {selectedMetadata?.poster_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMetadata(null)
+                      setThumbnailPreview(null)
+                      setThumbnailFile(null)
+                    }}
+                    className="btn-secondary"
+                    style={{ marginTop: '10px' }}
+                  >
+                    Choisir un autre fichier
+                  </button>
+                )}
               </div>
               <div className="form-row">
                 <div className="form-group">
@@ -692,18 +1041,67 @@ export default function DVDExtractPage() {
             <div className="config-section">
               <h3>🎥 Qualités de transcodage</h3>
               <div className="qualities-grid">
-                {['2160p', '1440p', '1080p', '720p', '480p', '360p'].map((quality) => (
-                  <label key={quality} className="quality-item">
-                    <input
-                      type="checkbox"
-                      checked={qualities.includes(quality)}
-                      onChange={() => toggleQuality(quality)}
-                    />
-                    <span>{quality}</span>
-                  </label>
-                ))}
+                {['2160p', '1440p', '1080p', '720p', '480p', '360p'].map((quality) => {
+                  const isAvailable = availableQualities.includes(quality)
+                  return (
+                    <label 
+                      key={quality} 
+                      className={`quality-item ${!isAvailable ? 'disabled' : ''}`}
+                      style={!isAvailable ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                      title={!isAvailable ? 'Cette qualité n\'est pas disponible dans les paramètres' : ''}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={qualities.includes(quality)}
+                        onChange={() => toggleQuality(quality)}
+                        disabled={!isAvailable}
+                      />
+                      <span>{quality}</span>
+                    </label>
+                  )
+                })}
               </div>
             </div>
+
+            {selectedMetadata && (
+              <div className="config-section" style={{ marginTop: '20px', padding: '15px', background: 'rgba(255, 0, 0, 0.1)', border: '1px solid rgba(255, 0, 0, 0.3)', borderRadius: '8px' }}>
+                <h3 style={{ marginBottom: '10px', fontSize: '14px', color: 'rgba(255, 255, 255, 0.9)' }}>
+                  📋 Métadonnées sélectionnées qui seront ajoutées à la vidéo:
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', fontSize: '12px' }}>
+                  {selectedMetadata.poster_url && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      🖼️ <strong>Affiche:</strong> Oui
+                    </div>
+                  )}
+                  {selectedMetadata.trailer_url && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      🎬 <strong>Bande-annonce:</strong> Oui
+                    </div>
+                  )}
+                  {selectedMetadata.duration && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      ⏱️ <strong>Durée:</strong> {selectedMetadata.duration}
+                    </div>
+                  )}
+                  {selectedMetadata.platform && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      📺 <strong>Plateforme:</strong> {selectedMetadata.platform}
+                    </div>
+                  )}
+                  {selectedMetadata.rating && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      ⭐ <strong>Note:</strong> {selectedMetadata.rating}/10
+                    </div>
+                  )}
+                  {selectedMetadata.year && (
+                    <div style={{ color: 'rgba(255, 255, 255, 0.8)' }}>
+                      📅 <strong>Année:</strong> {selectedMetadata.year}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="actions">
               <button onClick={() => setStep(2)} className="btn-secondary">

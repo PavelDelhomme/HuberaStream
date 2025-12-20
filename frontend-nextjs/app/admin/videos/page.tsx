@@ -185,7 +185,7 @@ export default function AdminVideosPage() {
               </button>
             </>
           )}
-          <Link href="/upload" className="admin-action-button primary">
+          <Link href="/video/upload" className="admin-action-button primary">
             ⬆️ Upload Vidéo
           </Link>
         </div>

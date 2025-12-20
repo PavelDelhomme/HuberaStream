@@ -1,5 +1,6 @@
 .upload-page {
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 70px);
+  padding-top: calc(70px + 30px);
   background-color: #0f0f0f;
   padding: 30px;
   display: flex;

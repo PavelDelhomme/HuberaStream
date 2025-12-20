@@ -1,6 +1,6 @@
 # Status du Projet StreamMake
 
-**Dernière mise à jour**: 18 décembre 2025
+**Dernière mise à jour**: 20 décembre 2025
 
 ## 🔴 PRIORITÉS À VALIDER / À FAIRE (En haut de la liste)
 
@@ -232,6 +232,20 @@
 - [ ] **À FAIRE**: Couverture de code
 
 ## 🐛 Problèmes Connus
+
+### Extraction DVD - **EN COURS** 🟡
+- **Date de détection**: 20 décembre 2025
+- **Problème**: L'extraction DVD échoue avec l'erreur `Unrecognized option 'dvd_device'`
+- **Cause**: Le backend semble utiliser une version obsolète du code compilé qui ajoute encore `-dvd_device` aux arguments `ffmpeg`, alors que cette option n'est plus supportée
+- **Solution en cours**: 
+  - Ajout de logs de debug détaillés pour tracer la construction des arguments `ffmpeg`
+  - Reconstruction du backend avec `--no-cache` pour forcer une recompilation complète
+  - Vérification que `-dvd_device` n'est pas ajouté aux args et utilisation de la variable d'environnement `DVD_DEVICE` à la place
+- **Fichiers modifiés**:
+  - `backend/internal/video/dvd_extractor.go` - Logs de debug et vérification que `-dvd_device` n'est pas dans les args
+- **Prochaines étapes**: 
+  - Tester l'extraction DVD après reconstruction du backend
+  - Vérifier les logs de debug pour identifier où `-dvd_device` est ajouté si le problème persiste
 
 ### Clients Torrent
 - [x] **CONFIGURÉ** - Tous les clients torrent sont configurés dans docker-compose.yml

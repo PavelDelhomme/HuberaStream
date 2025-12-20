@@ -1,6 +1,9 @@
 .playlists-container {
-  min-height: calc(100vh - 60px);
-  padding: 40px 20px;
+  min-height: calc(100vh - 70px);
+  padding-top: calc(70px + 40px);
+  padding-left: 20px;
+  padding-right: 20px;
+  padding-bottom: 40px;
   background: linear-gradient(180deg, #000000 0%, #0f0f0f 100%);
   color: #ffffff;
 }

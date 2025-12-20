@@ -475,18 +475,67 @@ func (h *UploadHandler) UploadThumbnail(c *gin.Context) {
 		return
 	}
 
-	file, err := c.FormFile("thumbnail")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Fichier image requis"})
-		return
-	}
+	// Vérifier si c'est un upload depuis une URL
+	var thumbnailPath string
+	if thumbnailURL := c.PostForm("thumbnail_url"); thumbnailURL != "" {
+		// Télécharger l'image depuis l'URL
+		resp, err := http.Get(thumbnailURL)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Erreur lors du téléchargement de l'image: %v", err)})
+			return
+		}
+		defer resp.Body.Close()
 
-	thumbnailName := fmt.Sprintf("%s%s", videoID.String(), filepath.Ext(file.Filename))
-	thumbnailPath := filepath.Join(h.cfg.ThumbnailStoragePath, thumbnailName)
+		if resp.StatusCode != http.StatusOK {
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Erreur HTTP lors du téléchargement: %d", resp.StatusCode)})
+			return
+		}
 
-	if err := c.SaveUploadedFile(file, thumbnailPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'enregistrement"})
-		return
+		// Déterminer l'extension depuis le Content-Type ou l'URL
+		contentType := resp.Header.Get("Content-Type")
+		ext := ".jpg" // Par défaut
+		if strings.Contains(contentType, "png") {
+			ext = ".png"
+		} else if strings.Contains(contentType, "webp") {
+			ext = ".webp"
+		} else if strings.Contains(thumbnailURL, ".png") {
+			ext = ".png"
+		} else if strings.Contains(thumbnailURL, ".webp") {
+			ext = ".webp"
+		}
+
+		thumbnailName := fmt.Sprintf("%s%s", videoID.String(), ext)
+		thumbnailPath = filepath.Join(h.cfg.ThumbnailStoragePath, thumbnailName)
+
+		// Créer le fichier
+		out, err := os.Create(thumbnailPath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur lors de la création du fichier: %v", err)})
+			return
+		}
+		defer out.Close()
+
+		// Copier le contenu
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Erreur lors de l'enregistrement: %v", err)})
+			return
+		}
+	} else {
+		// Upload depuis un fichier
+		file, err := c.FormFile("thumbnail")
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Fichier image ou URL requise"})
+			return
+		}
+
+		thumbnailName := fmt.Sprintf("%s%s", videoID.String(), filepath.Ext(file.Filename))
+		thumbnailPath = filepath.Join(h.cfg.ThumbnailStoragePath, thumbnailName)
+
+		if err := c.SaveUploadedFile(file, thumbnailPath); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Erreur lors de l'enregistrement"})
+			return
+		}
 	}
 
 	h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("thumbnail_path", thumbnailPath)
@@ -647,6 +696,8 @@ func (h *UploadHandler) ExtractVideoMetadata(c *gin.Context) {
 func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 	var req struct {
 		Filename string `json:"filename" binding:"required"`
+		Director string `json:"director,omitempty"`
+		Year     int    `json:"year,omitempty"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -655,18 +706,125 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 	}
 
 	log.Printf("[SearchMetadataFromFilename] 🔍 Recherche de métadonnées pour: %s", req.Filename)
+	if req.Director != "" {
+		log.Printf("[SearchMetadataFromFilename] 📝 Réalisateur fourni: %s", req.Director)
+	}
+	if req.Year > 0 {
+		log.Printf("[SearchMetadataFromFilename] 📅 Année fournie: %d", req.Year)
+	}
 	log.Printf("[SearchMetadataFromFilename] ⚠️  CODE MODIFIÉ - Utilisation du scraper web UNIQUEMENT (PAS DE TMDB)")
+
+	// Construire la requête de recherche améliorée avec réalisateur et année si disponibles
+	searchQuery := req.Filename
+	
+	// Pour les titres très courts (moins de 5 caractères), ajouter "film" pour être plus spécifique
+	// Cela évite de trouver "Kill Bill" quand on cherche "Kill"
+	if len(strings.TrimSpace(req.Filename)) < 5 && !strings.Contains(strings.ToLower(req.Filename), "film") && !strings.Contains(strings.ToLower(req.Filename), "movie") {
+		searchQuery = fmt.Sprintf("%s film", searchQuery)
+	}
+	
+	if req.Director != "" {
+		searchQuery = fmt.Sprintf("%s %s", searchQuery, req.Director)
+	}
+	if req.Year > 0 {
+		searchQuery = fmt.Sprintf("%s %d", searchQuery, req.Year)
+	}
 
 	// Utiliser UNIQUEMENT le scraper web gratuit (sans API) - PAS DE TMDB
 	webScraper := metadata.NewWebScraperService()
-	log.Printf("[SearchMetadataFromFilename] ⚡ Appel du scraper web...")
+	log.Printf("[SearchMetadataFromFilename] ⚡ Appel du scraper web avec requête: %s", searchQuery)
 
-	results, err := webScraper.SearchMoviesFromFilenameWeb(req.Filename)
+	results, err := webScraper.SearchMoviesFromFilenameWeb(searchQuery)
 
 	if err != nil {
 		log.Printf("[SearchMetadataFromFilename] ❌ Erreur scraper web: %v", err)
 	} else {
 		log.Printf("[SearchMetadataFromFilename] ✅ Scraper web a trouvé %d résultat(s)", len(results))
+	}
+
+	// Prioriser les résultats selon plusieurs critères
+	if len(results) > 0 {
+		log.Printf("[SearchMetadataFromFilename] 🎯 Tri des résultats selon titre exact, réalisateur et année...")
+		exactTitle := []*metadata.MovieMetadata{}
+		directorAndYear := []*metadata.MovieMetadata{}  // Correspondance réalisateur ET année
+		directorOnly := []*metadata.MovieMetadata{}    // Correspondance réalisateur uniquement
+		yearOnly := []*metadata.MovieMetadata{}         // Correspondance année uniquement
+		others := []*metadata.MovieMetadata{}
+
+		// Nettoyer le titre recherché pour comparaison
+		searchTitle := strings.ToLower(strings.TrimSpace(req.Filename))
+		// Enlever les extensions et caractères spéciaux
+		searchTitle = strings.TrimSuffix(searchTitle, ".mp4")
+		searchTitle = strings.TrimSuffix(searchTitle, ".mkv")
+		searchTitle = strings.TrimSuffix(searchTitle, ".avi")
+		searchTitle = strings.ReplaceAll(searchTitle, "_", " ")
+		searchTitle = strings.ReplaceAll(searchTitle, "-", " ")
+		searchTitle = strings.TrimSpace(searchTitle)
+
+		for _, result := range results {
+			exactMatch := false
+			directorMatch := false
+			yearMatch := false
+			
+			// Vérifier la correspondance exacte du titre (insensible à la casse)
+			// IMPORTANT: On ne fait QUE des correspondances exactes, pas de correspondance par préfixe
+			// Cela évite que "Kill" corresponde à "Kill Bill"
+			if result.Title != "" {
+				resultTitle := strings.ToLower(strings.TrimSpace(result.Title))
+				// Correspondance exacte stricte uniquement
+				if resultTitle == searchTitle {
+					exactMatch = true
+					log.Printf("[SearchMetadataFromFilename] ✅ Correspondance exacte du titre: '%s' vs '%s'", searchTitle, resultTitle)
+				}
+			}
+			
+			// Vérifier la correspondance du réalisateur (insensible à la casse)
+			if req.Director != "" && result.Director != "" {
+				directorLower := strings.ToLower(strings.TrimSpace(req.Director))
+				resultDirectorLower := strings.ToLower(strings.TrimSpace(result.Director))
+				// Vérifier si le nom du réalisateur est contenu dans le résultat ou vice versa
+				if strings.Contains(resultDirectorLower, directorLower) || strings.Contains(directorLower, resultDirectorLower) {
+					directorMatch = true
+					log.Printf("[SearchMetadataFromFilename] ✅ Correspondance réalisateur: '%s' vs '%s'", req.Director, result.Director)
+				}
+			}
+			
+			// Vérifier la correspondance de l'année (tolérance de ±2 ans)
+			if req.Year > 0 && result.ProductionYear > 0 {
+				yearDiff := req.Year - result.ProductionYear
+				if yearDiff >= -2 && yearDiff <= 2 {
+					yearMatch = true
+					log.Printf("[SearchMetadataFromFilename] ✅ Correspondance année: %d vs %d", req.Year, result.ProductionYear)
+				}
+			}
+			
+			// Classer les résultats selon leur priorité
+			if exactMatch {
+				exactTitle = append(exactTitle, result)
+			} else if directorMatch && yearMatch {
+				// Correspondance réalisateur ET année = priorité élevée
+				directorAndYear = append(directorAndYear, result)
+			} else if directorMatch {
+				// Correspondance réalisateur uniquement = priorité moyenne
+				directorOnly = append(directorOnly, result)
+			} else if yearMatch {
+				// Correspondance année uniquement = priorité moyenne
+				yearOnly = append(yearOnly, result)
+			} else {
+				// Aucune correspondance = priorité faible
+				others = append(others, result)
+			}
+		}
+		
+		// Combiner dans l'ordre de priorité:
+		// 1. Correspondances exactes du titre
+		// 2. Correspondances réalisateur ET année
+		// 3. Correspondances réalisateur uniquement
+		// 4. Correspondances année uniquement
+		// 5. Autres résultats
+		results = append(exactTitle, append(directorAndYear, append(directorOnly, append(yearOnly, others...)...)...)...)
+		log.Printf("[SearchMetadataFromFilename] 📊 Résultats triés: %d exact(s), %d réalisateur+année, %d réalisateur, %d année, %d autre(s)", 
+			len(exactTitle), len(directorAndYear), len(directorOnly), len(yearOnly), len(others))
 	}
 
 	if len(results) == 0 {

@@ -1,5 +1,6 @@
 .admin-videos {
   padding: 30px;
+  padding-top: calc(70px + 30px);
   max-width: 1600px;
   margin: 0 auto;
   min-height: calc(100vh - 70px);
@@ -23,6 +24,15 @@
   font-weight: 600;
   margin: 0;
   color: #ffffff;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .admin-videos-header h1 {
+    font-size: 24px;
+  }
 }
 
 .admin-videos-actions {

@@ -183,6 +183,8 @@ type ExtractDVDRequest struct {
 	AudioTrackIndices    []int    `json:"audio_track_indices"`
 	SubtitleTrackIndices []int    `json:"subtitle_track_indices"`
 	Qualities            []string `json:"qualities"` // ["1080p", "720p", "480p"]
+	TrailerURL           string   `json:"trailer_url,omitempty"`   // URL de la bande-annonce
+	Platform             string   `json:"platform,omitempty"`     // Plateforme (Disney+, Prime Video, etc.)
 }
 
 // ExtractDVD extrait le DVD et crée une vidéo
@@ -229,6 +231,8 @@ func (h *DVDHandler) ExtractDVD(c *gin.Context) {
 		CategoryID:    nil,
 		SubCategoryID: nil,
 		IsPublic:      req.IsPublic,
+		TrailerURL:    req.TrailerURL,
+		Platform:      req.Platform,
 	}
 
 	if req.CategoryID != "" {

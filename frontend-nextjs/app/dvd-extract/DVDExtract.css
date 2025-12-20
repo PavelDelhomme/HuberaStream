@@ -1,5 +1,6 @@
 .dvd-extract-page {
   padding: 30px;
+  padding-top: calc(70px + 30px);
   max-width: 1200px;
   margin: 0 auto;
   min-height: calc(100vh - 70px);
@@ -10,6 +11,15 @@
   font-size: 36px;
   margin-bottom: 10px;
   color: #ffffff;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .dvd-extract-container h1 {
+    font-size: 28px;
+  }
 }
 
 .subtitle {
@@ -239,6 +249,17 @@
   font-size: 16px;
   outline: none;
   font-family: inherit;
+}
+
+.form-select {
+  background-color: rgba(0, 0, 0, 0.3);
+  color: #ffffff;
+}
+
+.form-select option {
+  background-color: #1a1a1a;
+  color: #ffffff;
+  padding: 8px;
 }
 
 .form-input:focus,

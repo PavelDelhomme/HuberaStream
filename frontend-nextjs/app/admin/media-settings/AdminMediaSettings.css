@@ -1,5 +1,6 @@
 .admin-media-settings {
   padding: 30px;
+  padding-top: calc(70px + 30px);
   max-width: 1200px;
   margin: 0 auto;
   min-height: calc(100vh - 70px);
@@ -14,6 +15,15 @@
   font-size: 32px;
   margin-bottom: 10px;
   color: #ffffff;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .admin-header h1 {
+    font-size: 24px;
+  }
 }
 
 .subtitle {

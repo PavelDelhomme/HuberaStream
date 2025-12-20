@@ -11,10 +11,27 @@
   gap: 20px;
 }
 
+.admin-users {
+  padding: 30px;
+  max-width: 1600px;
+  margin: 0 auto;
+  min-height: calc(100vh - 70px);
+  padding-top: calc(70px + 30px);
+}
+
 .admin-header-content h1 {
   font-size: 32px;
   margin-bottom: 8px;
   color: #ffffff;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .admin-header-content h1 {
+    font-size: 24px;
+  }
 }
 
 .subtitle {
@@ -61,13 +78,45 @@
   color: #ffc107;
 }
 
-.admin-filters {
+.users-filters {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 16px;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 12px 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.filter-tab:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  transform: translateY(-2px);
+}
+
+.filter-tab.active {
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  border-color: #ff0000;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.3);
 }
 
 .search-box {
@@ -115,6 +164,36 @@
 .filter-buttons button.active {
   background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
   border-color: #ff0000;
+  color: #ffffff;
+}
+
+.role-select {
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  outline: none;
+  min-width: 120px;
+}
+
+.role-select:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.role-select:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: #ff0000;
+  box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.1);
+}
+
+.role-select option {
+  background: #1a1a1a;
   color: #ffffff;
 }
 
