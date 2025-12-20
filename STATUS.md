@@ -235,15 +235,22 @@
 
 ### Extraction DVD - **EN COURS** 🟡
 - **Date de détection**: 20 décembre 2025
-- **Problème**: L'extraction DVD échoue avec l'erreur `Unrecognized option 'dvd_device'`
-- **Cause**: Le backend semble utiliser une version obsolète du code compilé qui ajoute encore `-dvd_device` aux arguments `ffmpeg`, alors que cette option n'est plus supportée
-- **Solution en cours**: 
-  - Ajout de logs de debug détaillés pour tracer la construction des arguments `ffmpeg`
-  - Reconstruction du backend avec `--no-cache` pour forcer une recompilation complète
-  - Vérification que `-dvd_device` n'est pas ajouté aux args et utilisation de la variable d'environnement `DVD_DEVICE` à la place
+- **Problème 1**: L'extraction DVD échoue avec l'erreur `Unrecognized option 'dvd_device'`
+  - **Cause**: Le backend semble utiliser une version obsolète du code compilé qui ajoute encore `-dvd_device` aux arguments `ffmpeg`, alors que cette option n'est plus supportée
+  - **Solution en cours**: 
+    - Ajout de logs de debug détaillés pour tracer la construction des arguments `ffmpeg`
+    - Reconstruction du backend avec `--no-cache` pour forcer une recompilation complète
+    - Vérification que `-dvd_device` n'est pas ajouté aux args et utilisation de la variable d'environnement `DVD_DEVICE` à la place
+- **Problème 2**: Erreur de parsing JSON lors de la lecture des informations DVD : `invalid character '[' looking for beginning of object key string`
+  - **Cause**: Les messages d'erreur AC3 (`[ac3 @ ...] error decoding the audio block "programs"`) polluent la sortie JSON de `ffprobe`, et la regex trouve `"programs"` dans le message d'erreur au lieu de la vraie clé JSON
+  - **Solution appliquée**: 
+    - Amélioration de la logique de nettoyage JSON pour trouver toutes les occurrences de clés JSON
+    - Vérification que chaque occurrence n'est pas dans un message d'erreur (détection de patterns comme `[ac3 @`, `error decoding`, `expacc`, `out-of-range`)
+    - Utilisation de la première occurrence valide qui n'est pas dans un message d'erreur
 - **Fichiers modifiés**:
-  - `backend/internal/video/dvd_extractor.go` - Logs de debug et vérification que `-dvd_device` n'est pas dans les args
+  - `backend/internal/video/dvd_extractor.go` - Logs de debug, vérification `-dvd_device`, amélioration nettoyage JSON
 - **Prochaines étapes**: 
+  - Tester la lecture des informations DVD avec la nouvelle logique de nettoyage JSON
   - Tester l'extraction DVD après reconstruction du backend
   - Vérifier les logs de debug pour identifier où `-dvd_device` est ajouté si le problème persiste
 

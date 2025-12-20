@@ -405,28 +405,76 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	// Le problème : les messages d'erreur AC3 peuvent apparaître juste après {
 	// Exemple: { [ac3 @ ...] error ... "programs": [...]
 	// Le problème est que "programs" peut apparaître dans le message d'erreur lui-même
-	// Solution : utiliser une regex pour trouver les vraies clés JSON avec leur syntaxe complète
-	// Une vraie clé JSON est de la forme "key": suivi d'un espace et d'un [ ou {
+	// Solution : trouver toutes les occurrences de clés JSON et ignorer celles dans des messages d'erreur
 	
 	// Regex pour trouver les clés JSON valides avec leur syntaxe complète
 	// Pattern: "key": suivi d'un espace (ou newline) et d'un [ ou {
 	jsonKeyPattern := regexp.MustCompile(`("programs"|"format"|"streams")\s*:\s*(\[|\{)`)
 	
-	// Trouver la première occurrence d'une vraie clé JSON
-	matches := jsonKeyPattern.FindStringSubmatchIndex(outputStr)
-	if matches == nil || len(matches) < 2 {
+	// Trouver toutes les occurrences de clés JSON
+	allMatches := jsonKeyPattern.FindAllStringSubmatchIndex(outputStr, -1)
+	if allMatches == nil || len(allMatches) == 0 {
 		return nil, fmt.Errorf("impossible de trouver une clé JSON valide dans la sortie ffprobe")
 	}
 	
-	// La position de début de la clé (groupe 1 dans la regex)
-	firstKeyPos := matches[2] // Position de début de "programs"/"format"/"streams"
-	firstKey := outputStr[matches[2]:matches[3]] // La clé trouvée
+	// Trouver le premier { dans la sortie
+	firstBrace := strings.Index(outputStr, "{")
+	if firstBrace < 0 {
+		return nil, fmt.Errorf("impossible de trouver l'accolade ouvrante '{' dans la sortie ffprobe")
+	}
 	
-	// Vérifier qu'il y a un { avant cette clé (sinon ce n'est pas du JSON valide)
-	beforeKey := outputStr[:firstKeyPos]
-	lastBrace := strings.LastIndex(beforeKey, "{")
-	if lastBrace < 0 {
-		return nil, fmt.Errorf("impossible de trouver l'accolade ouvrante avant la clé JSON")
+	// Chercher la première clé JSON qui n'est PAS dans un message d'erreur
+	// Un message d'erreur typique contient [ac3 @ ou error avant la clé
+	var firstKeyPos int = -1
+	var firstKey string
+	
+	for _, match := range allMatches {
+		if len(match) < 4 {
+			continue
+		}
+		
+		keyStart := match[2] // Position de début de "programs"/"format"/"streams"
+		keyEnd := match[3]   // Position de fin
+		
+		// Vérifier que la clé est après le premier {
+		if keyStart <= firstBrace {
+			continue
+		}
+		
+		// Vérifier le contexte avant la clé pour détecter les messages d'erreur
+		contextBefore := outputStr[firstBrace:keyStart]
+		
+		// Si on trouve des patterns d'erreur typiques, ignorer cette clé
+		errorPatterns := []string{
+			"[ac3 @",
+			"error decoding",
+			"error",
+			"warning",
+			"expacc",
+			"out-of-range",
+		}
+		
+		isInError := false
+		for _, pattern := range errorPatterns {
+			if strings.Contains(contextBefore, pattern) {
+				isInError = true
+				break
+			}
+		}
+		
+		// Si ce n'est pas dans un message d'erreur, c'est la bonne clé
+		if !isInError {
+			firstKeyPos = keyStart
+			firstKey = outputStr[keyStart:keyEnd]
+			log.Printf("[DVD Info] Clé JSON valide trouvée: '%s' à la position %d (après vérification des erreurs)", firstKey, firstKeyPos)
+			break
+		} else {
+			log.Printf("[DVD Info] Clé JSON ignorée (dans message d'erreur): '%s' à la position %d", outputStr[keyStart:keyEnd], keyStart)
+		}
+	}
+	
+	if firstKeyPos < 0 {
+		return nil, fmt.Errorf("impossible de trouver une clé JSON valide (toutes les occurrences sont dans des messages d'erreur)")
 	}
 	
 	// Reconstruire le JSON : { + tout ce qui vient après la première clé valide
@@ -435,7 +483,7 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	outputStr = cleanedJSON
 	
 	log.Printf("[DVD Info] JSON nettoyé : clé '%s' trouvée à la position %d, %d caractères supprimés entre { et la clé", 
-		firstKey, firstKeyPos, firstKeyPos-lastBrace-1)
+		firstKey, firstKeyPos, firstKeyPos-firstBrace-1)
 	
 	// Chercher la fin du JSON (dernière accolade fermante) au cas où
 	jsonEnd := strings.LastIndex(outputStr, "}")
