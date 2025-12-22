@@ -876,10 +876,17 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 		return
 	}
 
+	// Améliorer les résultats avec l'IA de détection (si disponible)
+	// Note: L'IA sera initialisée dans le handler AI, on peut l'utiliser ici via un service partagé
+	// Pour l'instant, on retourne les résultats tels quels, l'amélioration sera faite côté frontend
+	
 	log.Printf("[SearchMetadataFromFilename] %d résultat(s) trouvé(s) pour: %s", len(results), req.Filename)
 	c.JSON(http.StatusOK, gin.H{
 		"results": results,
 		"count":   len(results),
+		"search_key": req.Filename,
+		"director": req.Director,
+		"year": req.Year,
 	})
 }
 

@@ -396,94 +396,104 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	// Nettoyer le JSON en enlevant les messages d'erreur AC3 qui polluent la sortie
 	outputStr := string(output)
 	
-	if len(outputStr) > 500 {
-		log.Printf("[DVD Info] Output brut (premiers 500 caractères): %s", outputStr[:500])
+	// Log pour debug
+	if len(outputStr) > 300 {
+		log.Printf("[DVD Info] Output brut (premiers 300 caractères): %s", outputStr[:300])
 	} else {
 		log.Printf("[DVD Info] Output brut: %s", outputStr)
 	}
 	
-	// Le problème : les messages d'erreur AC3 peuvent apparaître juste après {
-	// Exemple: { [ac3 @ ...] error ... "programs": [...]
-	// Le problème est que "programs" peut apparaître dans le message d'erreur lui-même
-	// Solution : trouver toutes les occurrences de clés JSON et ignorer celles dans des messages d'erreur
-	
-	// Regex pour trouver les clés JSON valides avec leur syntaxe complète
-	// Pattern: "key": suivi d'un espace (ou newline) et d'un [ ou {
-	jsonKeyPattern := regexp.MustCompile(`("programs"|"format"|"streams")\s*:\s*(\[|\{)`)
-	
-	// Trouver toutes les occurrences de clés JSON
-	allMatches := jsonKeyPattern.FindAllStringSubmatchIndex(outputStr, -1)
-	if allMatches == nil || len(allMatches) == 0 {
-		return nil, fmt.Errorf("impossible de trouver une clé JSON valide dans la sortie ffprobe")
-	}
+	// Le problème : les messages d'erreur AC3 apparaissent juste après {
+	// Exemple: { [ac3 @ ...] error ... "programs": [ ], "streams": [ ... ]
+	// Solution : trouver "programs": [ ] qui vient APRÈS le message d'erreur [ac3 @
+	// et reconstruire le JSON à partir de { + "programs": [ ]
 	
 	// Trouver le premier { dans la sortie
 	firstBrace := strings.Index(outputStr, "{")
 	if firstBrace < 0 {
 		return nil, fmt.Errorf("impossible de trouver l'accolade ouvrante '{' dans la sortie ffprobe")
 	}
+	log.Printf("[DVD Info] Premier { trouvé à la position %d", firstBrace)
 	
-	// Chercher la première clé JSON qui n'est PAS dans un message d'erreur
-	// Un message d'erreur typique contient [ac3 @ ou error avant la clé
-	var firstKeyPos int = -1
-	var firstKey string
+	// Chercher "programs": [ ] qui vient APRÈS le message d'erreur [ac3 @
+	// Le pattern doit gérer les espaces et retours à la ligne avec (?s)
+	programsPattern := regexp.MustCompile(`(?s)"programs"\s*:\s*\[\s*\]`)
+	programsMatches := programsPattern.FindAllStringIndex(outputStr, -1)
 	
-	for _, match := range allMatches {
-		if len(match) < 4 {
-			continue
+	if programsMatches == nil || len(programsMatches) == 0 {
+		return nil, fmt.Errorf("impossible de trouver 'programs': [ ] dans la sortie ffprobe")
+	}
+	
+	log.Printf("[DVD Info] %d occurrence(s) de 'programs': [ ] trouvée(s)", len(programsMatches))
+	
+	var programsStartPos int = -1
+	
+	// Trouver "programs": [ ] qui vient APRÈS le message d'erreur [ac3 @
+	for i, match := range programsMatches {
+		programsStart := match[0]
+		
+		// Vérifier le contexte avant "programs": [ ]
+		// Si on trouve [ac3 @ dans les 300 caractères précédents, c'est le vrai JSON (après l'erreur)
+		contextStart := firstBrace
+		if programsStart-300 > firstBrace {
+			contextStart = programsStart - 300
 		}
+		contextBefore := outputStr[contextStart:programsStart]
 		
-		keyStart := match[2] // Position de début de "programs"/"format"/"streams"
-		keyEnd := match[3]   // Position de fin
+		hasErrorPattern := strings.Contains(contextBefore, "[ac3 @") || 
+		                  strings.Contains(contextBefore, "error decoding") ||
+		                  strings.Contains(contextBefore, "expacc") ||
+		                  strings.Contains(contextBefore, "out-of-range")
 		
-		// Vérifier que la clé est après le premier {
-		if keyStart <= firstBrace {
-			continue
-		}
+		log.Printf("[DVD Info] Occurrence %d: 'programs': [ ] à la position %d, contexte contient [ac3 @: %v", 
+			i+1, programsStart, hasErrorPattern)
 		
-		// Vérifier le contexte avant la clé pour détecter les messages d'erreur
-		contextBefore := outputStr[firstBrace:keyStart]
-		
-		// Si on trouve des patterns d'erreur typiques, ignorer cette clé
-		errorPatterns := []string{
-			"[ac3 @",
-			"error decoding",
-			"error",
-			"warning",
-			"expacc",
-			"out-of-range",
-		}
-		
-		isInError := false
-		for _, pattern := range errorPatterns {
-			if strings.Contains(contextBefore, pattern) {
-				isInError = true
-				break
-			}
-		}
-		
-		// Si ce n'est pas dans un message d'erreur, c'est la bonne clé
-		if !isInError {
-			firstKeyPos = keyStart
-			firstKey = outputStr[keyStart:keyEnd]
-			log.Printf("[DVD Info] Clé JSON valide trouvée: '%s' à la position %d (après vérification des erreurs)", firstKey, firstKeyPos)
+		// Si on trouve [ac3 @ dans le contexte, c'est le vrai "programs": [ ] (après l'erreur)
+		if hasErrorPattern {
+			programsStartPos = programsStart
+			log.Printf("[DVD Info] ✅ 'programs': [ ] valide trouvé à la position %d (après message d'erreur)", programsStartPos)
 			break
-		} else {
-			log.Printf("[DVD Info] Clé JSON ignorée (dans message d'erreur): '%s' à la position %d", outputStr[keyStart:keyEnd], keyStart)
 		}
 	}
 	
-	if firstKeyPos < 0 {
-		return nil, fmt.Errorf("impossible de trouver une clé JSON valide (toutes les occurrences sont dans des messages d'erreur)")
+	// Si on n'a pas trouvé, prendre la dernière occurrence (probablement la bonne)
+	if programsStartPos < 0 && len(programsMatches) > 0 {
+		lastMatch := programsMatches[len(programsMatches)-1]
+		programsStartPos = lastMatch[0]
+		log.Printf("[DVD Info] ⚠️ 'programs': [ ] non trouvé avec pattern d'erreur, utilisation dernière occurrence: position %d", programsStartPos)
 	}
 	
-	// Reconstruire le JSON : { + tout ce qui vient après la première clé valide
-	// Cela supprime automatiquement tous les messages d'erreur entre { et la clé
-	cleanedJSON := "{" + outputStr[firstKeyPos:]
+	if programsStartPos < 0 {
+		return nil, fmt.Errorf("impossible de trouver 'programs': [ ] valide dans la sortie ffprobe")
+	}
+	
+	// Reconstruire le JSON : { + "programs": [ ] + tout ce qui suit
+	// Cela supprime automatiquement tous les messages d'erreur entre { et "programs"
+	cleanedJSON := "{" + outputStr[programsStartPos:]
+	
+	// Vérifier que le JSON nettoyé commence bien par { "programs"
+	previewLen := 50
+	if len(cleanedJSON) < previewLen {
+		previewLen = len(cleanedJSON)
+	}
+	if !strings.HasPrefix(cleanedJSON, `{"programs`) && !strings.HasPrefix(cleanedJSON, `{ "programs`) {
+		log.Printf("[DVD Info] ⚠️ JSON nettoyé ne commence pas par { \"programs, premiers %d chars: %s", previewLen, cleanedJSON[:previewLen])
+		// Essayer de corriger en trouvant le vrai début
+		programsIdx := strings.Index(cleanedJSON, `"programs"`)
+		if programsIdx > 0 {
+			cleanedJSON = "{" + cleanedJSON[programsIdx:]
+			previewLen2 := 100
+			if len(cleanedJSON) < previewLen2 {
+				previewLen2 = len(cleanedJSON)
+			}
+			log.Printf("[DVD Info] JSON corrigé, nouveau début: %s", cleanedJSON[:previewLen2])
+		}
+	}
+	
 	outputStr = cleanedJSON
 	
-	log.Printf("[DVD Info] JSON nettoyé : clé '%s' trouvée à la position %d, %d caractères supprimés entre { et la clé", 
-		firstKey, firstKeyPos, firstKeyPos-firstBrace-1)
+	log.Printf("[DVD Info] JSON nettoyé : 'programs': [ ] trouvé à la position %d, %d caractères supprimés entre { et 'programs'", 
+		programsStartPos, programsStartPos-firstBrace-1)
 	
 	// Chercher la fin du JSON (dernière accolade fermante) au cas où
 	jsonEnd := strings.LastIndex(outputStr, "}")
@@ -531,8 +541,81 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	}
 
 	// Parser le JSON nettoyé
+	// Vérifier d'abord que le JSON nettoyé ne contient pas de messages d'erreur
+	if strings.Contains(outputStr, "[ac3 @") {
+		log.Printf("[DVD Info] ⚠️ ATTENTION: Le JSON nettoyé contient encore '[ac3 @', ce qui ne devrait pas arriver")
+		// Essayer de nettoyer à nouveau
+		ac3Pos := strings.Index(outputStr, "[ac3 @")
+		if ac3Pos > 0 && ac3Pos < len(outputStr) {
+			// Trouver le prochain "programs" après [ac3 @
+			nextPrograms := strings.Index(outputStr[ac3Pos:], `"programs"`)
+			if nextPrograms > 0 {
+				outputStr = "{" + outputStr[ac3Pos+nextPrograms:]
+				log.Printf("[DVD Info] JSON re-nettoyé après détection de [ac3 @")
+			}
+		}
+	}
+	
+	// Parser le JSON nettoyé
 	if err := json.Unmarshal([]byte(outputStr), &probeData); err != nil {
-		return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr)
+		// Log détaillé pour debug
+		log.Printf("[DVD Info] ❌ ERREUR parsing JSON: %v", err)
+		previewLen := 500
+		if len(outputStr) < previewLen {
+			previewLen = len(outputStr)
+		}
+		log.Printf("[DVD Info] JSON nettoyé (premiers %d caractères): %s", previewLen, outputStr[:previewLen])
+		
+		// Essayer une dernière fois de nettoyer le JSON
+		// Si le JSON commence toujours par { [ac3 @, on doit trouver le vrai début
+		if strings.HasPrefix(outputStr, "{ [ac3 @") || strings.Contains(outputStr[:100], "[ac3 @") {
+			log.Printf("[DVD Info] ⚠️ JSON contient encore [ac3 @ au début, tentative de nettoyage final")
+			// Trouver le premier "programs" ou "streams" qui vient après [ac3 @
+			ac3Pos := strings.Index(outputStr, "[ac3 @")
+			if ac3Pos >= 0 {
+				// Chercher "programs" ou "streams" après [ac3 @
+				afterAc3 := outputStr[ac3Pos:]
+				programsIdx := strings.Index(afterAc3, `"programs"`)
+				streamsIdx := strings.Index(afterAc3, `"streams"`)
+				
+				var startIdx int = -1
+				if programsIdx >= 0 && (streamsIdx < 0 || programsIdx < streamsIdx) {
+					startIdx = ac3Pos + programsIdx
+				} else if streamsIdx >= 0 {
+					startIdx = ac3Pos + streamsIdx
+				}
+				
+				if startIdx > 0 {
+					outputStr = "{" + outputStr[startIdx:]
+					log.Printf("[DVD Info] JSON re-nettoyé, nouveau début à la position %d", startIdx)
+					// Réessayer de parser
+					if err2 := json.Unmarshal([]byte(outputStr), &probeData); err2 != nil {
+						log.Printf("[DVD Info] ❌ ERREUR parsing JSON après re-nettoyage: %v", err2)
+						previewLen2 := 500
+						if len(outputStr) < previewLen2 {
+							previewLen2 = len(outputStr)
+						}
+						log.Printf("[DVD Info] JSON après re-nettoyage (premiers %d caractères): %s", previewLen2, outputStr[:previewLen2])
+						previewLen3 := 1000
+						if len(outputStr) < previewLen3 {
+							previewLen3 = len(outputStr)
+						}
+						return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err2, outputStr[:previewLen3])
+					}
+					log.Printf("[DVD Info] ✅ JSON parsé avec succès après re-nettoyage")
+				} else {
+					previewLen4 := 1000
+					if len(outputStr) < previewLen4 {
+						previewLen4 = len(outputStr)
+					}
+					return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:previewLen4])
+				}
+			} else {
+				return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:min(1000, len(outputStr))])
+			}
+		} else {
+			return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:min(1000, len(outputStr))])
+		}
 	}
 
 	// Initialiser tous les tableaux pour éviter les valeurs null en JSON
@@ -1976,11 +2059,25 @@ func (e *DVDExtractor) ExtractDVD(
 	}
 
 	// Construire la commande ffmpeg
-	log.Printf("[DVD Extraction] 🔧 DÉBUT construction args - devicePath: %s", devicePath)
+	log.Printf("[DVD Extraction] 🔧 DÉBUT construction args - devicePath: %s, longestTitle: %d", devicePath, longestTitle)
 	args := []string{}
 
-	// Utiliser le titre le plus long au lieu de toujours dvd://1
-	args = append(args, "-i", fmt.Sprintf("dvd://%d", longestTitle))
+	// Construire l'input : utiliser directement le device path
+	// ffmpeg peut lire directement depuis /dev/sr0 ou tout autre device block
+	// On utilise le device directement comme input (sans dvd://N car cela cherche dans /dev/dvd)
+	var input string
+	if strings.HasPrefix(devicePath, "/dev/") {
+		// Utiliser directement le device comme input
+		// ffmpeg détectera automatiquement le DVD
+		input = devicePath
+		log.Printf("[DVD Extraction] Utilisation directe du device: %s", devicePath)
+	} else {
+		// Si c'est un point de montage, utiliser directement le chemin
+		input = devicePath
+		log.Printf("[DVD Extraction] Utilisation du point de montage: %s", devicePath)
+	}
+	
+	args = append(args, "-i", input)
 	log.Printf("[DVD Extraction] 🔧 Après ajout -i: args=%v", args)
 
 	// Mapper la piste vidéo (ignorer le stream dvd_nav_packet qui est index 0)
@@ -2045,15 +2142,9 @@ func (e *DVDExtractor) ExtractDVD(
 	cmd := exec.Command(e.ffmpegPath, args...)
 	log.Printf("[DVD Extraction] 🔧 Commande créée: %s avec args: %v", e.ffmpegPath, args)
 	
-	// Définir la variable d'environnement DVD_DEVICE si c'est un device block
-	// (ffmpeg ne supporte pas l'option -dvd_device dans cette version)
-	if strings.HasPrefix(devicePath, "/dev/") {
-		cmd.Env = append(os.Environ(), fmt.Sprintf("DVD_DEVICE=%s", devicePath))
-		log.Printf("[DVD Extraction] Variable d'environnement DVD_DEVICE définie: %s", devicePath)
-	}
 	
-	// Log de la commande complète pour debug (après avoir défini l'environnement)
-	log.Printf("[DVD Extraction] Commande ffmpeg: %s %s (DVD_DEVICE=%s)", e.ffmpegPath, strings.Join(args, " "), devicePath)
+	// Log de la commande complète pour debug
+	log.Printf("[DVD Extraction] Commande ffmpeg finale: %s %s", e.ffmpegPath, strings.Join(args, " "))
 	log.Printf("[DVD Extraction] DEBUG Args complets: %v", args)
 	
 	output, err := cmd.CombinedOutput()

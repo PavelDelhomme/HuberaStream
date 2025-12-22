@@ -53,5 +53,12 @@ func autoMigrate(db *gorm.DB) error {
 		&models.TorrentConfig{},
 		&models.UploadSession{},
 		&models.UploadChunk{},
+		// Modèles IA
+		&models.UserPreference{},
+		&models.MovieDetectionMemory{},
+		&models.Recommendation{},
+		&models.SeriesTracking{},
+		&models.SeriesEpisodeTracking{},
+		&models.LearningPattern{},
 	)
 }

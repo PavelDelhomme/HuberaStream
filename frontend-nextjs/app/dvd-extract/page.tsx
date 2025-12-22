@@ -430,9 +430,17 @@ export default function DVDExtractPage() {
         
         // Rechercher automatiquement les métadonnées depuis le titre du DVD
         if (dvdData.title && dvdData.title.trim() !== '' && dvdData.title !== 'DVD Extraite') {
-          // Passer le réalisateur et l'année si disponibles pour améliorer la recherche
+          // D'abord rechercher avec juste le titre pour avoir plus de résultats
           setAnalyzingStage('Recherche de métadonnées en cours...')
-          await searchMetadataFromTitle(dvdData.title, dvdData.director, dvdData.year)
+          await searchMetadataFromTitle(dvdData.title)
+          
+          // Si on a un réalisateur ou une année, essayer une recherche plus précise
+          // en préservant les résultats de la première recherche
+          if (dvdData.director || dvdData.year) {
+            // Faire une recherche précise mais préserver les résultats existants
+            // Si la recherche précise trouve des résultats, ils seront fusionnés avec les précédents
+            await searchMetadataFromTitle(dvdData.title, dvdData.director, dvdData.year, true)
+          }
         }
         
         setAnalyzingProgress(100)
@@ -486,12 +494,15 @@ export default function DVDExtractPage() {
     return textarea.value
   }
 
-  const searchMetadataFromTitle = async (title: string, director?: string, year?: number) => {
+  const searchMetadataFromTitle = async (title: string, director?: string, year?: number, preserveExistingResults: boolean = false) => {
     if (!title || title.trim() === '') return
 
     setSearchingMetadata(true)
-    setMetadataResults([])
-    setShowMetadataResults(false)
+    // Ne pas réinitialiser les résultats si on veut les préserver (pour recherche en cascade)
+    if (!preserveExistingResults) {
+      setMetadataResults([])
+      setShowMetadataResults(false)
+    }
     setAnalyzingStage('Recherche de métadonnées en cours...')
 
     try {
@@ -516,9 +527,47 @@ export default function DVDExtractPage() {
 
       const results = response.data.results || []
       if (results.length > 0) {
-        setMetadataResults(results)
-        setShowMetadataResults(true)
+        // Si on préserve les résultats existants et qu'on a déjà des résultats, les fusionner
+        if (preserveExistingResults && metadataResults.length > 0) {
+          // Fusionner les résultats en évitant les doublons (basé sur imdb_id)
+          const existingIds = new Set(metadataResults.map((r: any) => r.imdb_id).filter(Boolean))
+          const newResults = results.filter((r: any) => !r.imdb_id || !existingIds.has(r.imdb_id))
+          setMetadataResults([...metadataResults, ...newResults])
+        } else {
+          setMetadataResults(results)
+        }
+        setShowMetadataResults(true) // Afficher automatiquement les résultats
         setAnalyzingStage('Métadonnées trouvées !')
+        
+        // Si c'est une recherche automatique (appelée depuis handleGetDVDInfo), 
+        // sélectionner automatiquement le premier résultat si c'est une correspondance exacte
+        if (director || year) {
+          // Recherche avec réalisateur/année - essayer de trouver une correspondance exacte
+          const currentResults = preserveExistingResults && metadataResults.length > 0 
+            ? [...metadataResults, ...results] 
+            : results
+          const exactMatch = currentResults.find((r: any) => {
+            const titleMatch = r.title?.toLowerCase().trim() === title.toLowerCase().trim()
+            const directorMatch = !directorToUse || r.director?.toLowerCase().includes(directorToUse.toLowerCase()) || directorToUse.toLowerCase().includes(r.director?.toLowerCase() || '')
+            const yearMatch = !yearToUse || r.year === yearToUse || r.production_year === yearToUse
+            return titleMatch && (directorMatch || yearMatch)
+          })
+          
+          if (exactMatch) {
+            selectMetadata(exactMatch)
+          } else if (currentResults.length === 1) {
+            // Si un seul résultat, le sélectionner automatiquement
+            selectMetadata(currentResults[0])
+          }
+        } else {
+          const currentResults = preserveExistingResults && metadataResults.length > 0 
+            ? [...metadataResults, ...results] 
+            : results
+          if (currentResults.length === 1) {
+            // Si un seul résultat sans réalisateur/année, le sélectionner automatiquement
+            selectMetadata(currentResults[0])
+          }
+        }
       } else {
         setAnalyzingStage('Aucune métadonnée trouvée')
       }

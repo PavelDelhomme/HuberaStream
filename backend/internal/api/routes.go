@@ -55,6 +55,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
 	favoriteHandler := NewFavoriteHandler(db, cfg)
 	torrentIndexHandler := NewTorrentIndexHandler(db, cfg)
+	
+	// Initialiser le service torrent pour l'IA (utiliser le même que torrentHandler)
+	aiHandler := NewAIHandler(db, torrentHandler.torrentService)
 
 	// Routes publiques
 	api := router.Group("/api")
@@ -146,6 +149,23 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			favorites.POST("/:id", favoriteHandler.AddFavorite)
 			favorites.DELETE("/:id", favoriteHandler.RemoveFavorite)
 			favorites.GET("/:id/check", favoriteHandler.IsFavorite)
+		}
+
+		// IA - Recommandations
+		ai := protected.Group("/ai")
+		{
+			ai.GET("/recommendations", aiHandler.GetRecommendations)
+			ai.POST("/remember-selection", aiHandler.RememberMovieSelection)
+			ai.GET("/learning-stats", aiHandler.GetLearningStats)
+		}
+
+		// IA - Suivi de séries
+		series := protected.Group("/series")
+		{
+			series.GET("", aiHandler.GetTrackedSeries)
+			series.POST("", aiHandler.AddSeriesToTracking)
+			series.PUT("/:id", aiHandler.UpdateSeriesTracking)
+			series.DELETE("/:id", aiHandler.DeleteSeriesTracking)
 		}
 	}
 

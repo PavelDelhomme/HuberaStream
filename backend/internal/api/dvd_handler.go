@@ -114,14 +114,20 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 		devicePath = "/dev/dvd" // Par défaut
 	}
 
+	log.Printf("[DVD Handler] GetDVDInfo appelé avec device: %s", devicePath)
+	
 	info, err := h.extractor.GetDVDInfo(devicePath)
 	if err != nil {
+		log.Printf("[DVD Handler] ❌ ERREUR GetDVDInfo: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Erreur lors de la lecture du DVD",
 			"message": err.Error(),
 		})
 		return
 	}
+	
+	log.Printf("[DVD Handler] ✅ GetDVDInfo réussi: %d pistes vidéo, %d pistes audio, %d sous-titres", 
+		len(info.VideoTracks), len(info.AudioTracks), len(info.SubtitleTracks))
 
 	// Si on a un titre et/ou réalisateur, chercher automatiquement une miniature
 	// Essayer plusieurs variantes de recherche
