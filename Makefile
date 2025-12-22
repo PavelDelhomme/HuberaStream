@@ -438,11 +438,7 @@ test-all:
 # ============================================================================
 
 status:
-	@echo "${GREEN}📊 Statut des services:${NC}"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) ps
-	@echo ""
-	@echo "${GREEN}Test API:${NC}"
-	@./scripts/test-api.sh || true
+	@./scripts/status.sh
 
 shell-backend:
 	@echo "${GREEN}🐚 Shell du conteneur backend...${NC}"
