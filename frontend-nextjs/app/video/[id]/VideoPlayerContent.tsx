@@ -6,6 +6,7 @@ import ReactPlayer from 'react-player'
 import { authService, User } from '@/lib/auth'
 import api from '@/lib/api'
 import Link from 'next/link'
+import VideoCardWithPreview from '@/components/VideoCardWithPreview'
 import './VideoPlayerPage.css'
 
 interface Video {
@@ -20,6 +21,20 @@ interface Video {
   views?: number
   user?: any
   created_at?: string
+  director?: string
+  production_year?: number
+  year?: number
+  rating?: number
+  genre?: string
+  genres?: string[]
+  platform?: string
+  trailer_url?: string
+  poster_url?: string
+  backdrop_url?: string
+  imdb_id?: string
+  actors?: string
+  synopsis?: string
+  category_id?: string
 }
 
 export default function VideoPlayerContent({ videoId }: { videoId: string }) {
@@ -189,8 +204,49 @@ export default function VideoPlayerContent({ videoId }: { videoId: string }) {
 
   const fetchRelatedVideos = async () => {
     try {
+      // Essayer d'abord d'utiliser l'API de recommandations IA
+      if (user) {
+        try {
+          const recommendationsResponse = await api.get('/ai/recommendations', {
+            params: { limit: 12 }
+          })
+          const recommendations = recommendationsResponse.data.recommendations || []
+          if (recommendations.length > 0) {
+            // Filtrer la vidéo actuelle
+            const filtered = recommendations.filter((v: any) => v.id !== videoId)
+            setRelatedVideos(filtered.slice(0, 12))
+            return
+          }
+        } catch (err) {
+          console.debug('Recommandations IA non disponibles, utilisation de la méthode par défaut')
+        }
+      }
+
+      // Fallback: récupérer les vidéos de la même catégorie ou similaires
+      if (video?.category_id) {
+        try {
+          const categoryResponse = await api.get('/videos', {
+            params: { 
+              page: 1, 
+              limit: 12,
+              category_id: video.category_id,
+              is_public: true
+            }
+          })
+          const categoryVideos = categoryResponse.data.videos || []
+          const filtered = categoryVideos.filter((v: any) => v.id !== videoId)
+          if (filtered.length > 0) {
+            setRelatedVideos(filtered.slice(0, 12))
+            return
+          }
+        } catch (err) {
+          console.debug('Erreur lors de la récupération des vidéos par catégorie')
+        }
+      }
+
+      // Dernier fallback: vidéos populaires
       const response = await api.get('/videos', {
-        params: { page: 1, limit: 12 }
+        params: { page: 1, limit: 12, sort: 'views', is_public: true }
       })
       const videos = response.data.videos || []
       const filteredVideos = videos.filter((v: any) => v.id !== videoId)
@@ -199,6 +255,16 @@ export default function VideoPlayerContent({ videoId }: { videoId: string }) {
       console.error('Erreur lors de la récupération des vidéos similaires:', err)
       setRelatedVideos([])
     }
+  }
+
+  const formatViews = (views: number): string => {
+    if (views >= 1000000) {
+      return `${(views / 1000000).toFixed(1)}M`
+    }
+    if (views >= 1000) {
+      return `${(views / 1000).toFixed(1)}K`
+    }
+    return views.toString()
   }
 
   const handleTimeUpdate = async (position: number) => {
@@ -327,8 +393,61 @@ export default function VideoPlayerContent({ videoId }: { videoId: string }) {
         </div>
 
         <div className="video-info">
-          <h1>{video.title}</h1>
-          {video.description && <p className="video-description">{video.description}</p>}
+          <div className="video-header">
+            <h1>{video.title}</h1>
+            <div className="video-meta-header">
+              {(video.production_year || video.year) && (
+              <span className="video-year">{video.production_year || video.year}</span>
+            )}
+              {(video as any).rating && (
+                <span className="video-rating">⭐ {(video as any).rating}/10</span>
+              )}
+              {(video as any).platform && (
+                <span className="video-platform">📺 {(video as any).platform}</span>
+              )}
+              {video.views > 0 && (
+                <span className="video-views-count">👁️ {formatViews(video.views)} vues</span>
+              )}
+            </div>
+            {(video.genres && video.genres.length > 0) || video.genre ? (
+              <div className="video-genres">
+                {video.genres && video.genres.length > 0
+                  ? video.genres.map((genre: string, idx: number) => (
+                      <span key={idx} className="genre-tag">{genre}</span>
+                    ))
+                  : video.genre && (
+                      <span className="genre-tag">{video.genre}</span>
+                    )}
+              </div>
+            ) : null}
+            {video.director && (
+              <div className="video-director">
+                <strong>Réalisateur:</strong> {video.director}
+              </div>
+            )}
+          </div>
+          
+          {video.description && (
+            <div className="video-description-section">
+              <p className="video-description">{video.description}</p>
+            </div>
+          )}
+          
+          <div className="video-actions">
+            <Link href={`/video/${video.id}`} className="play-button-large">
+              ▶️ Lecture
+            </Link>
+            {video.trailer_url && (
+              <a 
+                href={video.trailer_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="trailer-button"
+              >
+                🎬 Bande-annonce
+              </a>
+            )}
+          </div>
           
           {video.formats && video.formats.length > 0 && (
             <div className="quality-selector">
@@ -350,20 +469,13 @@ export default function VideoPlayerContent({ videoId }: { videoId: string }) {
 
       {relatedVideos.length > 0 && (
         <div className="related-videos">
-          <h2>Vidéos similaires</h2>
+          <h2>🎬 Titres similaires</h2>
           <div className="related-videos-grid">
             {relatedVideos.map((relatedVideo) => (
-              <Link key={relatedVideo.id} href={`/video/${relatedVideo.id}`} className="related-video-item">
-                {relatedVideo.thumbnail_path ? (
-                  <img 
-                    src={`/api/thumbnails/${relatedVideo.thumbnail_path.split('/').pop()}`} 
-                    alt={relatedVideo.title}
-                  />
-                ) : (
-                  <div className="thumbnail-placeholder">📺</div>
-                )}
-                <h3>{relatedVideo.title}</h3>
-              </Link>
+              <VideoCardWithPreview 
+                key={relatedVideo.id} 
+                video={relatedVideo}
+              />
             ))}
           </div>
         </div>

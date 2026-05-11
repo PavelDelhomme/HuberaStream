@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type DVDTrack struct {
@@ -340,23 +341,416 @@ func (e *DVDExtractor) FindMountPoints() []string {
 	return mountPoints
 }
 
+// mountDVD tente de monter le DVD à un point de montage temporaire
+// Retourne le point de montage si le montage réussit, sinon retourne une chaîne vide
+func (e *DVDExtractor) mountDVD(devicePath string) string {
+	// Créer un point de montage temporaire
+	mountPoint := filepath.Join("/tmp", fmt.Sprintf("dvd_mount_%d", time.Now().Unix()))
+	
+	// Créer le répertoire de montage
+	if err := os.MkdirAll(mountPoint, 0755); err != nil {
+		log.Printf("[DVD Extraction] ⚠️  Impossible de créer le point de montage %s: %v", mountPoint, err)
+		return ""
+	}
+	
+	// Essayer de monter le DVD
+	// Utiliser mount avec l'option -t iso9660 ou -t udf pour les DVD
+	cmd := exec.Command("mount", "-t", "iso9660", devicePath, mountPoint)
+	if err := cmd.Run(); err != nil {
+		// Essayer avec udf
+		cmd = exec.Command("mount", "-t", "udf", devicePath, mountPoint)
+		if err := cmd.Run(); err != nil {
+			// Essayer sans spécifier le type de système de fichiers
+			cmd = exec.Command("mount", devicePath, mountPoint)
+			if err := cmd.Run(); err != nil {
+				log.Printf("[DVD Extraction] ⚠️  Impossible de monter le DVD %s à %s: %v", devicePath, mountPoint, err)
+				// Nettoyer le répertoire de montage
+				os.Remove(mountPoint)
+				return ""
+			}
+		}
+	}
+	
+	// Vérifier que le montage a réussi en vérifiant la présence de VIDEO_TS
+	videoTSPath := filepath.Join(mountPoint, "VIDEO_TS")
+	if info, err := os.Stat(videoTSPath); err == nil && info.IsDir() {
+		log.Printf("[DVD Extraction] ✅ DVD monté avec succès à: %s", mountPoint)
+		return mountPoint
+	}
+	
+	// Si VIDEO_TS n'existe pas, le montage a peut-être échoué
+	log.Printf("[DVD Extraction] ⚠️  DVD monté mais VIDEO_TS non trouvé à: %s", mountPoint)
+	// Démontage
+	exec.Command("umount", mountPoint).Run()
+	os.Remove(mountPoint)
+	return ""
+}
+
+// analyzeVOBFiles analyse les fichiers VOB du DVD pour identifier les titres et langues
+// Les fichiers VOB sont organisés comme VTS_XX_Y_Z.VOB où :
+// - XX = numéro du VTS (Video Title Set)
+// - Y = numéro du titre dans ce VTS
+// - Z = numéro de partie (les VOB sont limités à ~1GB)
+func (e *DVDExtractor) analyzeVOBFiles(videoTSPath string) (map[int][]string, error) {
+	vobFiles := make(map[int][]string)
+	
+	// Lire le répertoire VIDEO_TS
+	files, err := os.ReadDir(videoTSPath)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la lecture de VIDEO_TS: %w", err)
+	}
+	
+	// Pattern pour matcher les fichiers VOB: VTS_XX_Y_Z.VOB
+	vobPattern := regexp.MustCompile(`VTS_(\d+)_(\d+)_(\d+)\.VOB`)
+	
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		
+		fileName := file.Name()
+		matches := vobPattern.FindStringSubmatch(fileName)
+		if len(matches) == 4 {
+			vtsNum, _ := strconv.Atoi(matches[1])
+			titleNum, _ := strconv.Atoi(matches[2])
+			partNum, _ := strconv.Atoi(matches[3])
+			
+			// Créer une clé unique pour chaque titre (VTS + titre)
+			titleKey := vtsNum*1000 + titleNum
+			
+			fullPath := filepath.Join(videoTSPath, fileName)
+			vobFiles[titleKey] = append(vobFiles[titleKey], fullPath)
+			
+			log.Printf("[DVD VOB Analysis] 📁 Fichier VOB trouvé: %s (VTS=%d, Titre=%d, Partie=%d)", 
+				fileName, vtsNum, titleNum, partNum)
+		}
+	}
+	
+	// Trier les fichiers VOB par partie pour chaque titre
+	for titleKey, files := range vobFiles {
+		// Trier par nom de fichier (qui contient le numéro de partie)
+		// Cela garantit l'ordre correct: VTS_01_1_0.VOB, VTS_01_1_1.VOB, etc.
+		sortedFiles := make([]string, len(files))
+		copy(sortedFiles, files)
+		// Trier par nom de fichier
+		for i := 0; i < len(sortedFiles)-1; i++ {
+			for j := i + 1; j < len(sortedFiles); j++ {
+				if sortedFiles[i] > sortedFiles[j] {
+					sortedFiles[i], sortedFiles[j] = sortedFiles[j], sortedFiles[i]
+				}
+			}
+		}
+		vobFiles[titleKey] = sortedFiles
+		log.Printf("[DVD VOB Analysis] 📊 Titre %d: %d fichier(s) VOB", titleKey, len(sortedFiles))
+	}
+	
+	return vobFiles, nil
+}
+
+// analyzeIFOFiles analyse les fichiers IFO du DVD pour extraire toutes les langues et pistes
+// Les fichiers IFO contiennent les métadonnées complètes du DVD (comme HandBrake les utilise)
+// VIDEO_TS.IFO = informations générales du DVD
+// VTS_XX_0.IFO = informations pour chaque Video Title Set (VTS)
+func (e *DVDExtractor) analyzeIFOFiles(videoTSPath string) (map[int]*IFOInfo, error) {
+	ifoInfos := make(map[int]*IFOInfo)
+	
+	// Lire le répertoire VIDEO_TS
+	files, err := os.ReadDir(videoTSPath)
+	if err != nil {
+		return nil, fmt.Errorf("erreur lors de la lecture de VIDEO_TS: %w", err)
+	}
+	
+	// Pattern pour matcher les fichiers IFO: VTS_XX_0.IFO et VIDEO_TS.IFO
+	ifoPattern := regexp.MustCompile(`VTS_(\d+)_0\.IFO`)
+	
+	// D'abord, analyser VIDEO_TS.IFO (informations générales)
+	videoTSIFO := filepath.Join(videoTSPath, "VIDEO_TS.IFO")
+	if info, err := os.Stat(videoTSIFO); err == nil && !info.IsDir() {
+		log.Printf("[DVD IFO Analysis] 📄 Analyse de VIDEO_TS.IFO...")
+		ifoInfo := e.parseIFOFile(videoTSIFO, 0)
+		if ifoInfo != nil {
+			ifoInfos[0] = ifoInfo
+			log.Printf("[DVD IFO Analysis] ✅ VIDEO_TS.IFO analysé: %d piste(s) audio, %d sous-titre(s)", 
+				len(ifoInfo.AudioTracks), len(ifoInfo.SubtitleTracks))
+		}
+	}
+	
+	// Ensuite, analyser tous les VTS_XX_0.IFO
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		
+		fileName := file.Name()
+		matches := ifoPattern.FindStringSubmatch(fileName)
+		if len(matches) == 2 {
+			vtsNum, _ := strconv.Atoi(matches[1])
+			fullPath := filepath.Join(videoTSPath, fileName)
+			
+			log.Printf("[DVD IFO Analysis] 📄 Analyse de %s (VTS=%d)...", fileName, vtsNum)
+			ifoInfo := e.parseIFOFile(fullPath, vtsNum)
+			if ifoInfo != nil {
+				ifoInfos[vtsNum] = ifoInfo
+				log.Printf("[DVD IFO Analysis] ✅ %s analysé: %d piste(s) audio, %d sous-titre(s)", 
+					fileName, len(ifoInfo.AudioTracks), len(ifoInfo.SubtitleTracks))
+			}
+		}
+	}
+	
+	return ifoInfos, nil
+}
+
+// IFOInfo contient les informations extraites d'un fichier IFO
+type IFOInfo struct {
+	VTSNumber      int
+	AudioTracks    []DVDTrack
+	SubtitleTracks []DVDTrack
+	VideoTracks    []DVDTrack
+}
+
+// parseIFOFile parse un fichier IFO pour extraire les langues et pistes
+// Utilise lsdvd ou dvdbackup pour lire les métadonnées IFO
+func (e *DVDExtractor) parseIFOFile(ifoPath string, vtsNum int) *IFOInfo {
+	// Utiliser lsdvd pour analyser le fichier IFO
+	// lsdvd peut analyser directement un fichier IFO si on lui donne le device
+	// Mais on peut aussi utiliser dvdbackup ou dvdread pour extraire les infos
+	
+	// Méthode 1: Utiliser lsdvd avec le device parent (si disponible)
+	// Méthode 2: Utiliser dvdbackup -I pour lire les infos IFO
+	// Méthode 3: Utiliser ffprobe sur le fichier IFO
+	
+	// Pour l'instant, on utilise ffprobe pour analyser le fichier IFO
+	// ffprobe peut lire les fichiers IFO et extraire les streams
+	cmd := exec.Command(
+		e.ffprobePath,
+		"-v", "error",
+		"-hide_banner",
+		"-analyzeduration", "10000000",
+		"-probesize", "10000000",
+		"-print_format", "json",
+		"-show_streams",
+		"-show_format",
+		ifoPath,
+	)
+	
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	
+	err := cmd.Run()
+	if err != nil {
+		log.Printf("[DVD IFO Analysis] ⚠️  Erreur ffprobe sur %s: %v", ifoPath, err)
+		// Essayer avec lsdvd si disponible
+		return e.parseIFOWithLsdvd(ifoPath, vtsNum)
+	}
+	
+	output := stdout.Bytes()
+	var probeData struct {
+		Streams []struct {
+			Index         int               `json:"index"`
+			CodecType     string            `json:"codec_type"`
+			CodecName     string            `json:"codec_name"`
+			CodecLongName string            `json:"codec_long_name"`
+			Tags          map[string]string `json:"tags"`
+			Channels      int               `json:"channels"`
+			SampleRate    string            `json:"sample_rate"`
+		} `json:"streams"`
+	}
+	
+	if err := json.Unmarshal(output, &probeData); err != nil {
+		log.Printf("[DVD IFO Analysis] ⚠️  Erreur parsing JSON pour %s: %v", ifoPath, err)
+		return e.parseIFOWithLsdvd(ifoPath, vtsNum)
+	}
+	
+	info := &IFOInfo{
+		VTSNumber:      vtsNum,
+		AudioTracks:    []DVDTrack{},
+		SubtitleTracks: []DVDTrack{},
+		VideoTracks:    []DVDTrack{},
+	}
+	
+	// Parser les streams depuis ffprobe
+	for _, stream := range probeData.Streams {
+		language := ""
+		if stream.Tags != nil {
+			if lang, ok := stream.Tags["language"]; ok && lang != "" {
+				language = lang
+			} else if lang, ok := stream.Tags["LANGUAGE"]; ok && lang != "" {
+				language = lang
+			}
+		}
+		
+		track := DVDTrack{
+			Index:    stream.Index,
+			Codec:    stream.CodecName,
+			Language: language,
+		}
+		
+		switch stream.CodecType {
+		case "video":
+			track.Type = "video"
+			track.Title = fmt.Sprintf("Vidéo - %s", stream.CodecName)
+			info.VideoTracks = append(info.VideoTracks, track)
+		case "audio":
+			track.Type = "audio"
+			track.Channels = stream.Channels
+			track.SampleRate = stream.SampleRate
+			langName := e.getLanguageName(language)
+			if langName == "" && language != "" {
+				langName = strings.ToUpper(language)
+			} else if langName == "" {
+				langName = "Langue inconnue"
+			}
+			track.Title = fmt.Sprintf("%s - %s", langName, stream.CodecName)
+			if stream.Channels > 0 {
+				if stream.Channels == 1 {
+					track.Title += " (Mono)"
+				} else if stream.Channels == 2 {
+					track.Title += " (Stéréo)"
+				} else if stream.Channels == 6 {
+					track.Title += " (5.1)"
+				} else {
+					track.Title += fmt.Sprintf(" (%d canaux)", stream.Channels)
+				}
+			}
+			info.AudioTracks = append(info.AudioTracks, track)
+		case "subtitle":
+			track.Type = "subtitle"
+			langName := e.getLanguageName(language)
+			if langName == "" && language != "" {
+				langName = strings.ToUpper(language)
+			} else if langName == "" {
+				langName = "Langue inconnue"
+			}
+			track.Title = fmt.Sprintf("%s - %s", langName, stream.CodecName)
+			info.SubtitleTracks = append(info.SubtitleTracks, track)
+		}
+	}
+	
+	return info
+}
+
+// parseIFOWithLsdvd utilise lsdvd pour analyser un fichier IFO
+func (e *DVDExtractor) parseIFOWithLsdvd(ifoPath string, vtsNum int) *IFOInfo {
+	// lsdvd ne peut pas analyser directement un fichier IFO
+	// On retourne nil pour utiliser les autres méthodes
+	return nil
+}
+
 // GetDVDInfo récupère les informations du DVD (pistes audio/vidéo/sous-titres)
 // Utilise lsdvd pour une analyse complète de la structure, puis ffprobe/ffmpeg pour les détails
 func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	// D'abord, essayer d'obtenir le label du volume depuis le système de fichiers
 	volumeLabel := e.getVolumeLabel(devicePath)
+	log.Printf("[DVD Info] 📀 Label du volume: %s", volumeLabel)
+
+	// Essayer de monter le DVD pour accéder aux fichiers VOB
+	mountPoint := ""
+	if strings.HasPrefix(devicePath, "/dev/") {
+		// Chercher un point de montage existant
+		mountPoints := e.FindMountPoints()
+		for _, mp := range mountPoints {
+			videoTSPath := filepath.Join(mp, "VIDEO_TS")
+			if info, err := os.Stat(videoTSPath); err == nil && info.IsDir() {
+				// Vérifier quel device est monté ici
+				cmd := exec.Command("findmnt", "-n", "-o", "SOURCE", mp)
+				if output, err := cmd.Output(); err == nil {
+					mountedDevice := strings.TrimSpace(string(output))
+					if mountedDevice == devicePath || strings.Contains(mountedDevice, filepath.Base(devicePath)) {
+						mountPoint = mp
+						log.Printf("[DVD Info] ✅ DVD déjà monté à: %s", mountPoint)
+						break
+					}
+				}
+			}
+		}
+		
+		// Si pas monté, essayer de monter
+		if mountPoint == "" {
+			log.Printf("[DVD Info] 🔄 Tentative de montage du DVD...")
+			mountPoint = e.mountDVD(devicePath)
+		}
+	} else if strings.Contains(devicePath, "VIDEO_TS") {
+		// C'est déjà un chemin VIDEO_TS
+		mountPoint = filepath.Dir(filepath.Dir(devicePath))
+		log.Printf("[DVD Info] ✅ Chemin VIDEO_TS fourni: %s", devicePath)
+	}
+
+	// Analyser les fichiers VOB et IFO si le DVD est monté (comme HandBrake)
+	var vobFiles map[int][]string
+	var ifoInfos map[int]*IFOInfo
+	if mountPoint != "" {
+		videoTSPath := filepath.Join(mountPoint, "VIDEO_TS")
+		if info, err := os.Stat(videoTSPath); err == nil && info.IsDir() {
+			log.Printf("[DVD Info] 📁 Analyse automatique des fichiers DVD dans: %s", videoTSPath)
+			
+			// Analyser les fichiers VOB pour identifier les titres
+			vobFiles, _ = e.analyzeVOBFiles(videoTSPath)
+			if len(vobFiles) > 0 {
+				log.Printf("[DVD Info] ✅ %d titre(s) VOB trouvé(s)", len(vobFiles))
+			}
+			
+			// Analyser les fichiers IFO pour extraire toutes les langues (comme HandBrake)
+			log.Printf("[DVD Info] 📄 Analyse automatique des fichiers IFO pour détecter toutes les langues...")
+			ifoInfos, _ = e.analyzeIFOFiles(videoTSPath)
+			if len(ifoInfos) > 0 {
+				totalAudio := 0
+				totalSubtitles := 0
+				for vts, ifoInfo := range ifoInfos {
+					totalAudio += len(ifoInfo.AudioTracks)
+					totalSubtitles += len(ifoInfo.SubtitleTracks)
+					log.Printf("[DVD Info] 📊 VTS_%02d_0.IFO: %d piste(s) audio, %d sous-titre(s)", 
+						vts, len(ifoInfo.AudioTracks), len(ifoInfo.SubtitleTracks))
+				}
+				log.Printf("[DVD Info] ✅ Total: %d piste(s) audio, %d sous-titre(s) détectées depuis les fichiers IFO", 
+					totalAudio, totalSubtitles)
+			}
+		}
+	}
 
 	// Ensuite, essayer d'utiliser lsdvd pour obtenir la structure complète du DVD
 	lsdvdInfo := e.analyzeDVDWithLsdvd(devicePath)
 
-	// Utiliser directement le device avec ffprobe (plus fiable que dvd://)
+	// STRATÉGIE COMME HANDBRAKE : Utiliser les fichiers VOB si le DVD est monté
+	// Sinon, utiliser directement le device avec ffprobe
 	var ffprobeInput string
-	if strings.HasPrefix(devicePath, "/dev/") {
-		// Utiliser directement le device block
+	var videoTSPathForProbe string
+	
+	// Si le DVD est monté, utiliser les fichiers VOB pour l'analyse
+	if mountPoint != "" {
+		videoTSPathForProbe = filepath.Join(mountPoint, "VIDEO_TS")
+		// Utiliser le premier fichier VOB pour l'analyse (ou VIDEO_TS.IFO si disponible)
+		ifoPath := filepath.Join(videoTSPathForProbe, "VIDEO_TS.IFO")
+		if _, err := os.Stat(ifoPath); err == nil {
+			// Utiliser VIDEO_TS.IFO pour l'analyse (comme HandBrake)
+			ffprobeInput = ifoPath
+			log.Printf("[DVD Info] ✅ Utilisation VIDEO_TS.IFO pour l'analyse: %s", ifoPath)
+		} else {
+			// Sinon, analyser les fichiers VOB
+			vobFiles, _ := e.analyzeVOBFiles(videoTSPathForProbe)
+			if len(vobFiles) > 0 {
+				// Prendre le premier fichier VOB du premier titre
+				for _, files := range vobFiles {
+					if len(files) > 0 {
+						ffprobeInput = files[0]
+						log.Printf("[DVD Info] ✅ Utilisation premier fichier VOB pour l'analyse: %s", ffprobeInput)
+						break
+					}
+				}
+			}
+			if ffprobeInput == "" {
+				ffprobeInput = videoTSPathForProbe
+				log.Printf("[DVD Info] ⚠️  Utilisation dossier VIDEO_TS pour l'analyse: %s", videoTSPathForProbe)
+			}
+		}
+	} else if strings.HasPrefix(devicePath, "/dev/") {
+		// Si pas monté, utiliser directement le device block
 		ffprobeInput = devicePath
+		log.Printf("[DVD Info] ⚠️  DVD non monté, utilisation directe du device: %s", devicePath)
 	} else if strings.Contains(devicePath, "VIDEO_TS") {
 		// Chemin vers VIDEO_TS
 		ffprobeInput = devicePath
+		videoTSPathForProbe = devicePath
 	} else {
 		ffprobeInput = devicePath
 	}
@@ -403,10 +797,9 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		log.Printf("[DVD Info] Output brut: %s", outputStr)
 	}
 	
-	// Le problème : les messages d'erreur AC3 apparaissent juste après {
-	// Exemple: { [ac3 @ ...] error ... "programs": [ ], "streams": [ ... ]
-	// Solution : trouver "programs": [ ] qui vient APRÈS le message d'erreur [ac3 @
-	// et reconstruire le JSON à partir de { + "programs": [ ]
+	// NOUVELLE STRATÉGIE : Gérer les deux cas (avec et sans erreur AC3)
+	// Cas 1: JSON propre : { "programs": [ ] ou { "streams": [ ]
+	// Cas 2: JSON pollué : { [ac3 @ ...] error ... "programs": [ ]
 	
 	// Trouver le premier { dans la sortie
 	firstBrace := strings.Index(outputStr, "{")
@@ -415,93 +808,70 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 	}
 	log.Printf("[DVD Info] Premier { trouvé à la position %d", firstBrace)
 	
-	// Chercher "programs": [ ] qui vient APRÈS le message d'erreur [ac3 @
-	// Le pattern doit gérer les espaces et retours à la ligne avec (?s)
-	programsPattern := regexp.MustCompile(`(?s)"programs"\s*:\s*\[\s*\]`)
-	programsMatches := programsPattern.FindAllStringIndex(outputStr, -1)
+	// Vérifier si le JSON est propre (commence directement par { suivi de "programs" ou "streams")
+	// Chercher "programs" ou "streams" dans les 50 premiers caractères après {
+	afterBrace := outputStr[firstBrace:]
+	programsIdx := strings.Index(afterBrace, `"programs"`)
+	streamsIdx := strings.Index(afterBrace, `"streams"`)
 	
-	if programsMatches == nil || len(programsMatches) == 0 {
-		return nil, fmt.Errorf("impossible de trouver 'programs': [ ] dans la sortie ffprobe")
-	}
+	var jsonStartPos int = -1
 	
-	log.Printf("[DVD Info] %d occurrence(s) de 'programs': [ ] trouvée(s)", len(programsMatches))
-	
-	var programsStartPos int = -1
-	
-	// Trouver "programs": [ ] qui vient APRÈS le message d'erreur [ac3 @
-	for i, match := range programsMatches {
-		programsStart := match[0]
+	// Si on trouve "programs" ou "streams" dans les 50 premiers caractères, le JSON est probablement propre
+	if programsIdx >= 0 && programsIdx < 50 {
+		// JSON propre : commencer directement après {
+		jsonStartPos = firstBrace
+		log.Printf("[DVD Info] ✅ JSON propre détecté: 'programs' trouvé à la position %d (après {)", programsIdx)
+	} else if streamsIdx >= 0 && streamsIdx < 50 {
+		// JSON propre : commencer directement après {
+		jsonStartPos = firstBrace
+		log.Printf("[DVD Info] ✅ JSON propre détecté: 'streams' trouvé à la position %d (après {)", streamsIdx)
+	} else {
+		// JSON pollué : chercher "programs" ou "streams" après les erreurs AC3
+		log.Printf("[DVD Info] ⚠️ JSON pollué détecté, recherche de 'programs' ou 'streams' après les erreurs...")
 		
-		// Vérifier le contexte avant "programs": [ ]
-		// Si on trouve [ac3 @ dans les 300 caractères précédents, c'est le vrai JSON (après l'erreur)
-		contextStart := firstBrace
-		if programsStart-300 > firstBrace {
-			contextStart = programsStart - 300
+		// Chercher le premier "programs" ou "streams" qui vient APRÈS le premier {
+		var targetIdx int = -1
+		if programsIdx >= 0 && (streamsIdx < 0 || programsIdx < streamsIdx) {
+			targetIdx = programsIdx
+		} else if streamsIdx >= 0 {
+			targetIdx = streamsIdx
 		}
-		contextBefore := outputStr[contextStart:programsStart]
 		
-		hasErrorPattern := strings.Contains(contextBefore, "[ac3 @") || 
-		                  strings.Contains(contextBefore, "error decoding") ||
-		                  strings.Contains(contextBefore, "expacc") ||
-		                  strings.Contains(contextBefore, "out-of-range")
-		
-		log.Printf("[DVD Info] Occurrence %d: 'programs': [ ] à la position %d, contexte contient [ac3 @: %v", 
-			i+1, programsStart, hasErrorPattern)
-		
-		// Si on trouve [ac3 @ dans le contexte, c'est le vrai "programs": [ ] (après l'erreur)
-		if hasErrorPattern {
-			programsStartPos = programsStart
-			log.Printf("[DVD Info] ✅ 'programs': [ ] valide trouvé à la position %d (après message d'erreur)", programsStartPos)
-			break
-		}
-	}
-	
-	// Si on n'a pas trouvé, prendre la dernière occurrence (probablement la bonne)
-	if programsStartPos < 0 && len(programsMatches) > 0 {
-		lastMatch := programsMatches[len(programsMatches)-1]
-		programsStartPos = lastMatch[0]
-		log.Printf("[DVD Info] ⚠️ 'programs': [ ] non trouvé avec pattern d'erreur, utilisation dernière occurrence: position %d", programsStartPos)
-	}
-	
-	if programsStartPos < 0 {
-		return nil, fmt.Errorf("impossible de trouver 'programs': [ ] valide dans la sortie ffprobe")
-	}
-	
-	// Reconstruire le JSON : { + "programs": [ ] + tout ce qui suit
-	// Cela supprime automatiquement tous les messages d'erreur entre { et "programs"
-	cleanedJSON := "{" + outputStr[programsStartPos:]
-	
-	// Vérifier que le JSON nettoyé commence bien par { "programs"
-	previewLen := 50
-	if len(cleanedJSON) < previewLen {
-		previewLen = len(cleanedJSON)
-	}
-	if !strings.HasPrefix(cleanedJSON, `{"programs`) && !strings.HasPrefix(cleanedJSON, `{ "programs`) {
-		log.Printf("[DVD Info] ⚠️ JSON nettoyé ne commence pas par { \"programs, premiers %d chars: %s", previewLen, cleanedJSON[:previewLen])
-		// Essayer de corriger en trouvant le vrai début
-		programsIdx := strings.Index(cleanedJSON, `"programs"`)
-		if programsIdx > 0 {
-			cleanedJSON = "{" + cleanedJSON[programsIdx:]
-			previewLen2 := 100
-			if len(cleanedJSON) < previewLen2 {
-				previewLen2 = len(cleanedJSON)
+		if targetIdx >= 0 {
+			jsonStartPos = firstBrace + targetIdx
+			log.Printf("[DVD Info] ✅ 'programs'/'streams' trouvé à la position %d (après nettoyage)", jsonStartPos)
+		} else {
+			// Dernier recours : chercher n'importe quel "programs" ou "streams"
+			allProgramsIdx := strings.Index(outputStr, `"programs"`)
+			allStreamsIdx := strings.Index(outputStr, `"streams"`)
+			
+			if allProgramsIdx >= 0 && (allStreamsIdx < 0 || allProgramsIdx < allStreamsIdx) {
+				jsonStartPos = allProgramsIdx
+				log.Printf("[DVD Info] ⚠️ Utilisation de 'programs' trouvé à la position %d (dernier recours)", jsonStartPos)
+			} else if allStreamsIdx >= 0 {
+				jsonStartPos = allStreamsIdx
+				log.Printf("[DVD Info] ⚠️ Utilisation de 'streams' trouvé à la position %d (dernier recours)", jsonStartPos)
+			} else {
+				return nil, fmt.Errorf("impossible de trouver 'programs' ou 'streams' dans la sortie ffprobe")
 			}
-			log.Printf("[DVD Info] JSON corrigé, nouveau début: %s", cleanedJSON[:previewLen2])
 		}
+	}
+	
+	// Reconstruire le JSON : { + "programs"/"streams" + tout ce qui suit
+	// Cela supprime automatiquement tous les messages d'erreur entre { et "programs"/"streams"
+	cleanedJSON := "{" + outputStr[jsonStartPos:]
+	
+	// Chercher la fin du JSON (dernière accolade fermante) au cas où
+	jsonEnd := strings.LastIndex(cleanedJSON, "}")
+	if jsonEnd > 0 && jsonEnd < len(cleanedJSON)-1 {
+		// Il y a du texte après le JSON, l'enlever
+		cleanedJSON = cleanedJSON[:jsonEnd+1]
+		log.Printf("[DVD Info] Texte après JSON supprimé")
 	}
 	
 	outputStr = cleanedJSON
 	
-	log.Printf("[DVD Info] JSON nettoyé : 'programs': [ ] trouvé à la position %d, %d caractères supprimés entre { et 'programs'", 
-		programsStartPos, programsStartPos-firstBrace-1)
-	
-	// Chercher la fin du JSON (dernière accolade fermante) au cas où
-	jsonEnd := strings.LastIndex(outputStr, "}")
-	if jsonEnd > 0 && jsonEnd < len(outputStr)-1 {
-		// Il y a du texte après le JSON, l'enlever
-		outputStr = outputStr[:jsonEnd+1]
-		log.Printf("[DVD Info] Texte après JSON supprimé")
-	}
+	log.Printf("[DVD Info] JSON nettoyé : %d caractères supprimés entre { et début JSON", jsonStartPos-firstBrace-1)
 	
 	if len(outputStr) > 200 {
 		log.Printf("[DVD Info] JSON nettoyé (premiers 200 caractères): %s", outputStr[:200])
@@ -611,10 +981,18 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 					return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:previewLen4])
 				}
 			} else {
-				return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:min(1000, len(outputStr))])
+				previewLen5 := 1000
+				if len(outputStr) < previewLen5 {
+					previewLen5 = len(outputStr)
+				}
+				return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:previewLen5])
 			}
 		} else {
-			return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:min(1000, len(outputStr))])
+			previewLen6 := 1000
+			if len(outputStr) < previewLen6 {
+				previewLen6 = len(outputStr)
+			}
+			return nil, fmt.Errorf("erreur lors du parsing des données: %w (output: %s)", err, outputStr[:previewLen6])
 		}
 	}
 
@@ -699,21 +1077,75 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 		info.Title = "DVD Extraite"
 	}
 
-	// Enrichir avec les informations de lsdvd si disponibles
+	// PRIORITÉ : Utiliser les informations des fichiers IFO (plus précises, comme HandBrake)
+	// Utiliser les IFO AVANT de parser les streams ffprobe pour avoir toutes les pistes
+	if len(ifoInfos) > 0 {
+		// Trouver le VTS principal (généralement celui avec le plus de pistes audio)
+		var mainVTS int = 0
+		maxAudioTracks := 0
+		for vts, ifoInfo := range ifoInfos {
+			if len(ifoInfo.AudioTracks) > maxAudioTracks {
+				maxAudioTracks = len(ifoInfo.AudioTracks)
+				mainVTS = vts
+			}
+		}
+		
+		mainIFO := ifoInfos[mainVTS]
+		if mainIFO != nil {
+			log.Printf("[DVD Info] 🎯 Utilisation PRIORITAIRE des informations du VTS_%02d_0.IFO (principal)", mainVTS)
+			
+			// Utiliser les pistes audio des IFO EN PRIORITÉ (plus précises pour les langues)
+			// Les IFO contiennent TOUTES les pistes disponibles, pas seulement celles détectées par ffprobe
+			if len(mainIFO.AudioTracks) > 0 {
+				info.AudioTracks = mainIFO.AudioTracks
+				log.Printf("[DVD Info] ✅ %d piste(s) audio chargée(s) depuis IFO (priorité)", len(info.AudioTracks))
+				// Ajouter aussi à Tracks pour la liste complète
+				for _, track := range mainIFO.AudioTracks {
+					info.Tracks = append(info.Tracks, track)
+				}
+			}
+			
+			// Utiliser les sous-titres des IFO EN PRIORITÉ
+			if len(mainIFO.SubtitleTracks) > 0 {
+				info.SubtitleTracks = mainIFO.SubtitleTracks
+				log.Printf("[DVD Info] ✅ %d sous-titre(s) chargé(s) depuis IFO (priorité)", len(info.SubtitleTracks))
+				// Ajouter aussi à Tracks pour la liste complète
+				for _, track := range mainIFO.SubtitleTracks {
+					info.Tracks = append(info.Tracks, track)
+				}
+			}
+			
+			// Utiliser aussi les pistes vidéo des IFO si disponibles
+			if len(mainIFO.VideoTracks) > 0 {
+				info.VideoTracks = mainIFO.VideoTracks
+				log.Printf("[DVD Info] ✅ %d piste(s) vidéo chargée(s) depuis IFO (priorité)", len(info.VideoTracks))
+				// Ajouter aussi à Tracks pour la liste complète
+				for _, track := range mainIFO.VideoTracks {
+					info.Tracks = append(info.Tracks, track)
+				}
+			}
+		}
+	}
+	
+	// Enrichir avec les informations de lsdvd si disponibles (fallback)
 	if lsdvdInfo != nil {
 		if len(lsdvdInfo.AudioTracks) > 0 && len(info.AudioTracks) == 0 {
-			// Si lsdvd a trouvé des pistes audio mais pas ffprobe, utiliser celles de lsdvd
+			// Si lsdvd a trouvé des pistes audio mais pas ffprobe/IFO, utiliser celles de lsdvd
 			info.AudioTracks = lsdvdInfo.AudioTracks
-		} else if len(lsdvdInfo.AudioTracks) > 0 {
+			log.Printf("[DVD Info] ✅ %d piste(s) audio chargée(s) depuis lsdvd (fallback)", len(info.AudioTracks))
+		} else if len(lsdvdInfo.AudioTracks) > 0 && len(ifoInfos) == 0 {
 			// Fusionner les informations : lsdvd pour la structure, ffprobe pour les détails techniques
 			info.AudioTracks = e.mergeAudioTracks(lsdvdInfo.AudioTracks, info.AudioTracks)
+			log.Printf("[DVD Info] ✅ %d piste(s) audio fusionnée(s) (lsdvd + ffprobe)", len(info.AudioTracks))
 		}
 		if len(lsdvdInfo.SubtitleTracks) > 0 && len(info.SubtitleTracks) == 0 {
-			// Si lsdvd a trouvé des sous-titres mais pas ffprobe, utiliser ceux de lsdvd
+			// Si lsdvd a trouvé des sous-titres mais pas ffprobe/IFO, utiliser ceux de lsdvd
 			info.SubtitleTracks = lsdvdInfo.SubtitleTracks
-		} else if len(lsdvdInfo.SubtitleTracks) > 0 {
+			log.Printf("[DVD Info] ✅ %d sous-titre(s) chargé(s) depuis lsdvd (fallback)", len(info.SubtitleTracks))
+		} else if len(lsdvdInfo.SubtitleTracks) > 0 && len(ifoInfos) == 0 {
 			// Fusionner les informations
 			info.SubtitleTracks = e.mergeSubtitleTracks(lsdvdInfo.SubtitleTracks, info.SubtitleTracks)
+			log.Printf("[DVD Info] ✅ %d sous-titre(s) fusionné(s) (lsdvd + ffprobe)", len(info.SubtitleTracks))
 		}
 	}
 
@@ -735,6 +1167,14 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 
 	// Map pour stocker les langues détectées
 	languageMap := make(map[string]string)
+
+	// Vérifier si les IFO ont déjà été chargés (priorité)
+	// Si les IFO ont été chargés, on ne doit PAS ajouter les pistes audio/sous-titres depuis ffprobe
+	hasIFOData := len(ifoInfos) > 0
+	if hasIFOData {
+		log.Printf("[DVD Info] 📊 IFO chargés: %d piste(s) audio, %d sous-titre(s) depuis IFO (priorité sur ffprobe)", 
+			len(info.AudioTracks), len(info.SubtitleTracks))
+	}
 
 	for _, stream := range probeData.Streams {
 		// Extraire la langue depuis les tags
@@ -809,7 +1249,7 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 				track.SampleRate = sr
 			}
 		}
-
+		
 		switch stream.CodecType {
 		case "video":
 			track.Type = "video"
@@ -832,79 +1272,93 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 			} else {
 				track.Title = fmt.Sprintf("Piste vidéo principale - %s", stream.CodecName)
 			}
+			// Toujours ajouter les pistes vidéo depuis ffprobe (les IFO n'ont souvent pas de pistes vidéo)
 			info.VideoTracks = append(info.VideoTracks, track)
+			info.Tracks = append(info.Tracks, track)
 			videoIdx++
 		case "audio":
-			track.Type = "audio"
-			// Ajouter des informations sur l'audio
-			audioInfo := stream.CodecName
+			// Si les IFO ont déjà été chargés, NE PAS ajouter les pistes audio depuis ffprobe
+			// (les IFO sont plus précis pour les langues et contiennent TOUTES les pistes)
+			if !hasIFOData {
+				track.Type = "audio"
+				// Ajouter des informations sur l'audio
+				audioInfo := stream.CodecName
 
-			// Utiliser les détails depuis ffmpeg si disponibles
-			if details, ok := streamDetails[stream.Index]; ok {
-				if ch, ok := details["channels"]; ok {
-					if chInt, err := strconv.Atoi(ch); err == nil && chInt > 0 {
-						track.Channels = chInt
-						audioInfo += fmt.Sprintf(" %dch", chInt)
+				// Utiliser les détails depuis ffmpeg si disponibles
+				if details, ok := streamDetails[stream.Index]; ok {
+					if ch, ok := details["channels"]; ok {
+						if chInt, err := strconv.Atoi(ch); err == nil && chInt > 0 {
+							track.Channels = chInt
+							audioInfo += fmt.Sprintf(" %dch", chInt)
+						}
+					}
+					if sr, ok := details["sample_rate"]; ok && sr != "" {
+						track.SampleRate = sr
+						audioInfo += fmt.Sprintf(" %sHz", sr)
 					}
 				}
-				if sr, ok := details["sample_rate"]; ok && sr != "" {
-					track.SampleRate = sr
-					audioInfo += fmt.Sprintf(" %sHz", sr)
+
+				// Fallback sur les valeurs de ffprobe
+				if track.Channels == 0 && stream.Channels > 0 {
+					track.Channels = stream.Channels
+					audioInfo += fmt.Sprintf(" %dch", stream.Channels)
 				}
-			}
+				if track.SampleRate == "" && stream.SampleRate != "" {
+					track.SampleRate = stream.SampleRate
+					audioInfo += fmt.Sprintf(" %sHz", stream.SampleRate)
+				}
 
-			// Fallback sur les valeurs de ffprobe
-			if track.Channels == 0 && stream.Channels > 0 {
-				track.Channels = stream.Channels
-				audioInfo += fmt.Sprintf(" %dch", stream.Channels)
-			}
-			if track.SampleRate == "" && stream.SampleRate != "" {
-				track.SampleRate = stream.SampleRate
-				audioInfo += fmt.Sprintf(" %sHz", stream.SampleRate)
-			}
-
-			if language != "" {
-				// Convertir le code langue en nom complet
-				langName := e.getLanguageName(language)
-				audioInfo += fmt.Sprintf(" (%s)", langName)
-				track.Language = language
-			} else {
-				// Essayer de deviner depuis le codec ou l'index
-				// Par défaut, première piste audio souvent en français ou anglais
-				if audioIdx == 0 {
-					audioInfo += " (Français présumé)"
+				if language != "" {
+					// Convertir le code langue en nom complet
+					langName := e.getLanguageName(language)
+					audioInfo += fmt.Sprintf(" (%s)", langName)
+					track.Language = language
 				} else {
-					audioInfo += " (Langue inconnue)"
+					// Essayer de deviner depuis le codec ou l'index
+					// Par défaut, première piste audio souvent en français ou anglais
+					if audioIdx == 0 {
+						audioInfo += " (Français présumé)"
+					} else {
+						audioInfo += " (Langue inconnue)"
+					}
 				}
-			}
-			track.Title = audioInfo
-			info.AudioTracks = append(info.AudioTracks, track)
-			audioIdx++
-			if language != "" {
-				languageMap[language] = e.getLanguageName(language)
+				track.Title = audioInfo
+				info.AudioTracks = append(info.AudioTracks, track)
+				info.Tracks = append(info.Tracks, track)
+				audioIdx++
+				if language != "" {
+					languageMap[language] = e.getLanguageName(language)
+				}
+			} else {
+				log.Printf("[DVD Info] ⏭️  Piste audio stream %d ignorée (déjà chargée depuis IFO)", stream.Index)
 			}
 		case "subtitle":
-			track.Type = "subtitle"
-			if language != "" {
-				langName := e.getLanguageName(language)
-				track.Title = fmt.Sprintf("%s (%s)", langName, stream.CodecName)
-				track.Language = language
-			} else {
-				// Essayer de deviner depuis l'index
-				if subtitleIdx == 0 {
-					track.Title = fmt.Sprintf("Français présumé (%s)", stream.CodecName)
+			// Si les IFO ont déjà été chargés, NE PAS ajouter les sous-titres depuis ffprobe
+			// (les IFO sont plus précis pour les langues et contiennent TOUS les sous-titres)
+			if !hasIFOData {
+				track.Type = "subtitle"
+				if language != "" {
+					langName := e.getLanguageName(language)
+					track.Title = fmt.Sprintf("%s (%s)", langName, stream.CodecName)
+					track.Language = language
 				} else {
-					track.Title = fmt.Sprintf("Sous-titre %d (%s)", subtitleIdx+1, stream.CodecName)
+					// Essayer de deviner depuis l'index
+					if subtitleIdx == 0 {
+						track.Title = fmt.Sprintf("Français présumé (%s)", stream.CodecName)
+					} else {
+						track.Title = fmt.Sprintf("Sous-titre %d (%s)", subtitleIdx+1, stream.CodecName)
+					}
 				}
-			}
-			info.SubtitleTracks = append(info.SubtitleTracks, track)
-			subtitleIdx++
-			if language != "" {
-				languageMap[language] = e.getLanguageName(language)
+				info.SubtitleTracks = append(info.SubtitleTracks, track)
+				info.Tracks = append(info.Tracks, track)
+				subtitleIdx++
+				if language != "" {
+					languageMap[language] = e.getLanguageName(language)
+				}
+			} else {
+				log.Printf("[DVD Info] ⏭️  Sous-titre stream %d ignoré (déjà chargé depuis IFO)", stream.Index)
 			}
 		}
-
-		info.Tracks = append(info.Tracks, track)
 	}
 
 	// Si pas de pistes audio détectées, essayer plusieurs méthodes
@@ -970,6 +1424,31 @@ func (e *DVDExtractor) GetDVDInfo(devicePath string) (*DVDInfo, error) {
 				Codec: "mpeg2video", // Codec typique des DVD
 				Title: "Piste vidéo principale",
 			},
+		}
+	}
+
+	// Améliorer le titre avec le label du volume si disponible
+	if info.Title == "" || info.Title == "DVD Extraite" {
+		if volumeLabel != "" && volumeLabel != "unknown" && volumeLabel != "Unknown" {
+			info.Title = volumeLabel
+			log.Printf("[DVD Info] 📝 Titre mis à jour depuis le label du volume: %s", volumeLabel)
+		}
+	}
+
+	// Si on a analysé les fichiers VOB, ajouter des informations supplémentaires
+	if len(vobFiles) > 0 {
+		// Trouver le titre avec le plus de fichiers VOB (généralement le film principal)
+		var bestTitleKey int
+		maxFiles := 0
+		for titleKey, files := range vobFiles {
+			if len(files) > maxFiles {
+				maxFiles = len(files)
+				bestTitleKey = titleKey
+			}
+		}
+		if maxFiles > 0 {
+			log.Printf("[DVD Info] 🎬 Titre principal identifié: VTS %d avec %d fichier(s) VOB", 
+				bestTitleKey/1000, maxFiles)
 		}
 	}
 
@@ -1341,18 +1820,21 @@ func (e *DVDExtractor) extractAudioTracksFromFFmpeg(devicePath string) []DVDTrac
 
 // extractSubtitleTracksFromFFmpeg extrait les sous-titres depuis ffmpeg
 func (e *DVDExtractor) extractSubtitleTracksFromFFmpeg(devicePath string) []DVDTrack {
+	// Utiliser directement le device path au lieu de dvd://1
+	var ffmpegInput string
+	if strings.HasPrefix(devicePath, "/dev/") {
+		ffmpegInput = devicePath
+	} else {
+		ffmpegInput = devicePath
+	}
+	
 	cmd := exec.Command(
 		e.ffmpegPath,
-		"-i", "dvd://1",
+		"-i", ffmpegInput,
 		"-t", "0.1",
 		"-f", "null",
 		"-",
 	)
-	
-	// Définir la variable d'environnement DVD_DEVICE si c'est un device block
-	if strings.HasPrefix(devicePath, "/dev/") {
-		cmd.Env = append(os.Environ(), fmt.Sprintf("DVD_DEVICE=%s", devicePath))
-	}
 	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -2062,45 +2544,343 @@ func (e *DVDExtractor) ExtractDVD(
 	log.Printf("[DVD Extraction] 🔧 DÉBUT construction args - devicePath: %s, longestTitle: %d", devicePath, longestTitle)
 	args := []string{}
 
-	// Construire l'input : utiliser directement le device path
-	// ffmpeg peut lire directement depuis /dev/sr0 ou tout autre device block
-	// On utilise le device directement comme input (sans dvd://N car cela cherche dans /dev/dvd)
+	// Ajouter des options pour améliorer la lecture du DVD
+	// Ces options permettent à ffmpeg de mieux analyser et lire le DVD
+	args = append(args,
+		"-analyzeduration", "10000000", // 10 secondes d'analyse
+		"-probesize", "10000000",       // 10 MB de probe
+		"-thread_queue_size", "512",    // Taille de la queue pour la lecture
+	)
+
+	// STRATÉGIE COMME HANDBRAKE :
+	// 1. Essayer de monter le DVD et utiliser les fichiers VIDEO_TS (plus fiable)
+	// 2. Sinon, utiliser dvdread://N avec le titre spécifique (comme HandBrake)
+	// 3. En dernier recours, utiliser le device directement
+	
 	var input string
+	mountPoint := ""
+	
+	// Étape 1: Vérifier si le DVD est déjà monté
 	if strings.HasPrefix(devicePath, "/dev/") {
-		// Utiliser directement le device comme input
-		// ffmpeg détectera automatiquement le DVD
+		// Chercher un point de montage pour ce device
+		mountPoints := e.FindMountPoints()
+		for _, mp := range mountPoints {
+			// Vérifier si ce point de montage contient VIDEO_TS
+			videoTSPath := filepath.Join(mp, "VIDEO_TS")
+			if info, err := os.Stat(videoTSPath); err == nil && info.IsDir() {
+				// Vérifier quel device est monté ici
+				cmd := exec.Command("findmnt", "-n", "-o", "SOURCE", mp)
+				if output, err := cmd.Output(); err == nil {
+					mountedDevice := strings.TrimSpace(string(output))
+					if mountedDevice == devicePath || strings.Contains(mountedDevice, filepath.Base(devicePath)) {
+						mountPoint = mp
+						log.Printf("[DVD Extraction] ✅ DVD déjà monté à: %s", mountPoint)
+						break
+					}
+				}
+			}
+		}
+		
+		// Si pas monté, essayer de monter le DVD
+		if mountPoint == "" {
+			log.Printf("[DVD Extraction] 🔄 Tentative de montage du DVD...")
+			mountPoint = e.mountDVD(devicePath)
+			if mountPoint != "" {
+				log.Printf("[DVD Extraction] ✅ DVD monté avec succès à: %s", mountPoint)
+			}
+		}
+		
+		// Si on a un point de montage, utiliser les fichiers VOB directement (comme HandBrake)
+		if mountPoint != "" {
+			videoTSPath := filepath.Join(mountPoint, "VIDEO_TS")
+			
+			// Analyser les fichiers VOB pour trouver ceux du titre le plus long
+			vobFiles, err := e.analyzeVOBFiles(videoTSPath)
+			if err == nil && len(vobFiles) > 0 {
+				// Trouver les fichiers VOB du titre le plus long
+				// Le titre le plus long correspond généralement au VTS principal
+				// On cherche le VTS qui contient le plus de fichiers VOB (généralement le film principal)
+				var bestTitleKey int
+				maxFiles := 0
+				for titleKey, files := range vobFiles {
+					if len(files) > maxFiles {
+						maxFiles = len(files)
+						bestTitleKey = titleKey
+					}
+				}
+				
+				if maxFiles > 0 {
+					// Utiliser concat pour joindre tous les fichiers VOB du titre (comme HandBrake)
+					// ffmpeg peut lire plusieurs fichiers VOB en séquence avec concat
+					vobList := vobFiles[bestTitleKey]
+					
+					// Créer un fichier concat pour ffmpeg
+					concatFile := filepath.Join(filepath.Dir(outputPath), "concat_list.txt")
+					concatContent := ""
+					for _, vobFile := range vobList {
+						// Échapper les caractères spéciaux pour le format concat
+						escapedPath := strings.ReplaceAll(vobFile, "'", "'\\''")
+						concatContent += fmt.Sprintf("file '%s'\n", escapedPath)
+					}
+					
+					if err := os.WriteFile(concatFile, []byte(concatContent), 0644); err == nil {
+						// Utiliser le fichier concat avec ffmpeg
+						input = fmt.Sprintf("concat:%s", concatFile)
+						log.Printf("[DVD Extraction] ✅ Utilisation concat avec %d fichier(s) VOB du titre %d", len(vobList), bestTitleKey)
+						log.Printf("[DVD Extraction] 📁 Fichiers VOB: %v", vobList)
+					} else {
+						// Fallback: utiliser le premier fichier VOB
+						input = vobList[0]
+						log.Printf("[DVD Extraction] ⚠️  Erreur création concat, utilisation du premier VOB: %s", input)
+					}
+				} else {
+					// Aucun fichier VOB trouvé, utiliser VIDEO_TS directement
+					input = videoTSPath
+					log.Printf("[DVD Extraction] ⚠️  Aucun fichier VOB trouvé, utilisation du dossier VIDEO_TS: %s", videoTSPath)
+				}
+			} else {
+				// Si l'analyse VOB échoue, utiliser VIDEO_TS directement
+				input = videoTSPath
+				log.Printf("[DVD Extraction] ⚠️  Analyse VOB échouée, utilisation du dossier VIDEO_TS: %s", videoTSPath)
+			}
+		} else {
+		// Si le montage échoue, essayer d'utiliser directement le device
+		// Mais d'abord, essayer de lire les fichiers VOB depuis le device avec libdvdread
+		// Si ça ne marche pas, utiliser le device directement
+		log.Printf("[DVD Extraction] ⚠️  DVD non monté, tentative d'utilisation directe du device: %s", devicePath)
+		// Essayer d'utiliser directement le device - ffmpeg peut parfois le lire
+		// Mais on ne peut pas utiliser dvd://1 car le protocole n'est pas reconnu
 		input = devicePath
-		log.Printf("[DVD Extraction] Utilisation directe du device: %s", devicePath)
+		log.Printf("[DVD Extraction] ⚠️  Utilisation directe du device (sans montage): %s", devicePath)
+		}
+	} else if strings.Contains(devicePath, "VIDEO_TS") {
+		// Si c'est déjà un chemin VIDEO_TS, analyser les fichiers VOB
+		videoTSPath := devicePath
+		vobFiles, err := e.analyzeVOBFiles(videoTSPath)
+		if err == nil && len(vobFiles) > 0 {
+			// Trouver le titre avec le plus de fichiers VOB
+			var bestTitleKey int
+			maxFiles := 0
+			for titleKey, files := range vobFiles {
+				if len(files) > maxFiles {
+					maxFiles = len(files)
+					bestTitleKey = titleKey
+				}
+			}
+			
+			if maxFiles > 0 {
+				vobList := vobFiles[bestTitleKey]
+				concatFile := filepath.Join(filepath.Dir(outputPath), "concat_list.txt")
+				concatContent := ""
+				for _, vobFile := range vobList {
+					escapedPath := strings.ReplaceAll(vobFile, "'", "'\\''")
+					concatContent += fmt.Sprintf("file '%s'\n", escapedPath)
+				}
+				
+				if err := os.WriteFile(concatFile, []byte(concatContent), 0644); err == nil {
+					input = fmt.Sprintf("concat:%s", concatFile)
+					log.Printf("[DVD Extraction] ✅ Utilisation concat avec %d fichier(s) VOB depuis VIDEO_TS", len(vobList))
+				} else {
+					input = vobList[0]
+					log.Printf("[DVD Extraction] ⚠️  Erreur création concat, utilisation du premier VOB: %s", input)
+				}
+			} else {
+				input = videoTSPath
+				log.Printf("[DVD Extraction] ⚠️  Aucun fichier VOB trouvé, utilisation du dossier VIDEO_TS: %s", videoTSPath)
+			}
+		} else {
+			input = videoTSPath
+			log.Printf("[DVD Extraction] Utilisation du dossier VIDEO_TS: %s", videoTSPath)
+		}
 	} else {
-		// Si c'est un point de montage, utiliser directement le chemin
+		// Point de montage direct
+		videoTSPath := filepath.Join(devicePath, "VIDEO_TS")
+		if info, err := os.Stat(videoTSPath); err == nil && info.IsDir() {
+			// Analyser les fichiers VOB
+			vobFiles, err := e.analyzeVOBFiles(videoTSPath)
+			if err == nil && len(vobFiles) > 0 {
+				var bestTitleKey int
+				maxFiles := 0
+				for titleKey, files := range vobFiles {
+					if len(files) > maxFiles {
+						maxFiles = len(files)
+						bestTitleKey = titleKey
+					}
+				}
+				
+				if maxFiles > 0 {
+					vobList := vobFiles[bestTitleKey]
+					concatFile := filepath.Join(filepath.Dir(outputPath), "concat_list.txt")
+					concatContent := ""
+					for _, vobFile := range vobList {
+						escapedPath := strings.ReplaceAll(vobFile, "'", "'\\''")
+						concatContent += fmt.Sprintf("file '%s'\n", escapedPath)
+					}
+					
+					if err := os.WriteFile(concatFile, []byte(concatContent), 0644); err == nil {
+						input = fmt.Sprintf("concat:%s", concatFile)
+						log.Printf("[DVD Extraction] ✅ Utilisation concat avec %d fichier(s) VOB", len(vobList))
+					} else {
+						input = vobList[0]
+						log.Printf("[DVD Extraction] ⚠️  Erreur création concat, utilisation du premier VOB: %s", input)
+					}
+				} else {
+					input = videoTSPath
+					log.Printf("[DVD Extraction] ⚠️  Aucun fichier VOB trouvé, utilisation du dossier VIDEO_TS: %s", videoTSPath)
+				}
+			} else {
+				input = videoTSPath
+				log.Printf("[DVD Extraction] Utilisation du dossier VIDEO_TS: %s", videoTSPath)
+			}
+		} else {
+			input = devicePath
+			log.Printf("[DVD Extraction] Utilisation du point de montage: %s", devicePath)
+		}
+	}
+	
+	// Vérification AVANT d'ajouter -i : s'assurer que input n'est JAMAIS dvd://
+	if strings.HasPrefix(input, "dvd://") {
+		log.Printf("[DVD Extraction] ❌ ERREUR CRITIQUE: input est dvd://%s, remplacement FORCÉ par %s", input, devicePath)
 		input = devicePath
-		log.Printf("[DVD Extraction] Utilisation du point de montage: %s", devicePath)
 	}
 	
 	args = append(args, "-i", input)
 	log.Printf("[DVD Extraction] 🔧 Après ajout -i: args=%v", args)
+	log.Printf("[DVD Extraction] 🔧 Input utilisé: %s (devicePath=%s)", input, devicePath)
+	
+	// Vérification finale : s'assurer que input n'est pas dvd:// dans args
+	for i, arg := range args {
+		if arg == "-i" && i+1 < len(args) && strings.HasPrefix(args[i+1], "dvd://") {
+			log.Printf("[DVD Extraction] ❌ ERREUR: args[%d] contient encore dvd://%s, remplacement par %s", i+1, args[i+1], devicePath)
+			args[i+1] = devicePath
+			log.Printf("[DVD Extraction] ✅ CORRECTION: args[%d] remplacé par %s", i+1, devicePath)
+			break
+		}
+	}
 
-	// Mapper la piste vidéo (ignorer le stream dvd_nav_packet qui est index 0)
-	// Les streams vidéo commencent généralement à l'index 1
-	args = append(args, "-map", fmt.Sprintf("0:%d", videoTrackIndex+1))
+	// D'abord, lister les streams disponibles pour diagnostic et mapping correct
+	log.Printf("[DVD Extraction] 🔍 Diagnostic: Liste des streams disponibles...")
+	
+	// Vérification CRITIQUE : s'assurer que input n'est JAMAIS dvd:// avant ffprobe
+	probeInput := input
+	if strings.HasPrefix(probeInput, "dvd://") {
+		log.Printf("[DVD Extraction] ❌ ERREUR CRITIQUE: probeInput est dvd://%s, remplacement FORCÉ par %s", probeInput, devicePath)
+		probeInput = devicePath
+	}
+	
+	probeArgs := []string{"-v", "error", "-show_streams", "-of", "json"}
+	
+	// Utiliser -analyzeduration et -probesize pour mieux lire le DVD
+	probeArgs = append(probeArgs, "-analyzeduration", "10000000", "-probesize", "10000000")
+	probeArgs = append(probeArgs, probeInput)
+	
+	probeCmd := exec.Command(e.ffprobePath, probeArgs...)
+	// Plus besoin de DVD_DEVICE car on utilise directement le device
+	log.Printf("[DVD Extraction] 🔧 Commande ffprobe: %s %s (input vérifié: %s)", e.ffprobePath, strings.Join(probeArgs, " "), probeInput)
+	probeOutput, probeErr := probeCmd.Output()
+	
+	var availableVideoStreams []int
+	var availableAudioStreams []int
+	var availableSubtitleStreams []int
+	
+	if probeErr == nil {
+		var probeData struct {
+			Streams []struct {
+				Index      int    `json:"index"`
+				CodecType  string `json:"codec_type"`
+				CodecName  string `json:"codec_name"`
+				CodecLongName string `json:"codec_long_name"`
+			} `json:"streams"`
+		}
+		if err := json.Unmarshal(probeOutput, &probeData); err == nil {
+			log.Printf("[DVD Extraction] 📊 Streams disponibles: %d", len(probeData.Streams))
+			for _, stream := range probeData.Streams {
+				log.Printf("[DVD Extraction]   Stream %d: type=%s, codec=%s (%s)", 
+					stream.Index, stream.CodecType, stream.CodecName, stream.CodecLongName)
+				switch stream.CodecType {
+				case "video":
+					availableVideoStreams = append(availableVideoStreams, stream.Index)
+				case "audio":
+					availableAudioStreams = append(availableAudioStreams, stream.Index)
+				case "subtitle":
+					availableSubtitleStreams = append(availableSubtitleStreams, stream.Index)
+				}
+			}
+			log.Printf("[DVD Extraction] 📊 Streams par type: video=%d, audio=%d, subtitle=%d", 
+				len(availableVideoStreams), len(availableAudioStreams), len(availableSubtitleStreams))
+		}
+	} else {
+		log.Printf("[DVD Extraction] ⚠️ Impossible de lister les streams (non bloquant): %v", probeErr)
+	}
 
-	// Ajouter les pistes audio (les indices audio commencent après la vidéo)
-	// Il faut trouver le bon index dans les streams
-	// Si aucune piste audio n'est sélectionnée, on crée une vidéo muette
+	// Mapper la piste vidéo
+	// Utiliser le premier stream vidéo disponible si videoTrackIndex est 0
+	videoStreamIdx := 0
+	if len(availableVideoStreams) > 0 {
+		// Utiliser l'index réel du stream vidéo dans la liste
+		if videoTrackIndex < len(availableVideoStreams) {
+			videoStreamIdx = availableVideoStreams[videoTrackIndex]
+		} else {
+			videoStreamIdx = availableVideoStreams[0]
+			log.Printf("[DVD Extraction] ⚠️ videoTrackIndex %d hors limites, utilisation du premier stream vidéo (index %d)", 
+				videoTrackIndex, videoStreamIdx)
+		}
+	} else {
+		// Par défaut, utiliser l'index 1 (après dvd_nav_packet)
+		videoStreamIdx = 1
+		log.Printf("[DVD Extraction] ⚠️ Aucun stream vidéo détecté, utilisation de l'index par défaut: %d", videoStreamIdx)
+	}
+	
+	videoMap := fmt.Sprintf("0:%d", videoStreamIdx)
+	log.Printf("[DVD Extraction] 🎬 Mapping piste vidéo: %s (stream index=%d)", videoMap, videoStreamIdx)
+	args = append(args, "-map", videoMap)
+
+	// Ajouter les pistes audio (vérifier d'abord qu'elles existent)
 	if len(audioTrackIndices) > 0 {
-		for _, audioIdx := range audioTrackIndices {
-			// Les streams audio sont généralement après la vidéo et les sous-titres
-			// On doit mapper selon l'index réel dans les streams
-			args = append(args, "-map", fmt.Sprintf("0:a:%d", audioIdx))
+		if len(availableAudioStreams) == 0 {
+			log.Printf("[DVD Extraction] ⚠️ Aucun stream audio détecté par ffprobe, mais des pistes audio sont demandées")
+			log.Printf("[DVD Extraction] 🔍 Tentative de détection audio avec ffmpeg directement...")
+			// Essayer de détecter les streams audio avec ffmpeg directement
+			// Parfois ffprobe ne détecte pas les streams audio avec dvd://, mais ffmpeg les voit
+			// On va utiliser une approche plus permissive : mapper par type plutôt que par index
+			// Utiliser -map 0:a pour mapper tous les streams audio, ou -map 0:a:0 pour le premier
+			log.Printf("[DVD Extraction] 🎵 Mapping audio par type (0:a:%d) - ffmpeg détectera les streams", audioTrackIndices[0])
+			args = append(args, "-map", fmt.Sprintf("0:a:%d", audioTrackIndices[0]))
+			// Si ffmpeg ne trouve pas de stream audio, il échouera, mais au moins on aura essayé
+		} else {
+			// Mapper les streams audio disponibles
+			for _, audioIdx := range audioTrackIndices {
+				if audioIdx < len(availableAudioStreams) {
+					audioStreamIdx := availableAudioStreams[audioIdx]
+					audioMap := fmt.Sprintf("0:%d", audioStreamIdx)
+					log.Printf("[DVD Extraction] 🎵 Mapping piste audio: %s (stream index=%d, audioIdx=%d)", 
+						audioMap, audioStreamIdx, audioIdx)
+					args = append(args, "-map", audioMap)
+				} else {
+					log.Printf("[DVD Extraction] ⚠️ audioIdx %d hors limites (disponibles: %d), utilisation du mapping par type", 
+						audioIdx, len(availableAudioStreams))
+					// Essayer quand même avec le mapping par type
+					args = append(args, "-map", fmt.Sprintf("0:a:%d", audioIdx))
+				}
+			}
 		}
 	} else {
 		// Aucune piste audio sélectionnée : créer une vidéo muette
 		// Ne pas mapper de piste audio
+		log.Printf("[DVD Extraction] ℹ️ Aucune piste audio sélectionnée, vidéo muette")
 	}
 
-	// Ajouter les sous-titres
+	// Ajouter les sous-titres (vérifier d'abord qu'ils existent)
 	for _, subIdx := range subtitleTrackIndices {
-		args = append(args, "-map", fmt.Sprintf("0:s:%d", subIdx))
+		if len(availableSubtitleStreams) > 0 && subIdx < len(availableSubtitleStreams) {
+			subtitleStreamIdx := availableSubtitleStreams[subIdx]
+			subtitleMap := fmt.Sprintf("0:%d", subtitleStreamIdx)
+			log.Printf("[DVD Extraction] 📝 Mapping sous-titre: %s (stream index=%d, subIdx=%d)", 
+				subtitleMap, subtitleStreamIdx, subIdx)
+			args = append(args, "-map", subtitleMap)
+		} else {
+			log.Printf("[DVD Extraction] ⚠️ subIdx %d hors limites ou aucun sous-titre disponible, ignoré", subIdx)
+		}
 	}
 
 	// Codecs et options
@@ -2140,22 +2920,143 @@ func (e *DVDExtractor) ExtractDVD(
 	log.Printf("[DVD Extraction] ✅ Vérification OK: -dvd_device n'est PAS dans args")
 	
 	cmd := exec.Command(e.ffmpegPath, args...)
-	log.Printf("[DVD Extraction] 🔧 Commande créée: %s avec args: %v", e.ffmpegPath, args)
 	
+	// Plus besoin de DVD_DEVICE car on utilise directement le device
+	// ffmpeg détectera automatiquement les streams du DVD
+	log.Printf("[DVD Extraction] 🔧 Commande complète: %s %s", e.ffmpegPath, strings.Join(args, " "))
+	
+	log.Printf("[DVD Extraction] 🔧 Commande créée: %s avec args: %v", e.ffmpegPath, args)
 	
 	// Log de la commande complète pour debug
 	log.Printf("[DVD Extraction] Commande ffmpeg finale: %s %s", e.ffmpegPath, strings.Join(args, " "))
 	log.Printf("[DVD Extraction] DEBUG Args complets: %v", args)
 	
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
+	// Capturer stderr séparément pour voir les warnings
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	
+	log.Printf("[DVD Extraction] 🚀 Démarrage de l'extraction ffmpeg...")
+	startTime := time.Now()
+	
+	// Capturer aussi stdout pour voir les messages de progression
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+	
+	err = cmd.Run()
+	duration := time.Since(startTime)
+	outputStr := string(stderr.Bytes())
+	stdoutStr := string(stdout.Bytes())
+	
+	log.Printf("[DVD Extraction] ⏱️ Extraction terminée en %v", duration)
+	
+	// Log la sortie complète pour diagnostic
+	if len(outputStr) > 0 {
+		log.Printf("[DVD Extraction] 📋 Sortie stderr (premiers 1000 caractères): %s", 
+			func() string {
+				if len(outputStr) > 1000 {
+					return outputStr[:1000] + "..."
+				}
+				return outputStr
+			}())
+	}
+	if len(stdoutStr) > 0 {
+		log.Printf("[DVD Extraction] 📋 Sortie stdout (premiers 1000 caractères): %s", 
+			func() string {
+				if len(stdoutStr) > 1000 {
+					return stdoutStr[:1000] + "..."
+				}
+				return stdoutStr
+			}())
+	}
 	
 	if err != nil {
-		log.Printf("[DVD Extraction] ERREUR ffmpeg: %v", err)
-		log.Printf("[DVD Extraction] Sortie ffmpeg: %s", outputStr)
+		log.Printf("[DVD Extraction] ❌ ERREUR ffmpeg: %v", err)
+		log.Printf("[DVD Extraction] Sortie stderr ffmpeg complète (premiers 5000 caractères): %s", 
+			func() string {
+				if len(outputStr) > 5000 {
+					return outputStr[:5000] + "..."
+				}
+				return outputStr
+			}())
 		return "", fmt.Errorf("erreur lors de l'extraction: %w (output: %s)", err, outputStr)
 	}
 
-	log.Printf("[DVD Extraction] Extraction ffmpeg réussie")
+	log.Printf("[DVD Extraction] ✅ Extraction ffmpeg réussie")
+	
+	// Vérifier que le fichier existe et a une taille valide
+	if fileInfo, err := os.Stat(outputPath); err != nil {
+		log.Printf("[DVD Extraction] ❌ ERREUR: Le fichier extrait n'existe pas: %s", outputPath)
+		return "", fmt.Errorf("fichier extrait non trouvé: %w", err)
+	} else {
+		log.Printf("[DVD Extraction] 📁 Fichier extrait: %s, taille: %d bytes (%.2f MB)", 
+			outputPath, fileInfo.Size(), float64(fileInfo.Size())/1024/1024)
+		
+		// Vérifier la taille minimale (au moins 5 MB pour un extrait valide - un DVD de quelques secondes fait déjà plusieurs MB)
+		if fileInfo.Size() < 5*1024*1024 {
+			log.Printf("[DVD Extraction] ❌ ERREUR: Fichier très petit (%d bytes, %.2f MB), l'extraction a probablement échoué", 
+				fileInfo.Size(), float64(fileInfo.Size())/1024/1024)
+			log.Printf("[DVD Extraction] 🔍 Vérification avec ffprobe pour confirmer...")
+			
+			// Vérifier avec ffprobe que le fichier est valide
+			probeCmd := exec.Command(e.ffprobePath, "-v", "error", "-show_entries", "format=duration,size", 
+				"-of", "json", outputPath)
+			probeOutput, probeErr := probeCmd.Output()
+			if probeErr != nil {
+				log.Printf("[DVD Extraction] ❌ ERREUR: Fichier invalide selon ffprobe: %v", probeErr)
+				log.Printf("[DVD Extraction] Sortie ffprobe: %s", string(probeOutput))
+				return "", fmt.Errorf("fichier extrait trop petit (%d bytes) et invalide selon ffprobe: %w", fileInfo.Size(), probeErr)
+			}
+			
+			var probeData struct {
+				Format struct {
+					Duration string `json:"duration"`
+					Size     string `json:"size"`
+				} `json:"format"`
+			}
+			if err := json.Unmarshal(probeOutput, &probeData); err == nil {
+				if duration, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
+					if duration < 1.0 {
+						log.Printf("[DVD Extraction] ❌ ERREUR: Durée invalide (%.2f secondes), fichier corrompu", duration)
+						return "", fmt.Errorf("fichier extrait invalide: durée trop courte (%.2f secondes) et taille trop petite (%d bytes)", duration, fileInfo.Size())
+					}
+					log.Printf("[DVD Extraction] ⚠️ Fichier petit mais durée valide: %.2f secondes", duration)
+				} else {
+					log.Printf("[DVD Extraction] ❌ ERREUR: Impossible de parser la durée: %v", err)
+					return "", fmt.Errorf("fichier extrait invalide: taille trop petite (%d bytes) et durée non parsable", fileInfo.Size())
+				}
+			} else {
+				log.Printf("[DVD Extraction] ❌ ERREUR: Impossible de parser la réponse ffprobe: %v", err)
+				return "", fmt.Errorf("fichier extrait invalide: taille trop petite (%d bytes) et JSON invalide", fileInfo.Size())
+			}
+		} else {
+			// Fichier de taille raisonnable, vérifier avec ffprobe
+			log.Printf("[DVD Extraction] 🔍 Vérification de la validité du fichier avec ffprobe...")
+			probeCmd := exec.Command(e.ffprobePath, "-v", "error", "-show_entries", "format=duration,size", 
+				"-of", "json", outputPath)
+			probeOutput, probeErr := probeCmd.Output()
+			if probeErr != nil {
+				log.Printf("[DVD Extraction] ❌ ERREUR: Fichier invalide selon ffprobe: %v", probeErr)
+				log.Printf("[DVD Extraction] Sortie ffprobe: %s", string(probeOutput))
+				return "", fmt.Errorf("fichier extrait invalide (ffprobe échoue): %w", probeErr)
+			}
+			
+			var probeData struct {
+				Format struct {
+					Duration string `json:"duration"`
+					Size     string `json:"size"`
+				} `json:"format"`
+			}
+			if err := json.Unmarshal(probeOutput, &probeData); err == nil {
+				if duration, err := strconv.ParseFloat(probeData.Format.Duration, 64); err == nil {
+					log.Printf("[DVD Extraction] ✅ Fichier valide: durée=%.2f secondes (%.2f minutes)", 
+						duration, duration/60)
+				} else {
+					log.Printf("[DVD Extraction] ⚠️ Impossible de parser la durée: %v", err)
+				}
+			}
+			log.Printf("[DVD Extraction] ✅ Fichier extrait validé avec succès")
+		}
+	}
+	
 	return outputPath, nil
 }

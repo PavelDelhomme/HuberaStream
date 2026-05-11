@@ -8,7 +8,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"streammake/internal/config"
 	"streammake/internal/metadata"
@@ -119,6 +121,18 @@ func (h *DVDHandler) GetDVDInfo(c *gin.Context) {
 	info, err := h.extractor.GetDVDInfo(devicePath)
 	if err != nil {
 		log.Printf("[DVD Handler] ❌ ERREUR GetDVDInfo: %v", err)
+		
+		// Vérifier si c'est une erreur "No medium found"
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "No medium found") || strings.Contains(errMsg, "no medium found") {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Aucun DVD détecté",
+				"message": "Le lecteur DVD ne contient pas de disque. Veuillez insérer un DVD et réessayer.",
+				"details": "Le lecteur " + devicePath + " ne contient pas de média. Assurez-vous qu'un DVD est inséré dans le lecteur.",
+			})
+			return
+		}
+		
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Erreur lors de la lecture du DVD",
 			"message": err.Error(),
@@ -315,6 +329,19 @@ func (h *DVDHandler) processDVDExtraction(videoID uuid.UUID, req ExtractDVDReque
 			log.Printf("[DVD Extraction] ERREUR: Le fichier extrait est vide")
 			h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
 			return
+		}
+		// Vérifier que le fichier n'est pas trop petit (probablement corrompu)
+		// Un DVD extrait devrait faire au moins quelques MB (minimum ~5MB pour un extrait valide)
+		if fileInfo.Size() < 5*1024*1024 {
+			log.Printf("[DVD Extraction] ⚠️ ATTENTION: Le fichier extrait est très petit (%d bytes), probablement corrompu ou extraction incomplète", fileInfo.Size())
+			// Vérifier avec ffprobe si le fichier est valide
+			cmd := exec.Command("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", extractedPath)
+			if probeErr := cmd.Run(); probeErr != nil {
+				log.Printf("[DVD Extraction] ERREUR: Le fichier extrait est invalide (ffprobe échoue): %v", probeErr)
+				h.db.Model(&models.Video{}).Where("id = ?", videoID).Update("status", models.VideoStatusError)
+				return
+			}
+			log.Printf("[DVD Extraction] ⚠️ Fichier petit mais valide selon ffprobe, continuation du traitement")
 		}
 	}
 

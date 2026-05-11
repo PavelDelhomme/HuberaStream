@@ -714,27 +714,30 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 	}
 	log.Printf("[SearchMetadataFromFilename] ⚠️  CODE MODIFIÉ - Utilisation du scraper web UNIQUEMENT (PAS DE TMDB)")
 
-	// Construire la requête de recherche améliorée avec réalisateur et année si disponibles
-	searchQuery := req.Filename
+	// NOUVELLE STRATÉGIE : Faire d'abord une recherche simple avec juste le titre
+	// Puis filtrer les résultats par réalisateur/année si disponibles
+	// Cela évite que la recherche avec trop de paramètres ne trouve rien
+	
+	// Construire la requête de recherche simple (juste le titre)
+	simpleQuery := req.Filename
 	
 	// Pour les titres très courts (moins de 5 caractères), ajouter "film" pour être plus spécifique
-	// Cela évite de trouver "Kill Bill" quand on cherche "Kill"
-	if len(strings.TrimSpace(req.Filename)) < 5 && !strings.Contains(strings.ToLower(req.Filename), "film") && !strings.Contains(strings.ToLower(req.Filename), "movie") {
-		searchQuery = fmt.Sprintf("%s film", searchQuery)
+	// MAIS SEULEMENT si on n'a PAS de réalisateur ET d'année (sinon la recherche est déjà précise)
+	if len(strings.TrimSpace(req.Filename)) < 5 && 
+		!strings.Contains(strings.ToLower(req.Filename), "film") && 
+		!strings.Contains(strings.ToLower(req.Filename), "movie") &&
+		!(req.Director != "" && req.Year > 0) { // Ne pas ajouter "film" si on a déjà director+year
+		simpleQuery = fmt.Sprintf("%s film", simpleQuery)
+		log.Printf("[SearchMetadataFromFilename] 🔍 Ajout de 'film' à la requête simple (titre court sans réalisateur+année)")
 	}
 	
-	if req.Director != "" {
-		searchQuery = fmt.Sprintf("%s %s", searchQuery, req.Director)
-	}
-	if req.Year > 0 {
-		searchQuery = fmt.Sprintf("%s %d", searchQuery, req.Year)
-	}
+	log.Printf("[SearchMetadataFromFilename] 🔍 Requête de recherche simple: '%s'", simpleQuery)
 
 	// Utiliser UNIQUEMENT le scraper web gratuit (sans API) - PAS DE TMDB
 	webScraper := metadata.NewWebScraperService()
-	log.Printf("[SearchMetadataFromFilename] ⚡ Appel du scraper web avec requête: %s", searchQuery)
+	log.Printf("[SearchMetadataFromFilename] ⚡ Appel du scraper web avec requête simple: %s", simpleQuery)
 
-	results, err := webScraper.SearchMoviesFromFilenameWeb(searchQuery)
+	results, err := webScraper.SearchMoviesFromFilenameWeb(simpleQuery)
 
 	if err != nil {
 		log.Printf("[SearchMetadataFromFilename] ❌ Erreur scraper web: %v", err)
@@ -749,6 +752,7 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 		directorAndYear := []*metadata.MovieMetadata{}  // Correspondance réalisateur ET année
 		directorOnly := []*metadata.MovieMetadata{}    // Correspondance réalisateur uniquement
 		yearOnly := []*metadata.MovieMetadata{}         // Correspondance année uniquement
+		titleContains := []*metadata.MovieMetadata{}    // Titre contenu (mais pas exact)
 		others := []*metadata.MovieMetadata{}
 
 		// Nettoyer le titre recherché pour comparaison
@@ -761,20 +765,35 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 		searchTitle = strings.ReplaceAll(searchTitle, "-", " ")
 		searchTitle = strings.TrimSpace(searchTitle)
 
+		// Pour les titres courts (<= 4 caractères), être plus permissif
+		isShortTitle := len(searchTitle) <= 4
+
 		for _, result := range results {
 			exactMatch := false
+			titleContainsMatch := false
 			directorMatch := false
 			yearMatch := false
 			
 			// Vérifier la correspondance exacte du titre (insensible à la casse)
-			// IMPORTANT: On ne fait QUE des correspondances exactes, pas de correspondance par préfixe
-			// Cela évite que "Kill" corresponde à "Kill Bill"
 			if result.Title != "" {
 				resultTitle := strings.ToLower(strings.TrimSpace(result.Title))
-				// Correspondance exacte stricte uniquement
+				// Correspondance exacte stricte
 				if resultTitle == searchTitle {
 					exactMatch = true
+					titleContainsMatch = true
 					log.Printf("[SearchMetadataFromFilename] ✅ Correspondance exacte du titre: '%s' vs '%s'", searchTitle, resultTitle)
+				} else {
+					// Pour les titres courts, vérifier aussi si le titre recherché est le début du titre du résultat
+					// (ex: "Kill" correspond à "Kill" même si le titre complet est "Kill (2024)")
+					if isShortTitle && strings.HasPrefix(resultTitle, searchTitle+" ") {
+						exactMatch = true
+						titleContainsMatch = true
+						log.Printf("[SearchMetadataFromFilename] ✅ Correspondance titre court (préfixe): '%s' dans '%s'", searchTitle, resultTitle)
+					} else if strings.Contains(resultTitle, searchTitle) {
+						// Vérifier si le titre recherché est contenu dans le titre du résultat
+						titleContainsMatch = true
+						log.Printf("[SearchMetadataFromFilename] ✅ Titre recherché contenu dans le résultat: '%s' dans '%s'", searchTitle, resultTitle)
+					}
 				}
 			}
 			
@@ -783,7 +802,32 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 				directorLower := strings.ToLower(strings.TrimSpace(req.Director))
 				resultDirectorLower := strings.ToLower(strings.TrimSpace(result.Director))
 				// Vérifier si le nom du réalisateur est contenu dans le résultat ou vice versa
-				if strings.Contains(resultDirectorLower, directorLower) || strings.Contains(directorLower, resultDirectorLower) {
+				// Pour les noms composés, vérifier aussi les parties
+				directorParts := strings.Fields(directorLower)
+				resultDirectorParts := strings.Fields(resultDirectorLower)
+				
+				// Correspondance si au moins une partie du nom correspond
+				matches := false
+				for _, part := range directorParts {
+					if len(part) >= 3 { // Ignorer les particules (de, le, etc.)
+						if strings.Contains(resultDirectorLower, part) {
+							matches = true
+							break
+						}
+					}
+				}
+				if !matches {
+					for _, part := range resultDirectorParts {
+						if len(part) >= 3 {
+							if strings.Contains(directorLower, part) {
+								matches = true
+								break
+							}
+						}
+					}
+				}
+				
+				if matches || strings.Contains(resultDirectorLower, directorLower) || strings.Contains(directorLower, resultDirectorLower) {
 					directorMatch = true
 					log.Printf("[SearchMetadataFromFilename] ✅ Correspondance réalisateur: '%s' vs '%s'", req.Director, result.Director)
 				}
@@ -798,33 +842,68 @@ func (h *UploadHandler) SearchMetadataFromFilename(c *gin.Context) {
 				}
 			}
 			
+			// Pour les titres courts, être plus permissif : inclure tous les résultats
+			// Pour les titres plus longs, exclure seulement ceux qui ne correspondent vraiment pas
+			shouldExclude := false
+			if !isShortTitle && len(searchTitle) >= 5 {
+				// Pour les titres de 5+ caractères, exclure si pas de correspondance du tout
+				if !exactMatch && !titleContainsMatch && !(directorMatch && yearMatch) {
+					shouldExclude = true
+					log.Printf("[SearchMetadataFromFilename] ❌ Résultat exclu (titre non correspondant): '%s' (recherché: '%s')", result.Title, req.Filename)
+				}
+			}
+			// Pour les titres courts, on garde tous les résultats pour laisser l'utilisateur choisir
+			
+			if shouldExclude {
+				continue
+			}
+			
 			// Classer les résultats selon leur priorité
-			if exactMatch {
+			// PRIORITÉ 1 : Correspondance exacte du titre + réalisateur + année
+			if exactMatch && directorMatch && yearMatch {
+				exactTitle = append(exactTitle, result)
+				log.Printf("[SearchMetadataFromFilename] 🏆 PRIORITÉ MAXIMALE: Correspondance exacte titre+director+year: '%s'", result.Title)
+			} else if exactMatch && directorMatch {
+				// Correspondance exacte titre + réalisateur
+				exactTitle = append(exactTitle, result)
+				log.Printf("[SearchMetadataFromFilename] 🥇 PRIORITÉ TRÈS ÉLEVÉE: Correspondance exacte titre+director: '%s'", result.Title)
+			} else if exactMatch {
+				// Correspondance exacte du titre seule
 				exactTitle = append(exactTitle, result)
 			} else if directorMatch && yearMatch {
-				// Correspondance réalisateur ET année = priorité élevée
+				// Correspondance réalisateur ET année = priorité très élevée (même sans titre exact)
 				directorAndYear = append(directorAndYear, result)
-			} else if directorMatch {
-				// Correspondance réalisateur uniquement = priorité moyenne
+				log.Printf("[SearchMetadataFromFilename] 🥇 PRIORITÉ TRÈS ÉLEVÉE: Correspondance director+year: '%s'", result.Title)
+			} else if directorMatch && titleContainsMatch {
+				// Correspondance réalisateur ET titre = priorité élevée
 				directorOnly = append(directorOnly, result)
-			} else if yearMatch {
-				// Correspondance année uniquement = priorité moyenne
+			} else if yearMatch && titleContainsMatch {
+				// Correspondance année ET titre = priorité moyenne
 				yearOnly = append(yearOnly, result)
-			} else {
-				// Aucune correspondance = priorité faible
+			} else if titleContainsMatch {
+				// Titre contenu = priorité faible mais acceptable
+				titleContains = append(titleContains, result)
+			} else if directorMatch || yearMatch {
+				// Correspondance réalisateur ou année seule = priorité très faible
 				others = append(others, result)
+			} else {
+				// Aucune correspondance = seulement pour les titres courts
+				if isShortTitle {
+					others = append(others, result)
+				}
 			}
 		}
 		
 		// Combiner dans l'ordre de priorité:
 		// 1. Correspondances exactes du titre
 		// 2. Correspondances réalisateur ET année
-		// 3. Correspondances réalisateur uniquement
-		// 4. Correspondances année uniquement
-		// 5. Autres résultats
-		results = append(exactTitle, append(directorAndYear, append(directorOnly, append(yearOnly, others...)...)...)...)
-		log.Printf("[SearchMetadataFromFilename] 📊 Résultats triés: %d exact(s), %d réalisateur+année, %d réalisateur, %d année, %d autre(s)", 
-			len(exactTitle), len(directorAndYear), len(directorOnly), len(yearOnly), len(others))
+		// 3. Correspondances réalisateur ET titre
+		// 4. Correspondances année ET titre
+		// 5. Titre contenu
+		// 6. Autres résultats
+		results = append(exactTitle, append(directorAndYear, append(directorOnly, append(yearOnly, append(titleContains, others...)...)...)...)...)
+		log.Printf("[SearchMetadataFromFilename] 📊 Résultats triés: %d exact(s), %d réalisateur+année, %d réalisateur+titre, %d année+titre, %d titre contenu, %d autre(s)", 
+			len(exactTitle), len(directorAndYear), len(directorOnly), len(yearOnly), len(titleContains), len(others))
 	}
 
 	if len(results) == 0 {

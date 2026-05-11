@@ -1,4 +1,4 @@
-.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api test-metadata test-all install-deps status shell-backend shell-db install-torrents setup-images install-dependencies
+.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api tests-api test-metadata test-all install-deps status shell-backend shell-db install-torrents setup-images install-dependencies
 
 # Variables
 PROJECT_NAME := streammake
@@ -71,9 +71,13 @@ help:
 	@echo "${YELLOW}🧪 TESTS:${NC}"
 	@echo "  ${GREEN}check${NC}             Vérification complète avant démarrage (recommandé)"
 	@echo "  ${GREEN}test${NC}               Tests backend Go"
-	@echo "  ${GREEN}test-api${NC}           Tests API"
+	@echo "  ${GREEN}test-api${NC}           Tests API (alias: tests-api, ./test-api)"
 	@echo "  ${GREEN}test-metadata${NC}       Test recherche métadonnées"
 	@echo "  ${GREEN}test-all${NC}           Tests complets (API + fonctionnalités)"
+	@echo ""
+	@echo "${YELLOW}📌 Scripts à la racine (équivalent make):${NC}"
+	@echo "  ${GREEN}./streammake <cible>${NC}  Toute commande make (ex: ./streammake up)"
+	@echo "  ${GREEN}./test-api${NC}            ./test-metadata  ./test-all  ./test  ./check  ./status"
 	@echo ""
 	@echo "${YELLOW}🔍 VÉRIFICATION CODE:${NC}"
 	@echo "  ${GREEN}check-frontend${NC}     Vérifier erreurs frontend (ESLint, TypeScript)"
@@ -418,7 +422,7 @@ test:
 	@echo "${GREEN}🧪 Tests backend...${NC}"
 	@cd backend && go test ./...
 
-test-api:
+test-api tests-api:
 	@echo "${GREEN}🧪 Tests API...${NC}"
 	@echo "${YELLOW}💡 Les services seront démarrés automatiquement si nécessaire${NC}"
 	@./scripts/test-api.sh || exit 1

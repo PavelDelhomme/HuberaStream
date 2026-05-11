@@ -139,11 +139,3 @@ echo ""
 total_services=$(docker ps --format "{{.Names}}" | grep "^${PROJECT_NAME}-" | wc -l)
 echo -e "${GREEN}📊 Résumé : ${total_services} service(s) actif(s)${NC}"
 echo ""
-
-# Test API (sans les codes de couleur dans le grep)
-echo -e "${GREEN}🔍 Vérification API:${NC}"
-if [ -f "./scripts/test-api.sh" ]; then
-    ./scripts/test-api.sh 2>&1 | sed 's/\x1b\[[0-9;]*m//g' || true
-else
-    echo -e "${YELLOW}⚠️  Script test-api.sh non trouvé${NC}"
-fi

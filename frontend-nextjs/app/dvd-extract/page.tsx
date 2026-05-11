@@ -430,17 +430,14 @@ export default function DVDExtractPage() {
         
         // Rechercher automatiquement les métadonnées depuis le titre du DVD
         if (dvdData.title && dvdData.title.trim() !== '' && dvdData.title !== 'DVD Extraite') {
-          // D'abord rechercher avec juste le titre pour avoir plus de résultats
+          // Passer le titre, le réalisateur et l'année si disponibles
+          // Le backend priorisera automatiquement les résultats qui correspondent
           setAnalyzingStage('Recherche de métadonnées en cours...')
-          await searchMetadataFromTitle(dvdData.title)
-          
-          // Si on a un réalisateur ou une année, essayer une recherche plus précise
-          // en préservant les résultats de la première recherche
-          if (dvdData.director || dvdData.year) {
-            // Faire une recherche précise mais préserver les résultats existants
-            // Si la recherche précise trouve des résultats, ils seront fusionnés avec les précédents
-            await searchMetadataFromTitle(dvdData.title, dvdData.director, dvdData.year, true)
-          }
+          await searchMetadataFromTitle(
+            dvdData.title,
+            dvdData.director || undefined,
+            dvdData.year || undefined
+          )
         }
         
         setAnalyzingProgress(100)
@@ -539,34 +536,48 @@ export default function DVDExtractPage() {
         setShowMetadataResults(true) // Afficher automatiquement les résultats
         setAnalyzingStage('Métadonnées trouvées !')
         
-        // Si c'est une recherche automatique (appelée depuis handleGetDVDInfo), 
-        // sélectionner automatiquement le premier résultat si c'est une correspondance exacte
-        if (director || year) {
-          // Recherche avec réalisateur/année - essayer de trouver une correspondance exacte
-          const currentResults = preserveExistingResults && metadataResults.length > 0 
-            ? [...metadataResults, ...results] 
-            : results
+        // Ne pas sélectionner automatiquement un résultat si plusieurs sont disponibles
+        // Laisser l'utilisateur choisir parmi tous les résultats
+        // Seulement sélectionner automatiquement si un seul résultat exact est trouvé
+        const currentResults = preserveExistingResults && metadataResults.length > 0 
+          ? [...metadataResults, ...results] 
+          : results
+        
+        // Si on a des infos du DVD (director/year), essayer de trouver une correspondance exacte
+        // Le backend a déjà priorisé les résultats, donc le premier devrait être le meilleur
+        if (dvdInfo?.director || dvdInfo?.year) {
+          // Chercher une correspondance exacte (titre + réalisateur + année)
           const exactMatch = currentResults.find((r: any) => {
-            const titleMatch = r.title?.toLowerCase().trim() === title.toLowerCase().trim()
-            const directorMatch = !directorToUse || r.director?.toLowerCase().includes(directorToUse.toLowerCase()) || directorToUse.toLowerCase().includes(r.director?.toLowerCase() || '')
-            const yearMatch = !yearToUse || r.year === yearToUse || r.production_year === yearToUse
-            return titleMatch && (directorMatch || yearMatch)
+            const titleMatch = r.title?.toLowerCase().trim() === title.toLowerCase().trim() || 
+                              title.toLowerCase().trim() === r.title?.toLowerCase().trim().split('(')[0].trim()
+            const directorMatch = !dvdInfo.director || 
+                                 r.director?.toLowerCase().includes(dvdInfo.director.toLowerCase()) || 
+                                 dvdInfo.director.toLowerCase().includes(r.director?.toLowerCase() || '')
+            const yearMatch = !dvdInfo.year || 
+                             r.year === dvdInfo.year || 
+                             r.production_year === dvdInfo.year ||
+                             Math.abs((r.year || r.production_year || 0) - dvdInfo.year) <= 2
+            return titleMatch && directorMatch && yearMatch
           })
           
+          // Si on trouve une correspondance exacte, la sélectionner automatiquement
           if (exactMatch) {
+            console.log('[DVD-Extract] ✅ Correspondance exacte trouvée, sélection automatique:', exactMatch.title)
             selectMetadata(exactMatch)
-          } else if (currentResults.length === 1) {
-            // Si un seul résultat, le sélectionner automatiquement
+          } else if (currentResults.length > 0) {
+            // Sinon, sélectionner le premier résultat (déjà priorisé par le backend)
+            // Le backend a déjà trié les résultats : director+year en premier
+            console.log('[DVD-Extract] 📊 Sélection automatique du premier résultat priorisé:', currentResults[0].title)
             selectMetadata(currentResults[0])
           }
-        } else {
-          const currentResults = preserveExistingResults && metadataResults.length > 0 
-            ? [...metadataResults, ...results] 
-            : results
-          if (currentResults.length === 1) {
-            // Si un seul résultat sans réalisateur/année, le sélectionner automatiquement
-            selectMetadata(currentResults[0])
-          }
+        } else if (currentResults.length === 1) {
+          // Si un seul résultat sans réalisateur/année, le sélectionner automatiquement
+          console.log('[DVD-Extract] 📊 Un seul résultat trouvé, sélection automatique:', currentResults[0].title)
+          selectMetadata(currentResults[0])
+        } else if (currentResults.length > 0) {
+          // Si plusieurs résultats sans réalisateur/année, sélectionner le premier (déjà priorisé)
+          console.log('[DVD-Extract] 📊 Plusieurs résultats, sélection automatique du premier:', currentResults[0].title)
+          selectMetadata(currentResults[0])
         }
       } else {
         setAnalyzingStage('Aucune métadonnée trouvée')

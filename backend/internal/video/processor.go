@@ -80,23 +80,55 @@ func (p *Processor) GenerateThumbnail(videoPath string, videoID uuid.UUID) (stri
 
 // GetVideoDuration retourne la durée d'une vidéo en secondes
 func (p *Processor) GetVideoDuration(videoPath string) (int, error) {
+	// Vérifier que le fichier existe et n'est pas vide
+	if info, err := os.Stat(videoPath); err != nil {
+		return 0, fmt.Errorf("fichier vidéo non trouvé: %w", err)
+	} else if info.Size() == 0 {
+		return 0, fmt.Errorf("fichier vidéo vide (0 bytes)")
+	} else if info.Size() < 1000 {
+		// Fichier très petit (< 1KB), probablement corrompu ou extraction incomplète
+		return 0, fmt.Errorf("fichier vidéo suspect (taille: %d bytes, probablement corrompu)", info.Size())
+	}
+
+	// Utiliser ffprobe au lieu de ffmpeg pour plus de fiabilité
 	cmd := exec.Command(
-		p.ffmpegPath,
-		"-i", videoPath,
-		"-hide_banner",
+		p.ffprobePath,
+		"-v", "error",
 		"-show_entries", "format=duration",
-		"-v", "quiet",
-		"-of", "csv=p=0",
+		"-of", "default=noprint_wrappers=1:nokey=1",
+		videoPath,
 	)
 
 	output, err := cmd.Output()
 	if err != nil {
-		return 0, fmt.Errorf("erreur lors de la récupération de la durée: %w", err)
+		// Si ffprobe échoue, essayer avec ffmpeg en fallback
+		cmd2 := exec.Command(
+			p.ffmpegPath,
+			"-i", videoPath,
+			"-hide_banner",
+			"-show_entries", "format=duration",
+			"-v", "quiet",
+			"-of", "csv=p=0",
+		)
+		output2, err2 := cmd2.CombinedOutput()
+		if err2 != nil {
+			return 0, fmt.Errorf("erreur lors de la récupération de la durée (ffprobe: %v, ffmpeg: %v, output: %s): %w", err, err2, string(output2), err)
+		}
+		output = output2
+	}
+
+	outputStr := strings.TrimSpace(string(output))
+	if outputStr == "" {
+		return 0, fmt.Errorf("sortie vide de ffprobe/ffmpeg")
 	}
 
 	var duration float64
-	if _, err := fmt.Sscanf(string(output), "%f", &duration); err != nil {
-		return 0, fmt.Errorf("erreur lors du parsing de la durée: %w", err)
+	if _, err := fmt.Sscanf(outputStr, "%f", &duration); err != nil {
+		return 0, fmt.Errorf("erreur lors du parsing de la durée (output: '%s'): %w", outputStr, err)
+	}
+
+	if duration <= 0 {
+		return 0, fmt.Errorf("durée invalide: %f secondes", duration)
 	}
 
 	return int(duration), nil
