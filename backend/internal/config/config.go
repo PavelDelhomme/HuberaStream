@@ -53,6 +53,15 @@ type Config struct {
 
 	// Metadata
 	TMDBAPIKey string
+
+	// Intégration *arr (Prowlarr / Radarr / Sonarr) — URLs internes Docker ou vides
+	ProwlarrURL string
+	RadarrURL   string
+	SonarrURL   string
+
+	// Webhooks Radarr/Sonarr → StreamMake
+	WebhookSecret         string
+	PublicWebhookBaseURL  string // ex. https://stream.delhomme.ovh (sans /api) pour affichage admin
 }
 
 func Load() *Config {
@@ -108,6 +117,14 @@ func Load() *Config {
 
 		// Metadata
 		TMDBAPIKey: getEnv("TMDB_API_KEY", ""),
+
+		// *arr (optionnel ; activer les services avec docker compose --profile arr)
+		ProwlarrURL: strings.TrimSpace(getEnv("PROWLARR_URL", "")),
+		RadarrURL:   strings.TrimSpace(getEnv("RADARR_URL", "")),
+		SonarrURL:   strings.TrimSpace(getEnv("SONARR_URL", "")),
+
+		WebhookSecret:        strings.TrimSpace(getEnv("WEBHOOK_SECRET", "")),
+		PublicWebhookBaseURL: strings.TrimSpace(strings.TrimSuffix(getEnv("PUBLIC_WEBHOOK_BASE_URL", ""), "/")),
 	}
 }
 

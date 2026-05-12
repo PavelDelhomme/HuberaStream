@@ -29,12 +29,14 @@ cd StreamMake
 git checkout dev
 ```
 
-2. Démarrer les services avec Docker Compose
+3. Démarrer les services avec Docker Compose
 ```bash
 docker-compose up -d
 ```
 
-3. Les services seront disponibles sur:
+Pour le **déploiement Portainer / Nginx Proxy Manager** (réseau `web` partagé), voir `docs/DEPLOY-PORTAINER.md` et `docker-compose.portainer.yml`. Pour **Prowlarr + Radarr + Sonarr** : `make up-arr` ou `docker compose --profile arr up -d` (ports hôtes 3326–3328).
+
+4. Les services seront disponibles sur:
    - Frontend (via Nginx): http://localhost:3300
    - Frontend (direct, dev): http://localhost:3304
    - Backend API: http://localhost:3301

@@ -1,0 +1,140 @@
+.admin-webhooks {
+  padding: 30px;
+  padding-top: calc(70px + 30px);
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: calc(100vh - 70px);
+  color: #fff;
+}
+
+.admin-webhooks .admin-header {
+  margin-bottom: 28px;
+}
+
+.admin-webhooks .admin-header h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.admin-webhooks .subtitle {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.admin-webhooks .panel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.admin-webhooks .panel h2 {
+  font-size: 18px;
+  margin: 0 0 14px;
+}
+
+.admin-webhooks label {
+  display: block;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 6px;
+}
+
+.admin-webhooks input[type='password'],
+.admin-webhooks input[type='text'] {
+  width: 100%;
+  max-width: 520px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.admin-webhooks .url-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.admin-webhooks .url-row code {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.admin-webhooks button {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 14px;
+}
+
+.admin-webhooks button:hover {
+  background: #2563eb;
+}
+
+.admin-webhooks .warn {
+  color: #fbbf24;
+  font-size: 14px;
+  margin-top: 12px;
+}
+
+.admin-webhooks table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.admin-webhooks th,
+.admin-webhooks td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-webhooks th {
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+}
+
+.admin-webhooks pre {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 8px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.admin-webhooks .loading {
+  padding: 40px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.admin-webhooks .perf-note {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.55;
+}
+
+.admin-webhooks .perf-note ul {
+  margin: 8px 0 0 18px;
+}

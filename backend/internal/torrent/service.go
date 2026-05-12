@@ -65,6 +65,33 @@ func (s *TorrentService) AddTorrent(ctx context.Context, torrent *models.Torrent
 	return nil
 }
 
+// AddTorrentWithRetry tente plusieurs fois l’ajout au client (résilience réseau / client lent).
+func (s *TorrentService) AddTorrentWithRetry(ctx context.Context, torrent *models.Torrent, attempts int) error {
+	if attempts < 1 {
+		attempts = 1
+	}
+	backoff := 400 * time.Millisecond
+	var lastErr error
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
+			backoff *= 2
+			if backoff > 5*time.Second {
+				backoff = 5 * time.Second
+			}
+		}
+		lastErr = s.AddTorrent(ctx, torrent)
+		if lastErr == nil {
+			return nil
+		}
+	}
+	return lastErr
+}
+
 func (s *TorrentService) UpdateTorrentStatus(ctx context.Context, torrent *models.Torrent) error {
 	// Obtenir le statut depuis le client
 	// Note: On doit mapper l'ID du torrent dans notre DB vers l'ID du client

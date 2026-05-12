@@ -60,5 +60,6 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SeriesTracking{},
 		&models.SeriesEpisodeTracking{},
 		&models.LearningPattern{},
+		&models.MediaWebhookEvent{},
 	)
 }

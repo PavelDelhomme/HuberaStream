@@ -53,6 +53,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	dvdHandler := NewDVDHandler(db, cfg, uploadHandler) // Passer uploadHandler pour traitement automatique
 	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
 	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
+	mediaStackHandler := NewMediaStackHandler(cfg)
+	webhookHandler := NewWebhookHandler(db, cfg)
 	favoriteHandler := NewFavoriteHandler(db, cfg)
 	torrentIndexHandler := NewTorrentIndexHandler(db, cfg)
 	
@@ -74,6 +76,9 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 		// Catégories (publiques - accessibles sans authentification)
 		api.GET("/categories", categoryHandler.ListCategories)
+
+		api.POST("/webhooks/radarr", webhookHandler.PostRadarr)
+		api.POST("/webhooks/sonarr", webhookHandler.PostSonarr)
 
 		// Servir les thumbnails (publiques) - utiliser un handler dédié
 		api.GET("/thumbnails/:filename", streamHandler.ServeThumbnail)
@@ -282,6 +287,13 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			mediaSettings.GET("", mediaSettingsHandler.GetMediaSettings)
 			mediaSettings.PUT("", mediaSettingsHandler.UpdateMediaSettings)
 		}
+
+		// Statut Prowlarr / Radarr / Sonarr (stack optionnelle profile « arr »)
+		admin.GET("/media-stack/status", mediaStackHandler.GetMediaStackStatus)
+
+		// Webhooks *arr : URL d’accroche + historique
+		admin.GET("/webhooks/setup", webhookHandler.GetWebhookSetup)
+		admin.GET("/webhooks/events", webhookHandler.ListWebhookEvents)
 
 		// Scraper (recherche de torrents)
 		scrapers := admin.Group("/scraper")

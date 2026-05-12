@@ -6,7 +6,7 @@ services:
       - "com.streammake.project=streammake"
     environment:
       POSTGRES_USER: streammake
-      POSTGRES_PASSWORD: streammake_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-streammake_password}
       POSTGRES_DB: streammake_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -77,7 +77,7 @@ services:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: streammake
-      DB_PASSWORD: streammake_password
+      DB_PASSWORD: ${DB_PASSWORD:-streammake_password}
       DB_NAME: streammake_db
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -101,6 +101,12 @@ services:
       RTORRENT_URL: http://rtorrent:5000/RPC2
       TORRENT_CLIENT_TYPE: ${TORRENT_CLIENT_TYPE:-transmission}
       TORRENT_CLIENT_PATH: ${TORRENT_CLIENT_PATH:-http://transmission:9091/transmission/rpc}
+      # Prowlarr / Radarr / Sonarr : renseigner dans .env si profile « arr » (voir docs/DEPLOY-PORTAINER.md)
+      PROWLARR_URL: ${PROWLARR_URL:-}
+      RADARR_URL: ${RADARR_URL:-}
+      SONARR_URL: ${SONARR_URL:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
+      PUBLIC_WEBHOOK_BASE_URL: ${PUBLIC_WEBHOOK_BASE_URL:-}
     ports:
       - "3301:8080"
       - "2345:2345" # Port pour Delve debugger
@@ -285,6 +291,67 @@ services:
       - streammake-network
     restart: unless-stopped
 
+  # Suite *arr : indexer + films + séries (optionnel — docker compose --profile arr up -d)
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: streammake-prowlarr
+    labels:
+      - "com.streammake.project=streammake"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+    volumes:
+      - prowlarr_config:/config
+      - torrent_storage:/downloads
+    ports:
+      - "3326:9696"
+    networks:
+      - streammake-network
+    restart: unless-stopped
+    profiles:
+      - arr
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: streammake-radarr
+    labels:
+      - "com.streammake.project=streammake"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+    volumes:
+      - radarr_config:/config
+      - torrent_storage:/downloads
+    ports:
+      - "3327:7878"
+    networks:
+      - streammake-network
+    restart: unless-stopped
+    profiles:
+      - arr
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: streammake-sonarr
+    labels:
+      - "com.streammake.project=streammake"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Paris
+    volumes:
+      - sonarr_config:/config
+      - torrent_storage:/downloads
+    ports:
+      - "3328:8989"
+    networks:
+      - streammake-network
+    restart: unless-stopped
+    profiles:
+      - arr
+
 volumes:
   postgres_data:
   redis_data:
@@ -296,6 +363,9 @@ volumes:
   qbittorrent_config:
   deluge_config:
   rtorrent_config:
+  prowlarr_config:
+  radarr_config:
+  sonarr_config:
 
 
 networks:

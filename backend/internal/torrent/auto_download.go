@@ -413,9 +413,12 @@ func (s *AutoDownloadService) downloadApprovedCandidates(ctx context.Context) {
 			continue
 		}
 
-		// Ajouter au client torrent
-		if err := s.torrentService.AddTorrent(ctx, torrent); err != nil {
-			log.Printf("Erreur lors de l'ajout au client: %v", err)
+		// Ajouter au client torrent (plusieurs tentatives ; sinon on supprime le torrent pour permettre un nouvel essai)
+		if err := s.torrentService.AddTorrentWithRetry(ctx, torrent, 4); err != nil {
+			log.Printf("Erreur lors de l'ajout au client après retries: %v", err)
+			if delErr := s.db.Delete(torrent).Error; delErr != nil {
+				log.Printf("Erreur suppression torrent orphelin: %v", delErr)
+			}
 			continue
 		}
 
