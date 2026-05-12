@@ -1,4 +1,4 @@
-.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up up-arr down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api tests-api test-metadata test-all install-deps status shell-backend shell-db install-torrents setup-images install-dependencies
+.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up up-arr down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api tests-api test-metadata test-all benchmark-frontends benchmark-frontends-docker install-deps status shell-backend shell-db install-torrents setup-images install-dependencies
 
 # Variables
 PROJECT_NAME := streammake
@@ -14,12 +14,13 @@ ifneq ($(TERM),)
   endif
 endif
 
-# Codes de couleur (seulement si le terminal les supporte)
+# Codes de couleur (seulement si le terminal les supporte).
+# Utiliser $(shell printf …) : echo sans -e afficherait littéralement \033[…m.
 ifeq ($(HAS_COLOR),1)
-  GREEN := \033[0;32m
-  YELLOW := \033[0;33m
-  RED := \033[0;31m
-  NC := \033[0m
+  GREEN := $(shell printf '\033[0;32m')
+  YELLOW := $(shell printf '\033[0;33m')
+  RED := $(shell printf '\033[0;31m')
+  NC := $(shell printf '\033[0m')
 else
   GREEN :=
   YELLOW :=
@@ -75,6 +76,8 @@ help:
 	@echo "  ${GREEN}test-api${NC}           Tests API (alias: tests-api, ./test-api)"
 	@echo "  ${GREEN}test-metadata${NC}       Test recherche métadonnées"
 	@echo "  ${GREEN}test-all${NC}           Tests complets (API + fonctionnalités)"
+	@echo "  ${GREEN}benchmark-frontends${NC}        Builds Next + Vite (npm local)"
+	@echo "  ${GREEN}benchmark-frontends-docker${NC} Idem tout dans Docker (USE_DOCKER=1)"
 	@echo ""
 	@echo "${YELLOW}📌 Scripts à la racine (équivalent make):${NC}"
 	@echo "  ${GREEN}./streammake <cible>${NC}  Toute autre commande (ex: ./streammake logs-backend)"
@@ -164,23 +167,25 @@ up:
 			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build frontend-nextjs || { \
 				echo "${RED}❌ Erreur lors du build de Next.js${NC}"; \
 				echo "${YELLOW}💡 Essayez: make build-nextjs${NC}"; \
+				exit 1; \
 			}; \
 		else \
 			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) build frontend-nextjs || { \
 				echo "${RED}❌ Erreur lors du build de Next.js${NC}"; \
 				echo "${YELLOW}💡 Essayez: make build-nextjs${NC}"; \
+				exit 1; \
 			}; \
 		fi; \
 	fi
 	@echo "${GREEN}✅ Images vérifiées${NC}"
 	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
-		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build || { \
+		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d || { \
 			echo "${RED}❌ Erreur lors du démarrage des services${NC}"; \
 			echo "${YELLOW}💡 Vérifiez les logs avec: make logs${NC}"; \
 			exit 1; \
 		}; \
 	else \
-		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build || { \
+		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d || { \
 			echo "${RED}❌ Erreur lors du démarrage des services${NC}"; \
 			echo "${YELLOW}💡 Vérifiez les logs avec: make logs${NC}"; \
 			exit 1; \
@@ -260,13 +265,13 @@ restart:
 		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart || { \
 			echo "${YELLOW}⚠️  Redémarrage échoué, tentative de stop/start...${NC}"; \
 			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true; \
-			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build; \
+			docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d; \
 		}; \
 	else \
 		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) restart || { \
 			echo "${YELLOW}⚠️  Redémarrage échoué, tentative de stop/start...${NC}"; \
 			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) stop || true; \
-			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d --no-build; \
+			docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d; \
 		}; \
 	fi
 	@sleep 5
@@ -450,6 +455,14 @@ test-all:
 	@echo "${GREEN}🧪 Tests complets...${NC}"
 	@echo "${YELLOW}💡 Les services seront démarrés automatiquement si nécessaire${NC}"
 	@./scripts/test-all.sh || exit 1
+
+benchmark-frontends:
+	@echo "${GREEN}📊 Benchmark builds frontends (npm local)…${NC}"
+	@bash ./scripts/benchmark-frontends.sh
+
+benchmark-frontends-docker:
+	@echo "${GREEN}📊 Benchmark builds frontends (Docker, pas de npm sur l’hôte requis)…${NC}"
+	@USE_DOCKER=1 bash ./scripts/benchmark-frontends.sh
 
 # ============================================================================
 # UTILITAIRES

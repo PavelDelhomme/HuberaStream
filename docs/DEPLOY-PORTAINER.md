@@ -77,6 +77,7 @@ Volumes nommés : `prowlarr_config`, `radarr_config`, `sonarr_config` ; téléch
    Si Radarr est sur le même réseau Docker et que tu ne passes pas par NPM, tu peux utiliser  
    `http://backend:8080/api/webhooks/radarr?token=...` (nom du service `backend` du compose StreamMake).
 4. Historique : page admin **Webhooks *arr** ou `GET /api/admin/webhooks/events` (JWT admin).
+5. **Import automatique** : `WEBHOOK_IMPORT_ENABLED=true` sur le backend. Les chemins `MovieFile.Path` / `EpisodeFile.Path` des webhooks doivent être **lisibles dans le conteneur backend** : le compose monte `torrent_storage:/downloads:ro`. Configure Radarr/Sonarr pour que les fichiers finaux résident sous un chemin cohérent (ex. sous `/downloads/...` dans chaque conteneur).
 
-Les webhooks ne passent **pas** par l’API Radarr/Sonarr de StreamMake : ce sont **eux** qui appellent **ton** backend ; StreamMake enregistre l’événement (base `media_webhook_events`) pour audit et extensions futures (import vidéo automatique, etc.).
+Les webhooks ne passent **pas** par l’API Radarr/Sonarr de StreamMake : ce sont **eux** qui appellent **ton** backend ; StreamMake enregistre l’événement (`media_webhook_events`) et peut **copier + transcoder** la vidéo si l’import auto est activé et le fichier est accessible.
 

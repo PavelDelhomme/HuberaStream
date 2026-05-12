@@ -10,6 +10,7 @@ type WebhookSetup = {
   secret_configured: boolean
   secret_suffix: string
   public_base_url: string
+  webhook_import_enabled?: boolean
   paths: { radarr: string; sonarr: string }
 }
 
@@ -135,6 +136,10 @@ export default function AdminWebhooksPage() {
         {setup && (
           <p className="subtitle" style={{ marginTop: 10 }}>
             Secret configuré côté serveur : {setup.secret_configured ? `oui (${setup.secret_suffix || '****'})` : 'non — les webhooks seront refusés (401).'}
+            <br />
+            Import auto fichier → bibliothèque StreamMake :{' '}
+            <strong>{setup.webhook_import_enabled ? 'activé (WEBHOOK_IMPORT_ENABLED)' : 'désactivé'}</strong> — le backend doit voir le même chemin disque que Radarr/Sonarr (volume{' '}
+            <code>torrent_storage</code> monté sur <code>/downloads</code>).
           </p>
         )}
         <label htmlFor="wh-token">Token webhook (saisi localement pour prévisualiser l’URL)</label>

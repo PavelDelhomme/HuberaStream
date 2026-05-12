@@ -62,6 +62,7 @@ type Config struct {
 	// Webhooks Radarr/Sonarr → StreamMake
 	WebhookSecret         string
 	PublicWebhookBaseURL  string // ex. https://stream.delhomme.ovh (sans /api) pour affichage admin
+	EnableWebhookImport   bool   // tente d’importer le fichier vidéo si le chemin est visible par le backend
 }
 
 func Load() *Config {
@@ -125,6 +126,7 @@ func Load() *Config {
 
 		WebhookSecret:        strings.TrimSpace(getEnv("WEBHOOK_SECRET", "")),
 		PublicWebhookBaseURL: strings.TrimSpace(strings.TrimSuffix(getEnv("PUBLIC_WEBHOOK_BASE_URL", ""), "/")),
+		EnableWebhookImport:  getEnv("WEBHOOK_IMPORT_ENABLED", "false") == "true",
 	}
 }
 

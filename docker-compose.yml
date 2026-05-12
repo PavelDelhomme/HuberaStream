@@ -71,6 +71,8 @@ services:
       - /Volumes:/Volumes:ro
       # Partager le volume de config qBittorrent pour configuration automatique
       - qbittorrent_config:/config/qbittorrent:ro
+      # Même volume que Transmission/Radarr/Sonarr : chemins /downloads visibles pour import webhook
+      - torrent_storage:/downloads:ro
       # MODE DÉVELOPPEMENT: Monter le binaire compilé localement (si disponible)
       - ./.backend-bin:/app/bin:ro
     environment:
@@ -107,6 +109,7 @@ services:
       SONARR_URL: ${SONARR_URL:-}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
       PUBLIC_WEBHOOK_BASE_URL: ${PUBLIC_WEBHOOK_BASE_URL:-}
+      WEBHOOK_IMPORT_ENABLED: ${WEBHOOK_IMPORT_ENABLED:-false}
     ports:
       - "3301:8080"
       - "2345:2345" # Port pour Delve debugger
@@ -140,13 +143,13 @@ services:
     networks:
       - streammake-network
     restart: unless-stopped
-    command: npm run dev
+    command: ["sh", "-c", "if [ ! -f node_modules/.bin/next ]; then echo 'npm ci (volume node_modules vide)…' && npm ci --legacy-peer-deps; fi && exec npm run dev"]
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
 
   # Frontend React (ancien système - désactivé par défaut, profile legacy)
   frontend:
@@ -185,8 +188,10 @@ services:
     ports:
       - "3300:80" # Port principal via nginx
     depends_on:
-      - backend
-      - frontend-nextjs
+      backend:
+        condition: service_started
+      frontend-nextjs:
+        condition: service_healthy
     networks:
       - streammake-network
     restart: unless-stopped

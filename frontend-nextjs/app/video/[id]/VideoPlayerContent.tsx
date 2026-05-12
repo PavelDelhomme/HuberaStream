@@ -405,8 +405,8 @@ export default function VideoPlayerContent({ videoId }: { videoId: string }) {
               {(video as any).platform && (
                 <span className="video-platform">📺 {(video as any).platform}</span>
               )}
-              {video.views > 0 && (
-                <span className="video-views-count">👁️ {formatViews(video.views)} vues</span>
+              {(video.views ?? 0) > 0 && (
+                <span className="video-views-count">👁️ {formatViews(video.views ?? 0)} vues</span>
               )}
             </div>
             {(video.genres && video.genres.length > 0) || video.genre ? (

@@ -10,8 +10,9 @@ interface Video {
   thumbnail_path?: string
   thumbnail_url?: string
   duration: number
-  views: number
+  views?: number
   created_at: string
+  status?: string
   user?: {
     username: string
   }
@@ -103,7 +104,7 @@ export default function VideoGrid({ videos, title }: VideoGridProps) {
               <div className="video-info">
                 <h3 className="video-title">{video.title}</h3>
                 <div className="video-meta">
-                  <span className="video-views">{formatViews(video.views)} vues</span>
+                  <span className="video-views">{formatViews(video.views ?? 0)} vues</span>
                   {video.user && (
                     <span className="video-author">{video.user.username}</span>
                   )}

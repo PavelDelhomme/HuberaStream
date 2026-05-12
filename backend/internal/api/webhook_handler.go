@@ -1,16 +1,19 @@
 package api
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
 
 	"streammake/internal/config"
 	"streammake/internal/models"
+	"streammake/internal/torrent"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -22,12 +25,17 @@ const maxWebhookBodyBytes = 1 << 20 // 1 MiB
 var errWebhookPayloadTooLarge = errors.New("payload trop volumineux")
 
 type WebhookHandler struct {
-	db  *gorm.DB
-	cfg *config.Config
+	db   *gorm.DB
+	cfg  *config.Config
+	post *torrent.PostProcessor
 }
 
 func NewWebhookHandler(db *gorm.DB, cfg *config.Config) *WebhookHandler {
-	return &WebhookHandler{db: db, cfg: cfg}
+	return &WebhookHandler{
+		db:   db,
+		cfg:  cfg,
+		post: torrent.NewPostProcessor(db, cfg),
+	}
 }
 
 func (h *WebhookHandler) verifyWebhookToken(c *gin.Context) bool {
@@ -92,10 +100,11 @@ func (h *WebhookHandler) postWebhook(c *gin.Context, source string) {
 		return
 	}
 
+	eventType := parseEventType(body)
 	ev := models.MediaWebhookEvent{
 		ID:        uuid.New(),
 		Source:    source,
-		EventType: parseEventType(body),
+		EventType: eventType,
 		Payload:   string(body),
 		CreatedAt: time.Now().UTC(),
 	}
@@ -103,7 +112,31 @@ func (h *WebhookHandler) postWebhook(c *gin.Context, source string) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "enregistrement"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"ok": true, "id": ev.ID})
+
+	importStatus := "disabled"
+	if h.cfg.EnableWebhookImport && arrEventImportsMedia(eventType) {
+		paths := extractMediaPathsFromArrWebhook(source, body)
+		if len(paths) > 0 {
+			importStatus = "queued"
+			go h.runArrImport(context.Background(), source, body, paths)
+		} else {
+			importStatus = "no_paths"
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ok": true, "id": ev.ID, "import": importStatus})
+}
+
+func (h *WebhookHandler) runArrImport(ctx context.Context, source string, body []byte, paths []string) {
+	title := pickTitleFromArrWebhook(source, body)
+	desc := "Import automatique (" + source + ")"
+	for _, p := range paths {
+		if err := h.post.CreateVideoFromImportPath(ctx, p, title, desc, true); err != nil {
+			log.Printf("[webhook-import] %s %q: %v", source, p, err)
+			continue
+		}
+		log.Printf("[webhook-import] ok %s -> %q", source, p)
+	}
 }
 
 // ListWebhookEvents liste les derniers événements (admin).
@@ -131,18 +164,16 @@ func (h *WebhookHandler) ListWebhookEvents(c *gin.Context) {
 // GetWebhookSetup retourne les URL à configurer dans Radarr/Sonarr (sans exposer le secret complet).
 func (h *WebhookHandler) GetWebhookSetup(c *gin.Context) {
 	base := h.cfg.PublicWebhookBaseURL
-	if base == "" {
-		base = ""
-	}
 	secretConfigured := h.cfg.WebhookSecret != ""
 	mask := ""
 	if secretConfigured && len(h.cfg.WebhookSecret) >= 4 {
 		mask = "…" + h.cfg.WebhookSecret[len(h.cfg.WebhookSecret)-4:]
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"secret_configured": secretConfigured,
-		"secret_suffix":     mask,
-		"public_base_url":   base,
+		"secret_configured":      secretConfigured,
+		"secret_suffix":          mask,
+		"public_base_url":        base,
+		"webhook_import_enabled": h.cfg.EnableWebhookImport,
 		"paths": gin.H{
 			"radarr": "/api/webhooks/radarr",
 			"sonarr": "/api/webhooks/sonarr",

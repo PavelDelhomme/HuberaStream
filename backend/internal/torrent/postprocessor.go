@@ -198,6 +198,90 @@ func (p *PostProcessor) createVideoFromFile(ctx context.Context, torrent *models
 	return nil
 }
 
+// CreateVideoFromImportPath enregistre une vidéo depuis un chemin absolu (ex. webhook Radarr/Sonarr).
+// Le fichier doit être lisible par ce processus (même volume Docker que les *arr si chemins identiques).
+func (p *PostProcessor) CreateVideoFromImportPath(ctx context.Context, absPath, titleHint, description string, isPublic bool) error {
+	ext := strings.ToLower(filepath.Ext(absPath))
+	if !isImportableVideoExt(ext) {
+		return fmt.Errorf("extension non supportée: %s", ext)
+	}
+	fi, err := os.Stat(absPath)
+	if err != nil || fi.IsDir() {
+		return fmt.Errorf("fichier inaccessible: %w", err)
+	}
+
+	file, err := os.Open(absPath)
+	if err != nil {
+		return fmt.Errorf("ouverture: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return fmt.Errorf("checksum: %w", err)
+	}
+	checksum := fmt.Sprintf("%x", hash.Sum(nil))
+
+	var dup int64
+	if err := p.db.Model(&models.Video{}).Where("checksum = ?", checksum).Count(&dup).Error; err == nil && dup > 0 {
+		return fmt.Errorf("vidéo déjà importée (checksum identique)")
+	}
+
+	var adminUser models.User
+	if err := p.db.Where("role = ?", models.RoleAdmin).First(&adminUser).Error; err != nil {
+		adminUser.ID = uuid.MustParse("00000000-0000-0000-0000-000000000000")
+	}
+
+	title := strings.TrimSpace(titleHint)
+	if title == "" {
+		title = strings.TrimSuffix(filepath.Base(absPath), ext)
+		title = strings.ReplaceAll(title, "_", " ")
+		title = strings.ReplaceAll(title, ".", " ")
+		title = strings.TrimSpace(title)
+	}
+	if title == "" {
+		title = "Import média"
+	}
+	if description == "" {
+		description = "Import automatique (*arr)"
+	}
+
+	videoID := uuid.New()
+	videoModel := models.Video{
+		ID:          videoID,
+		Title:       title,
+		Description: description,
+		UserID:      adminUser.ID,
+		Status:      models.VideoStatusProcessing,
+		IsPublic:    isPublic,
+		Checksum:    checksum,
+	}
+
+	if err := p.db.Create(&videoModel).Error; err != nil {
+		return fmt.Errorf("création vidéo: %w", err)
+	}
+
+	videoFileName := fmt.Sprintf("%s_%d%s", videoID.String(), time.Now().Unix(), ext)
+	videoStoragePath := filepath.Join(p.cfg.VideoStoragePath, videoFileName)
+
+	if err := p.copyFile(absPath, videoStoragePath); err != nil {
+		p.db.Delete(&videoModel)
+		return fmt.Errorf("copie: %w", err)
+	}
+
+	go p.processVideo(ctx, videoID, videoStoragePath)
+	return nil
+}
+
+func isImportableVideoExt(ext string) bool {
+	switch ext {
+	case ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v":
+		return true
+	default:
+		return false
+	}
+}
+
 // copyFile copie un fichier
 func (p *PostProcessor) copyFile(src, dst string) error {
 	sourceFile, err := os.Open(src)
