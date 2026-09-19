@@ -1,7 +1,7 @@
 {
-  "name": "streammake-frontend",
+  "name": "@hubera/stream",
   "version": "1.0.0",
-  "description": "Frontend React pour StreamMake",
+  "description": "Hubera Stream — frontend React",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",

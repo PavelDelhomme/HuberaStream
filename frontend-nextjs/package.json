@@ -1,7 +1,7 @@
 {
-  "name": "streammake-frontend-nextjs",
+  "name": "@hubera/stream-web",
   "version": "1.0.0",
-  "description": "Frontend Next.js pour StreamMake",
+  "description": "Hubera Stream — frontend Next.js",
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",

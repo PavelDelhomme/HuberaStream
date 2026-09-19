@@ -1,6 +1,8 @@
-# StreamMake
+# Hubera Stream
 
-Plateforme de streaming personnelle avec backend Go, frontend React, et support multi-formats (HLS, DASH, WebRTC, progressive).
+Anciennement StreamMake. Produit Hubera (`stream.hubera.cloud`). Packages npm `@hubera/stream` / `@hubera/stream-web`.
+
+Plateforme de streaming personnelle avec backend Go, frontend React, et support multi-formats (HLS, DASH, WebRTC, progressive). Overlay Portainer : `docker-compose.portainer.yml` (réseau `shared-network-copy`).
 
 ## Architecture
 

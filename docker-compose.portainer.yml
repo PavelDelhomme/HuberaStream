@@ -1,15 +1,14 @@
-# Overlay pour Portainer / VPS : attache nginx au réseau « web » (Nginx Proxy Manager, Traefik, etc.)
-# Usage :
-#   docker compose -f docker-compose.yml -f docker-compose.portainer.yml up -d
-# Adaptez le nom du réseau externe si besoin (ci-dessous : web).
+# Overlay Portainer — Nginx Proxy Manager (réseau VPS `shared-network-copy`).
+# Usage : docker compose -f docker-compose.yml -f docker-compose.portainer.yml up -d
+# Ne pas down -v. Ne pas renommer les volumes existants.
 
 services:
   nginx:
     networks:
       - streammake-network
-      - web
+      - proxy
 
 networks:
-  web:
+  proxy:
     external: true
-    name: web
+    name: shared-network-copy
