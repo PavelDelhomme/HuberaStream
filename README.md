@@ -144,3 +144,13 @@ git push origin main
 - WebRTC n'est pas encore complètement implémenté
 - Le transcodage vidéo nécessite FFmpeg installé dans le conteneur
 
+
+## Portainer
+
+- Stack Git : `hubera-stream`
+- Compose : `docker-compose.portainer.yml`
+- Réseau : `shared-network-copy` (env `NPM_NETWORK`)
+- Env : `.env` local (gitignoré), pas dans Git
+- Updates : `https://hubera.cloud/updates/stream.json`
+
+Ne pas `down -v`. Ne pas fusionner avec Cloudity / PLM / Gasoil / JT.

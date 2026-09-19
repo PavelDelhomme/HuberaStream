@@ -1,14 +1,29 @@
-# Overlay Portainer — Nginx Proxy Manager (réseau VPS `shared-network-copy`).
-# Usage : docker compose -f docker-compose.yml -f docker-compose.portainer.yml up -d
-# Ne pas down -v. Ne pas renommer les volumes existants.
+# Hubera Portainer Git — unitaire.
+# Stack: hubera-stream
+# Compose: docker-compose.portainer.yml
+# Réseau: ${NPM_NETWORK:-shared-network-copy}
+# Ne jamais: docker compose down -v · Remove volumes · rename stacks users.
 
 services:
-  nginx:
+  web:
+    image: nginx:alpine
+    container_name: hubera-stream
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+      - hubera.slug=stream
+      - hubera.update_channel=stream
+    volumes:
+      - ./web:/usr/share/nginx/html:ro
+      - hubera-stream-html:/var/cache/nginx
     networks:
-      - streammake-network
       - proxy
+
+volumes:
+  hubera-stream-html:
+    name: hubera-stream-html
 
 networks:
   proxy:
     external: true
-    name: shared-network-copy
+    name: ${NPM_NETWORK:-shared-network-copy}
