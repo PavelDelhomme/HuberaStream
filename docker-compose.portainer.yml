@@ -6,15 +6,15 @@
 
 services:
   web:
-    image: nginx:alpine
+    build: .
+    image: hubera-stream:local
     container_name: hubera-stream
     restart: unless-stopped
     labels:
-      - com.centurylinklabs.watchtower.enable=true
+      - com.centurylinklabs.watchtower.enable=false
       - hubera.slug=stream
       - hubera.update_channel=stream
     volumes:
-      - ./web:/usr/share/nginx/html:ro
       - hubera-stream-html:/var/cache/nginx
     networks:
       - proxy
