@@ -1,0 +1,16 @@
+{
+  "generated": "2026-09-29T16:57:46Z",
+  "slug": "stream",
+  "app": "hubera_stream",
+  "name": "Hubera Stream",
+  "version": "0.0.0",
+  "versionCode": 0,
+  "min_supported": "0.0.0",
+  "apk": "",
+  "apk_url": "",
+  "sha256": "",
+  "mandatory": false,
+  "notes": "Hubera Stream (StreamMake). APK à venir.",
+  "published_at": "2026-09-29T16:57:46Z",
+  "legacy_stack": "hubera-stream"
+}
