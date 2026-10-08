@@ -13,8 +13,6 @@ export default function AdminMediaSettingsPage() {
   const [settings, setSettings] = useState({
     video_storage_path: '/app/storage/videos',
     thumbnail_storage_path: '/app/storage/thumbnails',
-    torrent_download_path: '/app/storage/torrents/downloads',
-    enable_auto_download: false,
     default_video_quality: '720p',
     enable_hls: true,
     enable_dash: false,
@@ -98,14 +96,6 @@ export default function AdminMediaSettingsPage() {
               type="text"
               value={settings.thumbnail_storage_path}
               onChange={(e) => setSettings({ ...settings, thumbnail_storage_path: e.target.value })}
-            />
-          </div>
-          <div className="form-group">
-            <label>Chemin de téléchargement des torrents</label>
-            <input
-              type="text"
-              value={settings.torrent_download_path}
-              onChange={(e) => setSettings({ ...settings, torrent_download_path: e.target.value })}
             />
           </div>
         </div>

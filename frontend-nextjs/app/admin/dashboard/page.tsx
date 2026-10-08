@@ -50,12 +50,6 @@ export default function AdminDashboard() {
           </div>
           
           <div className="stat-card">
-            <div className="stat-icon">📥</div>
-            <div className="stat-value">{stats.torrents_count || 0}</div>
-            <div className="stat-label">Torrents</div>
-          </div>
-          
-          <div className="stat-card">
             <div className="stat-icon">📁</div>
             <div className="stat-value">{stats.categories_count || 0}</div>
             <div className="stat-label">Catégories</div>

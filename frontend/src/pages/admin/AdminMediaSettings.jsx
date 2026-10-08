@@ -12,8 +12,6 @@ const AdminMediaSettings = () => {
   const [settings, setSettings] = useState({
     video_storage_path: '/app/storage/videos',
     thumbnail_storage_path: '/app/storage/thumbnails',
-    torrent_download_path: '/app/storage/torrents/downloads',
-    enable_auto_download: false,
     default_video_quality: '720p',
     enable_hls: true,
     enable_dash: false,
@@ -92,14 +90,6 @@ const AdminMediaSettings = () => {
               type="text"
               value={settings.thumbnail_storage_path}
               onChange={(e) => setSettings({ ...settings, thumbnail_storage_path: e.target.value })}
-            />
-          </div>
-          <div className="form-group">
-            <label>Chemin de téléchargement des torrents</label>
-            <input
-              type="text"
-              value={settings.torrent_download_path}
-              onChange={(e) => setSettings({ ...settings, torrent_download_path: e.target.value })}
             />
           </div>
         </div>
@@ -195,21 +185,6 @@ const AdminMediaSettings = () => {
               />
             </div>
           )}
-        </div>
-
-        {/* Téléchargements automatiques */}
-        <div className="settings-section">
-          <h2>📥 Téléchargements</h2>
-          <div className="form-group">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={settings.enable_auto_download}
-                onChange={(e) => setSettings({ ...settings, enable_auto_download: e.target.checked })}
-              />
-              Activer les téléchargements automatiques depuis les configurations torrent
-            </label>
-          </div>
         </div>
 
         <div className="form-actions">

@@ -28,8 +28,6 @@ func (h *AdminHandler) GetStats(c *gin.Context) {
 	var stats struct {
 		TotalUsers       int64 `json:"total_users"`
 		TotalVideos      int64 `json:"total_videos"`
-		TotalTorrents    int64 `json:"total_torrents"`
-		ActiveTorrents   int64 `json:"active_torrents"`
 		TotalCategories  int64 `json:"total_categories"`
 		StorageAvailable int64 `json:"storage_available"` // En bytes
 		StorageUsed      int64 `json:"storage_used"`      // En bytes
@@ -38,8 +36,6 @@ func (h *AdminHandler) GetStats(c *gin.Context) {
 
 	h.db.Model(&models.User{}).Count(&stats.TotalUsers)
 	h.db.Model(&models.Video{}).Count(&stats.TotalVideos)
-	h.db.Model(&models.Torrent{}).Count(&stats.TotalTorrents)
-	h.db.Model(&models.Torrent{}).Where("status IN ?", []string{"downloading", "seeding"}).Count(&stats.ActiveTorrents)
 	h.db.Model(&models.Category{}).Count(&stats.TotalCategories)
 
 	// Calculer l'espace disque disponible

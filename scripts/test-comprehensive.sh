@@ -32,7 +32,6 @@ TEST_USER_ID=""
 TEST_VIDEO_ID=""
 TEST_PLAYLIST_ID=""
 TEST_CATEGORY_ID=""
-TEST_TORRENT_ID=""
 
 # Fonction pour tester une requête
 test_request() {
@@ -462,101 +461,12 @@ fi
 echo ""
 
 # ============================================
-# 11. TESTS ADMINISTRATEUR - TORRENTS
-# ============================================
-echo "📋 11. TESTS ADMINISTRATEUR - TORRENTS"
-echo "---------------------------------------"
-
-if [ -n "$ADMIN_TOKEN" ]; then
-    test_request "GET" "/admin/torrents" "" "200" "Liste des torrents (admin)" "$ADMIN_TOKEN"
-    
-    # Création d'un torrent test
-    TORRENT_RESPONSE=$(curl -s -X POST "$API_URL/admin/torrents" \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer $ADMIN_TOKEN" \
-        -d '{"name":"Test Torrent '$(date +%s)'","magnet_url":"magnet:?xt=urn:btih:test","status":"pending"}')
-    
-    TEST_TORRENT_ID=$(extract_uuid "$TORRENT_RESPONSE" "id")
-    
-    if [ -n "$TEST_TORRENT_ID" ]; then
-        test_request "PUT" "/admin/torrents/$TEST_TORRENT_ID" '{"status":"downloading"}' "200" "Modification d'un torrent" "$ADMIN_TOKEN" "true"
-        test_request "DELETE" "/admin/torrents/$TEST_TORRENT_ID" "" "200" "Suppression d'un torrent" "$ADMIN_TOKEN" "true"
-    fi
-fi
-
-echo ""
-
-# ============================================
-# 12. TESTS ADMINISTRATEUR - CONFIGURATIONS TORRENT
-# ============================================
-echo "📋 12. TESTS ADMINISTRATEUR - CONFIGURATIONS TORRENT"
-echo "-----------------------------------------------------"
-
-if [ -n "$ADMIN_TOKEN" ]; then
-    test_request "GET" "/admin/torrent-configs" "" "200" "Liste des configurations torrent (admin)" "$ADMIN_TOKEN"
-    
-    # Création d'une configuration test
-    CONFIG_RESPONSE=$(curl -s -X POST "$API_URL/admin/torrent-configs" \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer $ADMIN_TOKEN" \
-        -d '{"name":"Test Config","download_path":"/tmp","max_download_speed":1000,"max_upload_speed":500}')
-    
-    CONFIG_ID=$(extract_uuid "$CONFIG_RESPONSE" "id")
-    
-    if [ -n "$CONFIG_ID" ]; then
-        test_request "PUT" "/admin/torrent-configs/$CONFIG_ID" '{"max_download_speed":2000}' "200" "Modification d'une configuration torrent" "$ADMIN_TOKEN" "true"
-        test_request "DELETE" "/admin/torrent-configs/$CONFIG_ID" "" "200" "Suppression d'une configuration torrent" "$ADMIN_TOKEN" "true"
-    fi
-fi
-
-echo ""
-
-# ============================================
-# 13. TESTS ADMINISTRATEUR - CLIENTS TORRENT
-# ============================================
-echo "📋 13. TESTS ADMINISTRATEUR - CLIENTS TORRENT"
-echo "----------------------------------------------"
-
-if [ -n "$ADMIN_TOKEN" ]; then
-    test_request "GET" "/admin/torrent-clients/status" "" "200" "Statut des clients torrent" "$ADMIN_TOKEN" "true"
-    test_request "GET" "/admin/torrent-clients/current" "" "200" "Client torrent actuel" "$ADMIN_TOKEN" "true"
-    test_request "PUT" "/admin/torrent-clients/current" '{"client":"transmission"}' "200" "Modification du client torrent actuel" "$ADMIN_TOKEN" "true"
-    
-    # Test de tous les clients torrent
-    echo "  Test des clients torrent individuels:"
-    test_request "POST" "/admin/torrent-clients/test" '{"client":"transmission","host":"transmission","port":9091,"username":"","password":""}' "200" "Test Transmission" "$ADMIN_TOKEN" "true"
-    test_request "POST" "/admin/torrent-clients/test" '{"client":"qbittorrent","host":"qbittorrent","port":8080,"username":"admin","password":"adminadmin"}' "200" "Test qBittorrent" "$ADMIN_TOKEN" "true"
-    test_request "POST" "/admin/torrent-clients/test" '{"client":"deluge","host":"deluge","port":8112,"username":"","password":"deluge"}' "200" "Test Deluge" "$ADMIN_TOKEN" "true"
-    test_request "POST" "/admin/torrent-clients/test" '{"client":"rtorrent","host":"rtorrent","port":5000,"username":"","password":""}' "200" "Test rTorrent" "$ADMIN_TOKEN" "true"
-fi
-
-echo ""
-
-# ============================================
-# 14. TESTS ADMINISTRATEUR - PARAMÈTRES MÉDIA
-# ============================================
 echo "📋 14. TESTS ADMINISTRATEUR - PARAMÈTRES MÉDIA"
 echo "----------------------------------------------"
 
 if [ -n "$ADMIN_TOKEN" ]; then
     test_request "GET" "/admin/media-settings" "" "200" "Récupération des paramètres média" "$ADMIN_TOKEN" "true"
-    test_request "PUT" "/admin/media-settings" '{"default_quality":"720p","auto_transcode":true,"auto_download":false}' "200" "Modification des paramètres média" "$ADMIN_TOKEN" "true"
-    
-    # Test de la configuration téléchargement automatique
-    test_request "PUT" "/admin/media-settings" '{"auto_download":true,"auto_download_quality":"720p"}' "200" "Activation téléchargement automatique" "$ADMIN_TOKEN" "true"
-fi
-
-echo ""
-
-# ============================================
-# 15. TESTS ADMINISTRATEUR - SCRAPER
-# ============================================
-echo "📋 15. TESTS ADMINISTRATEUR - SCRAPER"
-echo "-------------------------------------"
-
-if [ -n "$ADMIN_TOKEN" ]; then
-    test_request "POST" "/admin/scraper/search" '{"query":"test","category":"movies"}' "200" "Recherche de torrents via scraper" "$ADMIN_TOKEN" "true"
-    test_request "GET" "/admin/scraper/details?url=https://example.com" "" "200" "Détails d'un torrent via scraper" "$ADMIN_TOKEN" "true"
+    test_request "PUT" "/admin/media-settings" '{"default_quality":"720p","auto_transcode":true}' "200" "Modification des paramètres média" "$ADMIN_TOKEN" "true"
 fi
 
 echo ""

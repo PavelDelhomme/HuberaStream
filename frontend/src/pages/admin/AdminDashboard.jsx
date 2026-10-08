@@ -65,20 +65,15 @@ const AdminDashboard = () => {
       } catch (statsError) {
         // Si l'endpoint n'existe pas, calculer les stats depuis les autres endpoints
         console.log('Endpoint /admin/stats non disponible, calcul des stats...')
-        const [usersRes, videosRes, torrentsRes, categoriesRes] = await Promise.allSettled([
+        const [usersRes, videosRes, categoriesRes] = await Promise.allSettled([
           api.get('/admin/users?page=1&limit=1'),
           api.get('/videos?page=1&limit=1'),
-          api.get('/admin/torrents'),
           api.get('/categories')
         ])
         
         const stats = {
           total_users: usersRes.status === 'fulfilled' ? (usersRes.value.data?.total || usersRes.value.data?.users?.length || 0) : 0,
           total_videos: videosRes.status === 'fulfilled' ? (videosRes.value.data?.total || videosRes.value.data?.videos?.length || 0) : 0,
-          total_torrents: torrentsRes.status === 'fulfilled' ? (torrentsRes.value.data?.torrents?.length || 0) : 0,
-          active_torrents: torrentsRes.status === 'fulfilled' 
-            ? (torrentsRes.value.data?.torrents?.filter(t => t.status === 'downloading' || t.status === 'seeding')?.length || 0) 
-            : 0,
           total_categories: categoriesRes.status === 'fulfilled' ? (categoriesRes.value.data?.length || 0) : 0
         }
         setStats(stats)
@@ -89,8 +84,6 @@ const AdminDashboard = () => {
       setStats({
         total_users: 0,
         total_videos: 0,
-        total_torrents: 0,
-        active_torrents: 0,
         total_categories: 0
       })
     } finally {
@@ -142,22 +135,6 @@ const AdminDashboard = () => {
             <span className="stat-link">Gérer →</span>
           </div>
         </Link>
-        <Link to="/admin/torrents" className="stat-card stat-card-torrents">
-          <div className="stat-icon">📥</div>
-          <div className="stat-content">
-            <h3>Torrents</h3>
-            <p className="stat-value">{stats?.total_torrents || 0}</p>
-            <span className="stat-link">Gérer →</span>
-          </div>
-        </Link>
-        <Link to="/admin/torrents" className="stat-card stat-card-active">
-          <div className="stat-icon">⚡</div>
-          <div className="stat-content">
-            <h3>Torrents actifs</h3>
-            <p className="stat-value">{stats?.active_torrents || 0}</p>
-            <span className="stat-link">Voir →</span>
-          </div>
-        </Link>
         <Link to="/admin/categories" className="stat-card stat-card-categories">
           <div className="stat-icon">📂</div>
           <div className="stat-content">
@@ -203,26 +180,6 @@ const AdminDashboard = () => {
             <div className="menu-card-icon">📂</div>
             <h3>Catégories</h3>
             <p>Gérer les catégories et sous-catégories</p>
-          </Link>
-          <Link to="/admin/torrents" className="admin-menu-card">
-            <div className="menu-card-icon">📥</div>
-            <h3>Torrents</h3>
-            <p>Gérer les téléchargements torrent</p>
-          </Link>
-          <Link to="/admin/torrent-clients" className="admin-menu-card">
-            <div className="menu-card-icon">⚙️</div>
-            <h3>Clients Torrent</h3>
-            <p>Configurer les clients torrent</p>
-          </Link>
-          <Link to="/admin/torrent-configs" className="admin-menu-card">
-            <div className="menu-card-icon">🔧</div>
-            <h3>Configurations de téléchargement automatique</h3>
-            <p>Gérer les configurations de téléchargement</p>
-          </Link>
-          <Link to="/admin/torrent-candidates" className="admin-menu-card">
-            <div className="menu-card-icon">🎯</div>
-            <h3>Candidats Torrents</h3>
-            <p>Voir et gérer les torrents trouvés automatiquement</p>
           </Link>
           <Link to="/admin/media-settings" className="admin-menu-card">
             <div className="menu-card-icon">🎬</div>

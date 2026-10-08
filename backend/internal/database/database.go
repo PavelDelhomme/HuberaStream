@@ -49,8 +49,6 @@ func autoMigrate(db *gorm.DB) error {
 		&models.VideoFormat{},
 		&models.Category{},
 		&models.SubCategory{},
-		&models.Torrent{},
-		&models.TorrentConfig{},
 		&models.UploadSession{},
 		&models.UploadChunk{},
 		// Modèles IA
@@ -60,6 +58,5 @@ func autoMigrate(db *gorm.DB) error {
 		&models.SeriesTracking{},
 		&models.SeriesEpisodeTracking{},
 		&models.LearningPattern{},
-		&models.MediaWebhookEvent{},
 	)
 }

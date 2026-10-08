@@ -32,12 +32,6 @@ func main() {
 		log.Fatalf("Erreur lors de la création du dossier de stockage thumbnails: %v", err)
 	}
 
-	// Note: La configuration automatique de qBittorrent via Docker exec n'est pas possible
-	// car Docker n'est pas disponible dans le conteneur backend.
-	// L'utilisateur doit configurer qBittorrent manuellement via l'interface web:
-	// http://localhost:3306 (utilisateur: admin, mot de passe: adminadmin par défaut)
-	// ou via les variables d'environnement QBITTORRENT_USER et QBITTORRENT_PASS
-
 	// Initialiser le routeur API
 	router := api.SetupRouter(db, cfg)
 

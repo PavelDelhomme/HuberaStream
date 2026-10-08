@@ -7,7 +7,6 @@ import (
 	"streammake/internal/ai"
 	"streammake/internal/metadata"
 	"streammake/internal/models"
-	"streammake/internal/torrent"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -15,29 +14,17 @@ import (
 )
 
 type AIHandler struct {
-	db                  *gorm.DB
+	db                    *gorm.DB
 	recommendationService *ai.RecommendationService
 	detectionService      *ai.DetectionService
-	seriesService         *ai.SeriesAutoDownloadService
 }
 
-func NewAIHandler(db *gorm.DB, torrentService interface{}) *AIHandler {
-	recommendationService := ai.NewRecommendationService(db)
-	detectionService := ai.NewDetectionService(db)
-	
-	handler := &AIHandler{
-		db:                  db,
-		recommendationService: recommendationService,
-		detectionService:      detectionService,
+func NewAIHandler(db *gorm.DB) *AIHandler {
+	return &AIHandler{
+		db:                    db,
+		recommendationService: ai.NewRecommendationService(db),
+		detectionService:      ai.NewDetectionService(db),
 	}
-	
-	// Initialiser le service de séries si le torrentService est disponible
-	if ts, ok := torrentService.(*torrent.TorrentService); ok && ts != nil {
-		handler.seriesService = ai.NewSeriesAutoDownloadService(db, ts)
-		handler.seriesService.Start()
-	}
-	
-	return handler
 }
 
 // GetRecommendations retourne les recommandations pour l'utilisateur connecté
@@ -124,18 +111,8 @@ func (h *AIHandler) AddSeriesToTracking(c *gin.Context) {
 		return
 	}
 
-	if h.seriesService == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Service de séries non disponible"})
-		return
-	}
-
-	series, err := h.seriesService.AddSeriesToTracking(userUUID, req.Title, req.IMDBID, req.TMDBID, req.PosterURL)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, series)
+	_ = userUUID
+	LegalCatalogOnly(c)
 }
 
 // GetTrackedSeries retourne les séries suivies par l'utilisateur

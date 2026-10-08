@@ -58,9 +58,6 @@ func TestConfig_StoragePaths(t *testing.T) {
 	if cfg.ThumbnailStoragePath == "" {
 		t.Error("ThumbnailStoragePath ne devrait pas être vide")
 	}
-	if cfg.TorrentStoragePath == "" {
-		t.Error("TorrentStoragePath ne devrait pas être vide")
-	}
 }
 
 func TestConfig_AdminConfig(t *testing.T) {

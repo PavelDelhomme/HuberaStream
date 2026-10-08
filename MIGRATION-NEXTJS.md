@@ -58,7 +58,7 @@ make up-legacy
 ### 🚧 Pages à Migrer
 - [ ] VideoPlayer (`/video/[id]`) - **PRIORITÉ HAUTE**
 - [ ] Pages utilisateur (Profile, History, Favorites, Playlists)
-- [ ] Pages admin (Dashboard, Users, Videos, Torrents, etc.)
+- [ ] Pages admin (Dashboard, Users, Videos, etc.)
 - [ ] Upload et DVD Extract
 
 ## 🔧 Configuration

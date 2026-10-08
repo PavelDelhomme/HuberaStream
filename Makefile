@@ -1,9 +1,9 @@
-.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up up-arr down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api tests-api test-metadata test-all benchmark-frontends benchmark-frontends-docker install-deps status shell-backend shell-db install-torrents setup-images install-dependencies
+.PHONY: help build rebuild rebuild-backend rebuild-backend-local rebuild-backend-force up down down-force start stop stop-force run restart restart-backend logs logs-follow logs-% clean clean-all dev dev-backend dev-frontend debug-backend check test test-api tests-api test-metadata test-all benchmark-frontends benchmark-frontends-docker install-deps status shell-backend shell-db setup-images install-dependencies
 
 # Variables
 PROJECT_NAME := streammake
 DOCKER_COMPOSE_FILE := docker-compose.yml
-STREAMMAKE_CONTAINERS := streammake-postgres streammake-redis streammake-backend streammake-frontend-nextjs streammake-nginx streammake-transmission streammake-qbittorrent streammake-deluge streammake-rtorrent streammake-prowlarr streammake-radarr streammake-sonarr
+STREAMMAKE_CONTAINERS := streammake-postgres streammake-redis streammake-backend streammake-frontend-nextjs streammake-nginx
 
 # Détection du support des couleurs
 ifneq ($(TERM),)
@@ -41,7 +41,6 @@ help:
 	@echo ""
 	@echo "${YELLOW}🚀 DÉMARRAGE / ARRÊT:${NC}"
 	@echo "  ${GREEN}up / start / run${NC}   Démarrer tous les services"
-	@echo "  ${GREEN}up-arr${NC}             Démarrer avec Prowlarr + Radarr + Sonarr (profile arr)"
 	@echo "  ${GREEN}down / stop${NC}        Arrêter tous les services"
 	@echo "  ${GREEN}down-force / stop-force${NC} Arrêter FORCÉMENT (kill)"
 	@echo "  ${GREEN}restart${NC}            Redémarrer tous les services"
@@ -82,7 +81,6 @@ help:
 	@echo "${YELLOW}📌 Scripts à la racine (équivalent make):${NC}"
 	@echo "  ${GREEN}./streammake <cible>${NC}  Toute autre commande (ex: ./streammake logs-backend)"
 	@echo "  ${GREEN}./up ./down ./restart ./build ./dev ./dev-nextjs ./dev-backend${NC}"
-	@echo "  ${GREEN}./up-arr${NC}              Prowlarr + Radarr + Sonarr (profile arr)"
 	@echo "  ${GREEN}./logs ./clean${NC}         ${GREEN}./test-api ./tests-api ./test-metadata ./test-all${NC}"
 	@echo "  ${YELLOW}Portainer / NPM:${NC}      voir ${GREEN}docs/DEPLOY-PORTAINER.md${NC} et ${GREEN}docker-compose.portainer.yml${NC}"
 	@echo "  ${GREEN}./test ./check ./status${NC}"
@@ -99,7 +97,6 @@ help:
 	@echo "  ${GREEN}shell-backend${NC}      Shell du conteneur backend"
 	@echo "  ${GREEN}shell-db${NC}           Shell PostgreSQL"
 	@echo "  ${GREEN}install-deps${NC}       Installer dépendances Go"
-	@echo "  ${GREEN}install-torrents${NC}  Démarrer les clients torrent"
 	@echo "  ${GREEN}setup-images${NC}       Créer les images Docker (si buildx échoue)"
 	@echo ""
 
@@ -223,15 +220,6 @@ up:
 	fi
 	@echo "${YELLOW}Test API complet...${NC}"
 	@./scripts/test-api.sh || true
-
-up-arr:
-	@echo "${GREEN}🚀 Démarrage avec profile arr (Prowlarr, Radarr, Sonarr)...${NC}"
-	@if command -v docker &> /dev/null && docker compose version &> /dev/null; then \
-		docker compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) --profile arr up -d; \
-	else \
-		docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) --profile arr up -d; \
-	fi
-	@echo "${YELLOW}💡 Renseignez PROWLARR_URL, RADARR_URL, SONARR_URL dans .env pour le statut API (voir docs/DEPLOY-PORTAINER.md).${NC}"
 
 down:
 	@echo "${YELLOW}🛑 Arrêt de tous les services...${NC}"
@@ -639,15 +627,6 @@ check-compile:
 install-deps:
 	@echo "${GREEN}📦 Installation des dépendances Go...${NC}"
 	@cd backend && go mod tidy
-
-install-torrents:
-	@echo "${GREEN}📥 Démarrage des clients torrent...${NC}"
-	@docker-compose -f $(DOCKER_COMPOSE_FILE) -p $(PROJECT_NAME) up -d transmission qbittorrent deluge rtorrent
-	@echo "${GREEN}✅ Clients torrent démarrés:${NC}"
-	@echo "${YELLOW}  - Transmission: http://localhost:3305${NC}"
-	@echo "${YELLOW}  - qBittorrent: http://localhost:3306${NC}"
-	@echo "${YELLOW}  - Deluge: http://localhost:3307${NC}"
-	@echo "${YELLOW}  - ruTorrent: http://localhost:3308${NC}"
 
 setup-images:
 	@echo "${GREEN}🔨 Création des images Docker...${NC}"
