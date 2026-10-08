@@ -115,16 +115,8 @@ mobile/
 - `categories` - Catégories
 - `playlists` - Listes personnelles
 - `watch_history` - Historique de visionnage
-- `torrents` - Torrents
-- `torrent_configs` - Configurations torrent
 
-## Services externes
-
-### Clients Torrent
-- **Transmission** - Port 3305
-- **qBittorrent** - Port 3306
-- **Deluge** - Port 3307
-- **rTorrent** - Port 3308
+Le produit live (`/app/`) est un catalogue légal Pluto TV + Arte.tv. Pas de client torrent.
 
 ## Communication API
 

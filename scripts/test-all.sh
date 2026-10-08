@@ -156,22 +156,6 @@ else
     # Si la route existe et retourne autre chose que 404, on l'affiche
     test_route "GET" "/admin/categories" "" "200" "Gestion catégories" true 2>/dev/null || true
 fi
-test_route "GET" "/admin/torrents" "" "200" "Gestion torrents" true
-echo ""
-
-# Statut Prowlarr / Radarr / Sonarr (URLs optionnelles dans la config backend)
-echo -e "${BLUE}[5b] Statut media-stack (*arr)...${NC}"
-test_route "GET" "/admin/media-stack/status" "" "200" "Statut Prowlarr/Radarr/Sonarr (admin)" true
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^streammake-prowlarr$'; then
-  P_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3326/ 2>/dev/null || echo "000")
-  if [ "$P_CODE" = "200" ] || [ "$P_CODE" = "302" ] || [ "$P_CODE" = "401" ]; then
-    echo -e "${GREEN}✓${NC} Prowlarr UI joignable sur le port hôte 3326 (HTTP $P_CODE)"
-  else
-    echo -e "${YELLOW}⚠${NC} Prowlarr conteneur up mais port 3326 HTTP $P_CODE"
-  fi
-else
-  echo -e "${YELLOW}ℹ${NC} Profile arr non démarré : ignorer les ports 3326–3328 (make up-arr pour activer)"
-fi
 echo ""
 
 # Test 5: Routes DVD (admin seulement)

@@ -26,8 +26,6 @@ func (h *MediaSettingsHandler) GetMediaSettings(c *gin.Context) {
 	settings := gin.H{
 		"video_storage_path":        h.cfg.VideoStoragePath,
 		"thumbnail_storage_path":    h.cfg.ThumbnailStoragePath,
-		"torrent_download_path":     h.cfg.TorrentDownloadPath,
-		"enable_auto_download":      h.cfg.EnableAutoDownload,
 		"default_video_quality":     "720p", // Par défaut
 		"enable_hls":                true,
 		"enable_dash":               false,
@@ -43,8 +41,6 @@ func (h *MediaSettingsHandler) GetMediaSettings(c *gin.Context) {
 type UpdateMediaSettingsRequest struct {
 	VideoStoragePath        string `json:"video_storage_path"`
 	ThumbnailStoragePath    string `json:"thumbnail_storage_path"`
-	TorrentDownloadPath     string `json:"torrent_download_path"`
-	EnableAutoDownload      bool   `json:"enable_auto_download"`
 	DefaultVideoQuality     string `json:"default_video_quality"`
 	EnableHLS               bool   `json:"enable_hls"`
 	EnableDASH              bool   `json:"enable_dash"`

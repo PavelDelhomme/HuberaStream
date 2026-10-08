@@ -70,14 +70,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Link href="/admin/dashboard">📊 Tableau de bord</Link>
           <Link href="/admin/users">👥 Utilisateurs</Link>
           <Link href="/admin/videos">🎬 Vidéos</Link>
-          <Link href="/admin/torrents">📥 Torrents</Link>
-          <Link href="/admin/torrent-configs">⚙️ Configurations</Link>
-          <Link href="/admin/torrent-candidates">🎯 Candidats</Link>
-          <Link href="/admin/torrent-indexes">🔍 Index</Link>
-          <Link href="/admin/torrent-clients">💻 Clients</Link>
           <Link href="/admin/categories">📁 Catégories</Link>
           <Link href="/admin/media-settings">🎛️ Paramètres</Link>
-          <Link href="/admin/webhooks">🔗 Webhooks *arr</Link>
         </nav>
       </div>
       <div className="admin-content">

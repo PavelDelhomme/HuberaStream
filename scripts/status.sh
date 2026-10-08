@@ -127,14 +127,6 @@ echo ""
 get_service_status "backend"
 echo ""
 
-echo -e "${CYAN}📥 Clients Torrent:${NC}"
-echo ""
-get_service_status "transmission"
-get_service_status "qbittorrent"
-get_service_status "deluge"
-get_service_status "rtorrent"
-echo ""
-
 # Compter les services actifs
 total_services=$(docker ps --format "{{.Names}}" | grep "^${PROJECT_NAME}-" | wc -l)
 echo -e "${GREEN}📊 Résumé : ${total_services} service(s) actif(s)${NC}"

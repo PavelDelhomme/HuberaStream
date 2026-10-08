@@ -48,18 +48,10 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	streamHandler := NewStreamHandler(db, cfg)
 	adminHandler := NewAdminHandler(db, cfg)
 	categoryHandler := NewCategoryHandler(db)
-	torrentHandler := NewTorrentHandler(db, cfg)
-	scraperHandler := NewScraperHandler(db, cfg)
 	dvdHandler := NewDVDHandler(db, cfg, uploadHandler) // Passer uploadHandler pour traitement automatique
-	torrentClientsHandler := NewTorrentClientsHandler(db, cfg)
 	mediaSettingsHandler := NewMediaSettingsHandler(db, cfg)
-	mediaStackHandler := NewMediaStackHandler(cfg)
-	webhookHandler := NewWebhookHandler(db, cfg)
 	favoriteHandler := NewFavoriteHandler(db, cfg)
-	torrentIndexHandler := NewTorrentIndexHandler(db, cfg)
-	
-	// Initialiser le service torrent pour l'IA (utiliser le même que torrentHandler)
-	aiHandler := NewAIHandler(db, torrentHandler.torrentService)
+	aiHandler := NewAIHandler(db)
 
 	// Routes publiques
 	api := router.Group("/api")
@@ -77,8 +69,8 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		// Catégories (publiques - accessibles sans authentification)
 		api.GET("/categories", categoryHandler.ListCategories)
 
-		api.POST("/webhooks/radarr", webhookHandler.PostRadarr)
-		api.POST("/webhooks/sonarr", webhookHandler.PostSonarr)
+		api.POST("/webhooks/radarr", LegalCatalogOnly)
+		api.POST("/webhooks/sonarr", LegalCatalogOnly)
 
 		// Servir les thumbnails (publiques) - utiliser un handler dédié
 		api.GET("/thumbnails/:filename", streamHandler.ServeThumbnail)
@@ -227,94 +219,30 @@ func SetupRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 			categories.POST("/:categoryId/subcategories", categoryHandler.CreateSubCategory)
 		}
 
-		// Torrents
-		torrents := admin.Group("/torrents")
-		{
-			torrents.GET("", torrentHandler.ListTorrents)
-			torrents.POST("", torrentHandler.CreateTorrent)
-			torrents.GET("/:id/status", torrentHandler.GetTorrentStatus)
-			torrents.POST("/:id/pause", torrentHandler.PauseTorrent)
-			torrents.POST("/:id/resume", torrentHandler.ResumeTorrent)
-			torrents.POST("/:id/toggle-library", torrentHandler.ToggleAddToLibrary)
-			torrents.PUT("/:id", torrentHandler.UpdateTorrent)
-			torrents.DELETE("/:id", torrentHandler.DeleteTorrent)
-			torrents.POST("/download-1337x", torrentHandler.DownloadFrom1337x)
-		}
-
-		// Configurations de torrent
-		torrentConfigs := admin.Group("/torrent-configs")
-		{
-			torrentConfigs.GET("", torrentHandler.ListTorrentConfigs)
-			torrentConfigs.POST("", torrentHandler.CreateTorrentConfig)
-			torrentConfigs.PUT("/:id", torrentHandler.UpdateTorrentConfig)
-			torrentConfigs.DELETE("/:id", torrentHandler.DeleteTorrentConfig)
-			torrentConfigs.POST("/:id/trigger-search", torrentHandler.TriggerConfigSearch)
-		}
-
-		// Candidats de torrent (résultats de recherche automatique)
-		torrentCandidates := admin.Group("/torrent-candidates")
-		{
-			torrentCandidates.GET("", torrentHandler.ListTorrentCandidates)
-			torrentCandidates.POST("/:id/approve", torrentHandler.ApproveTorrentCandidate)
-			torrentCandidates.POST("/:id/disapprove", torrentHandler.DisapproveTorrentCandidate)
-			torrentCandidates.POST("/:id/reject", torrentHandler.RejectTorrentCandidate)
-			torrentCandidates.POST("/:id/download", torrentHandler.DownloadTorrentCandidate)
-			torrentCandidates.POST("/:id/learn", torrentHandler.LearnFromCandidate)
-			torrentCandidates.DELETE("/:id", torrentHandler.DeleteTorrentCandidate)
-			torrentCandidates.DELETE("/config/:configId/all", torrentHandler.DeleteAllTorrentCandidatesByConfig)
-		}
-
-		// Patterns d'apprentissage
-		learningPatterns := admin.Group("/torrent-learning-patterns")
-		{
-			learningPatterns.GET("", torrentHandler.ListLearningPatterns)
-			learningPatterns.POST("", torrentHandler.CreateLearningPattern)
-			learningPatterns.DELETE("/:id", torrentHandler.DeleteLearningPattern)
-		}
-
-		// Gestion des clients torrent
-		torrentClients := admin.Group("/torrent-clients")
-		{
-			torrentClients.GET("/status", torrentClientsHandler.GetTorrentClientsStatus)
-			torrentClients.GET("/current", torrentClientsHandler.GetCurrentTorrentClient)
-			torrentClients.PUT("/current", torrentClientsHandler.UpdateCurrentTorrentClient)
-			torrentClients.POST("/test", torrentClientsHandler.TestTorrentClient)
-		}
+		// Anciennes routes torrent / *arr : stub légal (plus de client)
+		admin.Any("/torrents", LegalCatalogOnly)
+		admin.Any("/torrents/*path", LegalCatalogOnly)
+		admin.Any("/torrent-configs", LegalCatalogOnly)
+		admin.Any("/torrent-configs/*path", LegalCatalogOnly)
+		admin.Any("/torrent-candidates", LegalCatalogOnly)
+		admin.Any("/torrent-candidates/*path", LegalCatalogOnly)
+		admin.Any("/torrent-learning-patterns", LegalCatalogOnly)
+		admin.Any("/torrent-learning-patterns/*path", LegalCatalogOnly)
+		admin.Any("/torrent-clients", LegalCatalogOnly)
+		admin.Any("/torrent-clients/*path", LegalCatalogOnly)
+		admin.Any("/torrent-indexes", LegalCatalogOnly)
+		admin.Any("/torrent-indexes/*path", LegalCatalogOnly)
+		admin.Any("/scraper", LegalCatalogOnly)
+		admin.Any("/scraper/*path", LegalCatalogOnly)
+		admin.Any("/media-stack/status", LegalCatalogOnly)
+		admin.Any("/webhooks/setup", LegalCatalogOnly)
+		admin.Any("/webhooks/events", LegalCatalogOnly)
 
 		// Paramètres multimédias
 		mediaSettings := admin.Group("/media-settings")
 		{
 			mediaSettings.GET("", mediaSettingsHandler.GetMediaSettings)
 			mediaSettings.PUT("", mediaSettingsHandler.UpdateMediaSettings)
-		}
-
-		// Statut Prowlarr / Radarr / Sonarr (stack optionnelle profile « arr »)
-		admin.GET("/media-stack/status", mediaStackHandler.GetMediaStackStatus)
-
-		// Webhooks *arr : URL d’accroche + historique
-		admin.GET("/webhooks/setup", webhookHandler.GetWebhookSetup)
-		admin.GET("/webhooks/events", webhookHandler.ListWebhookEvents)
-
-		// Scraper (recherche de torrents)
-		scrapers := admin.Group("/scraper")
-		{
-			scrapers.POST("/search", scraperHandler.Search)
-			scrapers.GET("/details", scraperHandler.GetTorrentDetails)
-			scrapers.GET("/browse-1337x", scraperHandler.BrowseCategory1337x)
-			scrapers.POST("/crawler/start", scraperHandler.StartCrawler)
-			scrapers.POST("/crawler/stop", scraperHandler.StopCrawler)
-			scrapers.GET("/crawler/status", scraperHandler.GetCrawlerStatus)
-		}
-
-		// Index de torrents (configuration des sites de torrents)
-		torrentIndexes := admin.Group("/torrent-indexes")
-		{
-			torrentIndexes.GET("", torrentIndexHandler.ListTorrentIndexes)
-			torrentIndexes.GET("/:id", torrentIndexHandler.GetTorrentIndex)
-			torrentIndexes.POST("", torrentIndexHandler.CreateTorrentIndex)
-			torrentIndexes.PUT("/:id", torrentIndexHandler.UpdateTorrentIndex)
-			torrentIndexes.DELETE("/:id", torrentIndexHandler.DeleteTorrentIndex)
-			torrentIndexes.POST("/:id/test", torrentIndexHandler.TestTorrentIndex)
 		}
 
 		// Upload par chunks (avec pause/reprise)

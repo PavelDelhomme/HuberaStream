@@ -389,60 +389,6 @@ const Navigation = () => {
                           {location.pathname === '/dvd-extract' && <span className="active-indicator">●</span>}
                         </button>
                         <div className="dropdown-divider"></div>
-                        <span className="dropdown-section-title">📥 Torrents</span>
-                        <button
-                          type="button"
-                          className={`dropdown-item ${location.pathname === '/admin/torrents' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setShowUserMenu(false);
-                            navigate('/admin/torrents');
-                          }}
-                        >
-                          📥 Gérer Torrents
-                          {location.pathname === '/admin/torrents' && <span className="active-indicator">●</span>}
-                        </button>
-                        <button
-                          type="button"
-                          className={`dropdown-item ${location.pathname === '/admin/torrent-clients' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setShowUserMenu(false);
-                            navigate('/admin/torrent-clients');
-                          }}
-                        >
-                          ⚙️ Clients Torrent
-                          {location.pathname === '/admin/torrent-clients' && <span className="active-indicator">●</span>}
-                        </button>
-                        <button
-                          type="button"
-                          className={`dropdown-item ${location.pathname === '/admin/torrent-configs' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setShowUserMenu(false);
-                            navigate('/admin/torrent-configs');
-                          }}
-                        >
-                          ⚙️ Configurations de téléchargement automatique
-                          {location.pathname === '/admin/torrent-configs' && <span className="active-indicator">●</span>}
-                        </button>
-                        <button
-                          type="button"
-                          className={`dropdown-item ${location.pathname === '/admin/torrent-indexes' ? 'active' : ''}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setShowUserMenu(false);
-                            navigate('/admin/torrent-indexes');
-                          }}
-                        >
-                          🔍 Index de Torrents
-                          {location.pathname === '/admin/torrent-indexes' && <span className="active-indicator">●</span>}
-                        </button>
-                        <div className="dropdown-divider"></div>
                         <span className="dropdown-section-title">🎛️ Paramètres</span>
                         <button
                           type="button"

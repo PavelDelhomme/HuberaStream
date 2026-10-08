@@ -47,7 +47,7 @@
   cursor: pointer;
 }
 
-/* Toggle button style (même que AdminTorrentConfigs) */
+/* Toggle button style (même que AdminMediaSettings) */
 .toggle-button {
   display: flex;
   align-items: center;
@@ -149,7 +149,7 @@
   color: #dc3545;
 }
 
-/* Action buttons style (même que AdminTorrentConfigs) */
+/* Action buttons style (même que AdminMediaSettings) */
 .action-button {
   display: flex;
   align-items: center;

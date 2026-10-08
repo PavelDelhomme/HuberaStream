@@ -16,10 +16,6 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminUsers from './pages/admin/AdminUsers'
 import AdminTorrents from './pages/admin/AdminTorrents'
 import AdminCategories from './pages/admin/AdminCategories'
-import AdminTorrentConfigs from './pages/admin/AdminTorrentConfigs'
-import AdminTorrentCandidates from './pages/admin/AdminTorrentCandidates'
-import AdminTorrentClients from './pages/admin/AdminTorrentClients'
-import AdminTorrentIndexes from './pages/admin/AdminTorrentIndexes'
 import AdminMediaSettings from './pages/admin/AdminMediaSettings'
 import AdminVideos from './pages/admin/AdminVideos'
 import { AuthProvider } from './context/AuthContext'
@@ -49,10 +45,6 @@ function App() {
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/torrents" element={<AdminTorrents />} />
               <Route path="/admin/categories" element={<AdminCategories />} />
-              <Route path="/admin/torrent-configs" element={<AdminTorrentConfigs />} />
-              <Route path="/admin/torrent-candidates" element={<AdminTorrentCandidates />} />
-              <Route path="/admin/torrent-clients" element={<AdminTorrentClients />} />
-              <Route path="/admin/torrent-indexes" element={<AdminTorrentIndexes />} />
               <Route path="/admin/media-settings" element={<AdminMediaSettings />} />
               <Route path="/admin/videos" element={<AdminVideos />} />
               <Route path="/upload" element={<Upload />} />

@@ -236,48 +236,6 @@ export default function Navigation() {
                       📀 Extraire DVD
                     </Link>
                     <div className="dropdown-divider"></div>
-                    <span className="dropdown-section-title">📥 Torrents</span>
-                    <Link 
-                      href="/admin/torrents" 
-                      prefetch={false} 
-                      className="dropdown-item"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      📥 Gérer Torrents
-                    </Link>
-                    <Link 
-                      href="/admin/torrent-clients" 
-                      prefetch={false} 
-                      className="dropdown-item"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      ⚙️ Clients Torrent
-                    </Link>
-                    <Link 
-                      href="/admin/torrent-configs" 
-                      prefetch={false} 
-                      className="dropdown-item"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      ⚙️ Configurations de téléchargement automatique
-                    </Link>
-                    <Link 
-                      href="/admin/torrent-candidates" 
-                      prefetch={false} 
-                      className="dropdown-item"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      🎯 Candidats Torrents
-                    </Link>
-                    <Link 
-                      href="/admin/torrent-indexes" 
-                      prefetch={false} 
-                      className="dropdown-item"
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      🔍 Index de Torrents
-                    </Link>
-                    <div className="dropdown-divider"></div>
                     <span className="dropdown-section-title">🎛️ Paramètres</span>
                     <Link 
                       href="/admin/media-settings" 

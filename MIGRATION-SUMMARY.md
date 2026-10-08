@@ -32,11 +32,6 @@
 11. ✅ AdminDashboard (`/admin/dashboard`)
 12. ✅ AdminUsers (`/admin/users`)
 13. ✅ AdminVideos (`/admin/videos`)
-14. ✅ AdminTorrents (`/admin/torrents`)
-15. ✅ AdminTorrentConfigs (`/admin/torrent-configs`)
-16. ✅ AdminTorrentCandidates (`/admin/torrent-candidates`)
-17. ✅ AdminTorrentIndexes (`/admin/torrent-indexes`)
-18. ✅ AdminTorrentClients (`/admin/torrent-clients`)
 19. ✅ AdminCategories (`/admin/categories`)
 20. ✅ AdminMediaSettings (`/admin/media-settings`)
 
@@ -68,11 +63,6 @@ Route (app)                              Size     First Load JS
 ├ ○ /admin/categories                    1.77 kB         111 kB
 ├ ○ /admin/dashboard                     935 B           111 kB
 ├ ○ /admin/media-settings                2.06 kB         112 kB
-├ ○ /admin/torrent-candidates            1.8 kB          111 kB
-├ ○ /admin/torrent-clients               1.68 kB         111 kB
-├ ○ /admin/torrent-configs               1.86 kB         111 kB
-├ ○ /admin/torrent-indexes               2.03 kB         112 kB
-├ ○ /admin/torrents                      1.9 kB          111 kB
 ├ ○ /admin/users                         2.4 kB          112 kB
 ├ ○ /admin/videos                        3.4 kB          122 kB
 ├ ○ /login                               1.55 kB         120 kB

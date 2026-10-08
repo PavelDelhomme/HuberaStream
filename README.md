@@ -36,7 +36,7 @@ git checkout dev
 docker-compose up -d
 ```
 
-Pour le **déploiement Portainer / Nginx Proxy Manager** (réseau `web` partagé), voir `docs/DEPLOY-PORTAINER.md` et `docker-compose.portainer.yml`. Pour **Prowlarr + Radarr + Sonarr** : `make up-arr` ou `docker compose --profile arr up -d` (ports hôtes 3326–3328). Pour la **RAM / Next.js / alternatives** : `docs/FRONTEND-MEMOIRE.md`. Pour une **comparaison détaillée des stacks** (maintenabilité, prod, multimédia) : `docs/FRONTEND-STRATEGIE-COMPARATIVE.md`. Mesures : `bash scripts/benchmark-frontends.sh` (npm local) ou **`USE_DOCKER=1 bash scripts/benchmark-frontends.sh`** / **`make benchmark-frontends-docker`** si tu n’as pas Node sur l’hôte.
+Live : catalogue légal Pluto TV + Arte.tv sur `https://stream.hubera.cloud/app/` (`docker-compose.portainer.yml`). Pas de client torrent. Voir `docs/DEPLOY-PORTAINER.md`. Pour la **RAM / Next.js / alternatives** : `docs/FRONTEND-MEMOIRE.md`. Mesures : `bash scripts/benchmark-frontends.sh`.
 
 4. Les services seront disponibles sur:
    - Frontend (via Nginx): http://localhost:3300

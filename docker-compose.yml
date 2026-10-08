@@ -69,10 +69,6 @@ services:
       - /run/media/pactivisme/KILL:/run/media/pactivisme/KILL:ro
       # Points de montage macOS (si applicable)
       - /Volumes:/Volumes:ro
-      # Partager le volume de config qBittorrent pour configuration automatique
-      - qbittorrent_config:/config/qbittorrent:ro
-      # Même volume que Transmission/Radarr/Sonarr : chemins /downloads visibles pour import webhook
-      - torrent_storage:/downloads:ro
       # MODE DÉVELOPPEMENT: Monter le binaire compilé localement (si disponible)
       - ./.backend-bin:/app/bin:ro
     environment:
@@ -86,30 +82,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       VIDEO_STORAGE_PATH: /app/storage/videos
       THUMBNAIL_STORAGE_PATH: /app/storage/thumbnails
-      TORRENT_STORAGE_PATH: /app/storage/torrents
-      TORRENT_DOWNLOAD_PATH: /downloads
       ADMIN_EMAIL: ${ADMIN_EMAIL:-dev@delhomme.ovh}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminStreamMake2024!}
       PORT: 8080
-      # Configuration des clients torrent (ports internes Docker)
-      TRANSMISSION_URL: http://transmission:9091/transmission/rpc
-      TRANSMISSION_USER: ${TRANSMISSION_USER:-transmission}
-      TRANSMISSION_PASS: ${TRANSMISSION_PASS:-transmission}
-      QBITTORRENT_URL: http://qbittorrent:8080
-      QBITTORRENT_USER: ${QBITTORRENT_USER:-admin}
-      QBITTORRENT_PASS: ${QBITTORRENT_PASS:-adminadmin}
-      DELUGE_URL: http://deluge:8112/json
-      DELUGE_PASS: ${DELUGE_PASS:-deluge}
-      RTORRENT_URL: http://rtorrent:5000/RPC2
-      TORRENT_CLIENT_TYPE: ${TORRENT_CLIENT_TYPE:-transmission}
-      TORRENT_CLIENT_PATH: ${TORRENT_CLIENT_PATH:-http://transmission:9091/transmission/rpc}
-      # Prowlarr / Radarr / Sonarr : renseigner dans .env si profile « arr » (voir docs/DEPLOY-PORTAINER.md)
-      PROWLARR_URL: ${PROWLARR_URL:-}
-      RADARR_URL: ${RADARR_URL:-}
-      SONARR_URL: ${SONARR_URL:-}
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
-      PUBLIC_WEBHOOK_BASE_URL: ${PUBLIC_WEBHOOK_BASE_URL:-}
-      WEBHOOK_IMPORT_ENABLED: ${WEBHOOK_IMPORT_ENABLED:-false}
     ports:
       - "3301:8080"
       - "2345:2345" # Port pour Delve debugger
@@ -196,181 +171,11 @@ services:
       - streammake-network
     restart: unless-stopped
 
-  # Clients Torrent - Ports exposés sur 33XX
-  transmission:
-    image: linuxserver/transmission:latest
-    container_name: streammake-transmission
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-      # TRANSMISSION_WEB_HOME retiré car l'image ne supporte plus les UI tiers
-      - USER=transmission
-      - PASS=transmission
-    volumes:
-      - torrent_storage:/downloads
-      - torrent_config:/config
-      - torrent_watch:/watch # Dossier pour surveiller les nouveaux torrents
-    ports:
-      - "3305:9091" # Transmission Web UI
-    networks:
-      - streammake-network
-    restart: unless-stopped
-    # Créer les dossiers nécessaires au démarrage
-    entrypoint: >
-      /bin/sh -c " mkdir -p /downloads/complete /downloads/incomplete /watch 2>/dev/null || true && /init "
-
-  qbittorrent:
-    image: lscr.io/linuxserver/qbittorrent:latest
-    container_name: streammake-qbittorrent
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-      - WEBUI_PORT=8080
-      # Variables pour la configuration automatique
-      - QBITTORRENT_URL=http://localhost:3306
-      - QBITTORRENT_USER=${QBITTORRENT_USER:-admin}
-      - QBITTORRENT_PASS=${QBITTORRENT_PASS:-adminadmin}
-    volumes:
-      - torrent_storage:/downloads
-      - qbittorrent_config:/config
-    ports:
-      - "3306:8080" # qBittorrent Web UI
-    networks:
-      - streammake-network
-    restart: unless-stopped
-    depends_on:
-      - backend
-    # Le mot de passe sera configuré automatiquement par le backend au démarrage
-
-  deluge:
-    image: lscr.io/linuxserver/deluge:latest
-    container_name: streammake-deluge
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-      - DELUGE_LOGLEVEL=error
-    volumes:
-      - torrent_storage:/downloads
-      - deluge_config:/config
-    ports:
-      - "3307:8112" # Deluge Web UI
-      - "3309:58846" # Deluge Daemon
-    networks:
-      - streammake-network
-    restart: unless-stopped
-
-  rtorrent:
-    # Image mise à jour : l'ancienne image linuxserver/rutorrent est dépréciée
-    image: crazymax/rtorrent-rutorrent:latest
-    container_name: streammake-rtorrent
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-      - RTORRENT_DHT_PORT=6881
-      - RTORRENT_INC_PORT=50000
-      - RTORRENT_MAX_PEERS=200
-      - RTORRENT_MAX_PEERS_GLOBAL=200
-    volumes:
-      - torrent_storage:/data
-      - rtorrent_config:/home/rtorrent/.rtorrent
-    ports:
-      - "3308:80" # ruTorrent Web UI
-      - "3310:5000" # rTorrent XMLRPC
-      - "3311:6881" # rTorrent DHT port
-      - "3311:6881/udp"
-      - "3312:51413" # rTorrent Peer port (TCP)
-      - "3312:51413/udp" # rTorrent Peer port (UDP)
-    networks:
-      - streammake-network
-    restart: unless-stopped
-
-  # Suite *arr : indexer + films + séries (optionnel — docker compose --profile arr up -d)
-  prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
-    container_name: streammake-prowlarr
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-    volumes:
-      - prowlarr_config:/config
-      - torrent_storage:/downloads
-    ports:
-      - "3326:9696"
-    networks:
-      - streammake-network
-    restart: unless-stopped
-    profiles:
-      - arr
-
-  radarr:
-    image: lscr.io/linuxserver/radarr:latest
-    container_name: streammake-radarr
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-    volumes:
-      - radarr_config:/config
-      - torrent_storage:/downloads
-    ports:
-      - "3327:7878"
-    networks:
-      - streammake-network
-    restart: unless-stopped
-    profiles:
-      - arr
-
-  sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
-    container_name: streammake-sonarr
-    labels:
-      - "com.streammake.project=streammake"
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Paris
-    volumes:
-      - sonarr_config:/config
-      - torrent_storage:/downloads
-    ports:
-      - "3328:8989"
-    networks:
-      - streammake-network
-    restart: unless-stopped
-    profiles:
-      - arr
-
 volumes:
   postgres_data:
   redis_data:
   video_storage:
   thumbnail_storage:
-  torrent_storage:
-  torrent_config:
-  torrent_watch: # Volume pour le dossier watch de Transmission
-  qbittorrent_config:
-  deluge_config:
-  rtorrent_config:
-  prowlarr_config:
-  radarr_config:
-  sonarr_config:
 
 
 networks:
