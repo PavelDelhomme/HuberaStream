@@ -82,13 +82,10 @@ StreamMake/
 
 ## Fonctionnalités
 
-- Gestion des utilisateurs (inscription, connexion)
-- Upload et téléchargement de vidéos depuis des plateformes de streaming
-- Transcodage automatique en multiples formats (HLS, DASH, progressive)
-- Lecture vidéo multi-format
-- Playlists personnelles
-- Historique de visionnage
-- Recherche de vidéos
+- Bibliothèque web légale : **Pluto TV** + **Arte.tv** (APIs publiques / flux officiels, ToS)
+- Fiches titres + lecture in-app via lecteurs officiels (embed Arte, iframe Pluto)
+- Hubera ID : cookie suite `.hubera.cloud` (pas de mot de passe collecté ici)
+- **Jamais** torrents, DeviantArt, miroir pirate, ou contournement DRM
 
 ## Développement
 

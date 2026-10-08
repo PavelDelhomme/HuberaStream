@@ -1,16 +1,17 @@
 {
-  "generated": "2026-09-29T16:57:46Z",
+  "generated": "2026-10-08T16:55:00Z",
   "slug": "stream",
   "app": "hubera_stream",
   "name": "Hubera Stream",
-  "version": "0.0.0",
-  "versionCode": 0,
+  "version": "0.1.0",
+  "versionCode": 1,
   "min_supported": "0.0.0",
   "apk": "",
   "apk_url": "",
   "sha256": "",
   "mandatory": false,
-  "notes": "Hubera Stream (StreamMake). APK à venir.",
-  "published_at": "2026-09-29T16:57:46Z",
-  "legacy_stack": "hubera-stream"
+  "notes": "Catalogue légal Pluto TV + Arte.tv. APK à venir. forceUpdate: false.",
+  "published_at": "2026-10-08T16:55:00Z",
+  "legacy_stack": "hubera-stream",
+  "forceUpdate": false
 }
